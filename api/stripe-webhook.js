@@ -45,12 +45,25 @@ module.exports = async (req, res) => {
       const session = event.data.object;
       const userId = session.client_reference_id;
       const customerId = session.customer;
+      const mode = session.mode; // 'payment' (Único/PIX) ou 'subscription' (Recorrente/Cartão)
 
       if (userId) {
-        console.log(`Liberando acesso PRO para o usuário: ${userId}`);
+        console.log(`Liberando acesso PRO para o usuário: ${userId} (Modo: ${mode})`);
+        
+        let updateData = { is_pro: true, stripe_customer_id: customerId };
+        
+        if (mode === 'payment') {
+          // Pagamento único: expira em 30 dias
+          const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+          updateData.subscription_expires_at = expires;
+        } else {
+          // Assinatura: fica ativo até cancelar
+          updateData.subscription_expires_at = null;
+        }
+
         const { error } = await supabaseAdmin
           .from('profiles')
-          .update({ is_pro: true, stripe_customer_id: customerId })
+          .update(updateData)
           .eq('id', userId);
           
         if (error) console.error('Erro no Supabase:', error);

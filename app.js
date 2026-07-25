@@ -2223,7 +2223,7 @@ function registerAuthEventListeners() {
 
             } catch (err) {
                 console.error(err);
-                showAuthAlert(alertEl, 'error', 'Ocorreu um erro ao tentar conectar.');
+                showAuthAlert(alertEl, 'error', 'Erro: ' + err.message);
             }
         });
     }
@@ -2392,24 +2392,36 @@ function registerSubscriptionEventListeners() {
     }
 
     const btnStripeCheckout = document.getElementById('btn-stripe-checkout');
+    const btnStripePix = document.getElementById('btn-stripe-pix');
 
-    // Botão de Assinar Plano redireciona para o Stripe
+    // Função auxiliar para redirecionar para o Checkout
+    const handleCheckout = async (paymentLinkUrl) => {
+        const session = await window.db.getSession();
+        if (!session || !session.id) {
+            alert("Você precisa estar logado para assinar o plano.");
+            return;
+        }
+        if (paymentLinkUrl.includes('COLOQUE_SEU_LINK')) {
+            alert('Aviso: Substitua o texto COLOQUE_SEU_LINK no arquivo app.js pelo link real do Stripe.');
+            return;
+        }
+        const checkoutUrl = new URL(paymentLinkUrl);
+        checkoutUrl.searchParams.append('client_reference_id', session.id);
+        window.location.href = checkoutUrl.toString();
+    };
+
+    // Assinatura Recorrente (Cartão)
     if (btnStripeCheckout) {
-        btnStripeCheckout.addEventListener('click', async () => {
-            const session = await window.db.getSession();
-            if (!session || !session.id) {
-                alert("Você precisa estar logado para assinar o plano.");
-                return;
-            }
-            
-            // LINK DO SEU PAYMENT LINK DO STRIPE
-            const STRIPE_PAYMENT_LINK = 'https://buy.stripe.com/test_fZu7sL7Z47Mj8t96lCbMQ00'; 
-            
-            // Adiciona o client_reference_id para o webhook saber quem pagou
-            const checkoutUrl = new URL(STRIPE_PAYMENT_LINK);
-            checkoutUrl.searchParams.append('client_reference_id', session.id);
-            
-            window.location.href = checkoutUrl.toString();
+        btnStripeCheckout.addEventListener('click', () => {
+            handleCheckout('https://buy.stripe.com/test_fZu7sL7Z47Mj8t96lCbMQ00'); 
+        });
+    }
+
+    // Pagamento Único 1 Mês (PIX)
+    if (btnStripePix) {
+        btnStripePix.addEventListener('click', () => {
+            // LINK DO SEU PRODUTO DE "PAGAMENTO ÚNICO" PARA ACEITAR PIX
+            handleCheckout('COLOQUE_SEU_LINK_DO_PIX_AQUI'); 
         });
     }
 }

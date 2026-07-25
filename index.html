@@ -120,11 +120,13 @@
                     <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
                 </div>
                 <h4 style="font-size: 1.1rem; font-weight: 700; color: var(--text-primary);">Assinatura por Cartão (Recorrente)</h4>
-                <p class="payment-instruction" style="font-size: 0.85rem; line-height: 1.5; color: var(--text-muted);">
-                    Clique no botão abaixo para assinar via Mercado Pago. O valor é de R$ 29,90/mês e será cobrado automaticamente. A liberação de 30 dias é renovada a cada cobrança.
+                <p class="payment-instruction" style="font-size: 0.85rem; line-height: 1.5; color: var(--text-muted); margin-bottom: 1rem;">
+                    Escolha o plano ideal para você: <strong>Assinatura Mensal</strong> automática no cartão de crédito, ou acesso de <strong>1 Mês avulso via PIX</strong>.
                 </p>
-                <!-- O botão ganha um ID para podermos anexar o event listener que adiciona o user_id -->
-                <button id="btn-stripe-checkout" class="btn btn-primary btn-block">Assinar Plano PRO</button>
+                <div style="display: flex; gap: 10px; margin-bottom: 1rem;">
+                    <button id="btn-stripe-checkout" class="btn btn-primary" style="flex: 1;">Assinar (Cartão)</button>
+                    <button id="btn-stripe-pix" class="btn btn-secondary" style="flex: 1; background-color: #21b183; border-color: #21b183; color: white;">1 Mês (PIX)</button>
+                </div>
             </div>
         </div>
     </div>
