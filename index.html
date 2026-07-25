@@ -121,11 +121,12 @@
                 </div>
                 <h4 style="font-size: 1.1rem; font-weight: 700; color: var(--text-primary);">Assinatura por Cartão (Recorrente)</h4>
                 <p class="payment-instruction" style="font-size: 0.85rem; line-height: 1.5; color: var(--text-muted); margin-bottom: 1rem;">
-                    Escolha o plano ideal para você: <strong>Assinatura Mensal</strong> automática no cartão de crédito, ou acesso de <strong>1 Mês avulso via PIX</strong>.
+                    Escolha o plano ideal: <strong>Assinatura Mensal</strong> (Cartão) ou <strong>1 Mês Avulso</strong> (PIX/Cartão).
                 </p>
-                <div style="display: flex; gap: 10px; margin-bottom: 1rem;">
-                    <button id="btn-stripe-checkout" class="btn btn-primary" style="flex: 1;">Assinar (Cartão)</button>
-                    <button id="btn-stripe-pix" class="btn btn-secondary" style="flex: 1; background-color: #21b183; border-color: #21b183; color: white;">1 Mês (PIX)</button>
+                <div style="display: flex; gap: 10px; margin-bottom: 1rem; flex-direction: column;">
+                    <button id="btn-mp-subscription" class="btn btn-primary" style="background-color: #009ee3; border-color: #009ee3;">Assinar Mensal (Cartão)</button>
+                    <button id="btn-mp-checkout" class="btn btn-secondary" style="background-color: #21b183; border-color: #21b183; color: white;">1 Mês Avulso (PIX / Cartão)</button>
+                    <p id="mp-loading" style="display: none; font-size: 0.8rem; color: #009ee3; text-align: center; margin-top: 5px;">Gerando link seguro do Mercado Pago...</p>
                 </div>
             </div>
         </div>

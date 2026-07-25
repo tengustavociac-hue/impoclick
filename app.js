@@ -2391,38 +2391,54 @@ function registerSubscriptionEventListeners() {
         });
     }
 
-    const btnStripeCheckout = document.getElementById('btn-stripe-checkout');
-    const btnStripePix = document.getElementById('btn-stripe-pix');
+    const btnMpCheckout = document.getElementById('btn-mp-checkout');
+    const btnMpSubscription = document.getElementById('btn-mp-subscription');
+    const mpLoading = document.getElementById('mp-loading');
 
-    // Função auxiliar para redirecionar para o Checkout
-    const handleCheckout = async (paymentLinkUrl) => {
+    const handleMpClick = async (apiEndpoint, btnElement) => {
         const session = await window.db.getSession();
         if (!session || !session.id) {
             alert("Você precisa estar logado para assinar o plano.");
             return;
         }
-        if (paymentLinkUrl.includes('COLOQUE_SEU_LINK')) {
-            alert('Aviso: Substitua o texto COLOQUE_SEU_LINK no arquivo app.js pelo link real do Stripe.');
-            return;
+        
+        // UI Feedback
+        if(btnMpCheckout) btnMpCheckout.disabled = true;
+        if(btnMpSubscription) btnMpSubscription.disabled = true;
+        if(mpLoading) mpLoading.style.display = 'block';
+        
+        try {
+            const response = await fetch(apiEndpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: session.id })
+            });
+            
+            const data = await response.json();
+            
+            if (data.init_point) {
+                window.location.href = data.init_point;
+            } else {
+                alert('Erro ao gerar link de pagamento: ' + (data.error || 'Erro desconhecido'));
+                if(btnMpCheckout) btnMpCheckout.disabled = false;
+                if(btnMpSubscription) btnMpSubscription.disabled = false;
+                if(mpLoading) mpLoading.style.display = 'none';
+            }
+        } catch (error) {
+            console.error('Erro na chamada MP:', error);
+            alert('Erro de conexão ao gerar pagamento.');
+            if(btnMpCheckout) btnMpCheckout.disabled = false;
+            if(btnMpSubscription) btnMpSubscription.disabled = false;
+            if(mpLoading) mpLoading.style.display = 'none';
         }
-        const checkoutUrl = new URL(paymentLinkUrl);
-        checkoutUrl.searchParams.append('client_reference_id', session.id);
-        window.location.href = checkoutUrl.toString();
     };
 
-    // Assinatura Recorrente (Cartão)
-    if (btnStripeCheckout) {
-        btnStripeCheckout.addEventListener('click', () => {
-            handleCheckout('https://buy.stripe.com/test_fZu7sL7Z47Mj8t96lCbMQ00'); 
-        });
+    if (btnMpCheckout) {
+        btnMpCheckout.addEventListener('click', () => handleMpClick('/api/mp-checkout', btnMpCheckout));
     }
-
-    // Pagamento Único 1 Mês (PIX)
-    if (btnStripePix) {
-        btnStripePix.addEventListener('click', () => {
-            // LINK DO SEU PRODUTO DE "PAGAMENTO ÚNICO" PARA ACEITAR PIX
-            handleCheckout('COLOQUE_SEU_LINK_DO_PIX_AQUI'); 
-        });
+    
+    if (btnMpSubscription) {
+        btnMpSubscription.addEventListener('click', () => handleMpClick('/api/mp-subscription', btnMpSubscription));
     }
 }
 

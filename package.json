@@ -5,6 +5,7 @@
   "scripts": {},
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",
-    "stripe": "^14.14.0"
+    "stripe": "^14.14.0",
+    "mercadopago": "^2.0.7"
   }
 }
