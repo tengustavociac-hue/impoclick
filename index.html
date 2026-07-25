@@ -123,20 +123,8 @@
                 <p class="payment-instruction" style="font-size: 0.85rem; line-height: 1.5; color: var(--text-muted);">
                     Clique no botão abaixo para assinar via Mercado Pago. O valor é de R$ 29,90/mês e será cobrado automaticamente. A liberação de 30 dias é renovada a cada cobrança.
                 </p>
-                <a href="https://mpago.la/2vWGgwT" target="_blank" class="btn btn-primary btn-block">Assinar Plano Recorrente</a>
-            </div>
-
-            <!-- Common Simulation panel -->
-            <div class="simulation-panel" style="margin-top: 1.5rem; border-top: 1px solid var(--border-color); padding-top: 1.25rem; width: 100%;">
-                <div style="background-color: var(--bg-app); border: 1px solid var(--border-color); padding: 0.85rem; border-radius: var(--border-radius-md); text-align: left; font-size: 0.75rem; line-height: 1.4; color: var(--text-primary); margin-bottom: 0.75rem;">
-                    💡 **Nota de Protótipo**: Como este site está rodando localmente sem um banco de dados ativo, clique no botão abaixo para simular a liberação instantânea de 30 dias após efetuar o seu pagamento.
-                </div>
-                <button id="btn-confirm-real-payment" class="btn btn-secondary btn-block">Confirmar Pagamento Realizado</button>
-            </div>
-
-            <div id="payment-loading" class="payment-loading hidden">
-                <div class="spinner"></div>
-                <p>Confirmando transação...</p>
+                <!-- O botão ganha um ID para podermos anexar o event listener que adiciona o user_id -->
+                <button id="btn-stripe-checkout" class="btn btn-primary btn-block">Assinar Plano PRO</button>
             </div>
         </div>
     </div>

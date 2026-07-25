@@ -2201,7 +2201,13 @@ function registerAuthEventListeners() {
                 const { data, error } = await window.db.signIn(email, password);
                 
                 if (error) {
-                    showAuthAlert(alertEl, 'error', 'E-mail ou senha incorretos.');
+                    let msg = 'E-mail ou senha incorretos.';
+                    if (error.message && error.message.includes('Email not confirmed')) {
+                        msg = 'Por favor, confirme seu e-mail (verifique a caixa de entrada).';
+                    } else if (error.message) {
+                        msg = error.message.includes('Invalid login') ? msg : error.message;
+                    }
+                    showAuthAlert(alertEl, 'error', msg);
                     return;
                 }
 
@@ -2321,32 +2327,18 @@ async function updateUserInLocalStorage(user) {
 function checkSubscriptionStatus(user) {
     if (!user) return { hasAccess: false, isTrial: false, daysRemaining: 0, isSubscribed: false };
     
-    // If they have had a subscription (even if currently expired)
-    if (user.subscriptionExpiresAt) {
-        if (user.isSubscribed) {
-            const timeLeft = user.subscriptionExpiresAt - Date.now();
-            if (timeLeft > 0) {
-                const days = Math.ceil(timeLeft / (1000 * 24 * 60 * 60));
-                return { hasAccess: true, isTrial: false, daysRemaining: days, isSubscribed: true };
-            } else {
-                // Subscription expired! Auto-expire user
-                user.isSubscribed = false;
-                updateUserInLocalStorage(user);
-            }
-        }
-        // Since they had a subscription, they do not get trial access anymore
-        return { hasAccess: false, isTrial: false, daysRemaining: 0, isSubscribed: false };
+    // Novo padrão: Webhook do Stripe atualiza a coluna is_pro no banco
+    if (user.is_pro) {
+        return { hasAccess: true, isTrial: false, daysRemaining: 30, isSubscribed: true };
     }
     
-    // Fallback logic for active subscriptions without subscriptionExpiresAt (legacy accounts)
-    if (user.isSubscribed) {
-        user.subscriptionExpiresAt = Date.now() + (30 * 24 * 60 * 60 * 1000);
-        updateUserInLocalStorage(user);
+    // Retrocompatibilidade
+    if (user.is_subscribed || user.isSubscribed) {
         return { hasAccess: true, isTrial: false, daysRemaining: 30, isSubscribed: true };
     }
     
     // Trial check (7 days = 604800000 ms) for new accounts
-    const createdAt = user.createdAt || Date.now();
+    const createdAt = user.created_at ? new Date(user.created_at).getTime() : Date.now();
     const expiryTime = createdAt + (7 * 24 * 60 * 60 * 1000);
     const timeLeft = expiryTime - Date.now();
     
@@ -2399,43 +2391,26 @@ function registerSubscriptionEventListeners() {
         });
     }
 
-    // Simulated confirmation
-    if (btnConfirmRealPayment) {
-        btnConfirmRealPayment.addEventListener('click', () => {
-            triggerPaymentApproval();
-        });
-    }
+    const btnStripeCheckout = document.getElementById('btn-stripe-checkout');
 
-    function triggerPaymentApproval() {
-        if (paymentLoading) paymentLoading.classList.remove('hidden');
-        
-        setTimeout(() => {
-            try {
-                // Calculate expiration date (30 days from now)
-                const expiresAt = Date.now() + (30 * 24 * 60 * 60 * 1000);
-                
-                const updatedUser = { 
-                    ...state.currentUser, 
-                    isSubscribed: true, 
-                    subscriptionExpiresAt: expiresAt 
-                };
-                
-                // Update database & session
-                updateUserInLocalStorage(updatedUser);
-                
-                // Hide modal and loading overlay
-                if (paymentLoading) paymentLoading.classList.add('hidden');
-                if (paymentModal) paymentModal.classList.add('hidden');
-                
-                // Refresh UI
-                updateUI();
-                alert('Assinatura ativada com sucesso por 30 dias! Obrigado pelo apoio.');
-            } catch (err) {
-                console.error(err);
-                alert('Erro ao processar assinatura.');
-                if (paymentLoading) paymentLoading.classList.add('hidden');
+    // Botão de Assinar Plano redireciona para o Stripe
+    if (btnStripeCheckout) {
+        btnStripeCheckout.addEventListener('click', async () => {
+            const session = await window.db.getSession();
+            if (!session || !session.id) {
+                alert("Você precisa estar logado para assinar o plano.");
+                return;
             }
-        }, 1500);
+            
+            // LINK DO SEU PAYMENT LINK DO STRIPE
+            const STRIPE_PAYMENT_LINK = 'https://buy.stripe.com/test_fZu7sL7Z47Mj8t96lCbMQ00'; 
+            
+            // Adiciona o client_reference_id para o webhook saber quem pagou
+            const checkoutUrl = new URL(STRIPE_PAYMENT_LINK);
+            checkoutUrl.searchParams.append('client_reference_id', session.id);
+            
+            window.location.href = checkoutUrl.toString();
+        });
     }
 }
 
