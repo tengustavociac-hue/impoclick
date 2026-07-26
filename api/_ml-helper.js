@@ -4,12 +4,20 @@ const ML_BASE = 'https://api.mercadolibre.com';
 const clientId = process.env.ML_CLIENT_ID;
 const clientSecret = process.env.ML_CLIENT_SECRET;
 
-const supabaseAdmin = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY
-);
+let supabaseAdmin = null;
+if (process.env.SUPABASE_URL) {
+    supabaseAdmin = createClient(
+        process.env.SUPABASE_URL,
+        process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY
+    );
+} else {
+    console.error('SUPABASE_URL não configurado nas variáveis de ambiente da Vercel.');
+}
 
 async function refreshMlToken(userId, refreshToken) {
+    if (!supabaseAdmin) {
+        throw new Error('SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY não configurados na Vercel.');
+    }
     if (!clientId || !clientSecret) {
         throw new Error("Variáveis ML_CLIENT_ID e ML_CLIENT_SECRET não configuradas na Vercel.");
     }
@@ -51,6 +59,9 @@ async function refreshMlToken(userId, refreshToken) {
 }
 
 async function getMlToken(userId) {
+    if (!supabaseAdmin) {
+        throw new Error('SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY não configurados na Vercel.');
+    }
     const { data: profile, error } = await supabaseAdmin
         .from('profiles')
         .select('ml_access_token, ml_refresh_token, ml_token_expires_at, ml_user_id')

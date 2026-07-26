@@ -17,6 +17,10 @@ module.exports = async (req, res) => {
     const redirectUri = process.env.ML_REDIRECT_URI || `https://${req.headers.host}/api/ml-callback`;
 
     try {
+        if (!supabaseAdmin) {
+            throw new Error('SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY não configurados na Vercel.');
+        }
+
         // Trocar o código de autorização pelos tokens de acesso
         const body = new URLSearchParams({
             grant_type: 'authorization_code',
