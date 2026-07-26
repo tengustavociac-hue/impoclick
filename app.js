@@ -3988,8 +3988,7 @@ function syncSettingsUI() {
             expWrapper.style.display = 'none';
         }
     }
-    
-        });
+
     // Delegated click handler for "Conectar Conta ML" in Viabilidade
     // This works even if the button is re‑created by any UI update.
     document.addEventListener('click', (e) => {
@@ -4050,9 +4049,6 @@ function syncSettingsUI() {
     const btnViabConnectMl = document.getElementById('btn-viab-connect-ml');
     const statusTextViabMl = document.getElementById('viab-ml-status-text');
     if (btnViabConnectMl && statusTextViabMl) {
-            window.location.href = url;
-        });
-        
         mlApiFetch('/api/ml-status').then(res => {
             if (res && res.connected) {
                 statusTextViabMl.textContent = `Conectado como: ${res.nickname}`;
