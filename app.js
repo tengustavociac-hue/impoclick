@@ -3368,31 +3368,6 @@ function initFeasibilityModule() {
     const panelSimples = document.getElementById('viab-tab-simples');
     if (!panelSimples) return;
 
-    // ML Status on Viability tab
-    function checkMLStatusViability() {
-        const btnConnectMl = document.getElementById('btn-viab-connect-ml');
-        const statusTextMl = document.getElementById('viab-ml-status-text');
-        
-        if (btnConnectMl && statusTextMl && state.currentUser) {
-            btnConnectMl.onclick = () => {
-                window.location.href = `/api/ml-auth?userId=${state.currentUser.id}`;
-            };
-            
-            mlApiFetch('/api/ml-status').then(res => {
-                if (res && res.connected) {
-                    statusTextMl.textContent = `Conectado como: ${res.nickname}`;
-                    statusTextMl.style.color = 'var(--success)';
-                    btnConnectMl.style.display = 'none';
-                } else {
-                    statusTextMl.textContent = 'Não conectado. Algumas simulações automáticas usarão estimativas padrão.';
-                    statusTextMl.style.color = 'var(--danger)';
-                    btnConnectMl.style.display = 'block';
-                }
-            });
-        }
-    }
-    checkMLStatusViability();
-
     function brl(v) {
         return `R$ ${(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     }
@@ -4065,6 +4040,31 @@ function syncSettingsUI() {
                 btnConnectMl.className = 'btn btn-primary btn-sm';
                 btnConnectMl.style.backgroundColor = '#FFE600';
                 btnConnectMl.style.color = '#2D3277';
+            }
+        });
+    }
+
+    // Sincronizar status do Mercado Livre (Aba Viabilidade)
+    const btnViabConnectMl = document.getElementById('btn-viab-connect-ml');
+    const statusTextViabMl = document.getElementById('viab-ml-status-text');
+    if (btnViabConnectMl && statusTextViabMl && state.currentUser) {
+        btnViabConnectMl.onclick = () => {
+            window.location.href = `/api/ml-auth?userId=${state.currentUser.id}`;
+        };
+        
+        mlApiFetch('/api/ml-status').then(res => {
+            if (res && res.connected) {
+                statusTextViabMl.textContent = `Conectado como: ${res.nickname}`;
+                statusTextViabMl.style.color = 'var(--success)';
+                btnViabConnectMl.textContent = 'Reconectar';
+                btnViabConnectMl.className = 'btn btn-secondary btn-sm';
+            } else {
+                statusTextViabMl.textContent = 'Não conectado. Algumas simulações automáticas usarão estimativas padrão.';
+                statusTextViabMl.style.color = 'var(--danger)';
+                btnViabConnectMl.textContent = 'Conectar Conta ML';
+                btnViabConnectMl.className = 'btn btn-primary btn-sm';
+                btnViabConnectMl.style.backgroundColor = '#FFE600';
+                btnViabConnectMl.style.color = '#2D3277';
             }
         });
     }
