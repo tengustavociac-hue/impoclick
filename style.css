@@ -307,7 +307,10 @@ h1, h2, h3, .card-title, .modal-header h3, .auth-header h2, .nav-logo span, .bra
 
 @media (max-width: 1024px) {
     .app-main {
-        grid-template-columns: 1fr;
+        /* minmax(0, 1fr) instead of 1fr — a bare 1fr track has an implicit
+           min-width:auto, so it grows to fit non-shrinking content (e.g. the
+           radio-tile-group below) instead of respecting the viewport width. */
+        grid-template-columns: minmax(0, 1fr);
     }
 }
 
@@ -440,7 +443,7 @@ label {
 
 @media (max-width: 768px) {
     .grid-2, .grid-3 {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
     }
 }
 
@@ -552,7 +555,7 @@ label {
 /* Radio Tiles Component */
 .radio-tile-group {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.75rem;
     margin-top: 0.5rem;
 }
@@ -644,7 +647,7 @@ label {
 
 @media (max-width: 900px) {
     .product-form {
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
     .name-field {
         grid-column: span 2;
@@ -828,13 +831,13 @@ tfoot th, tfoot td {
 
 @media (max-width: 1024px) {
     .results-kpi-grid {
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 
 @media (max-width: 580px) {
     .results-kpi-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
     }
 }
 
@@ -943,7 +946,7 @@ tfoot th, tfoot td {
 
 @media (max-width: 900px) {
     .grid-2-desktop {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
     }
 }
 
@@ -2292,18 +2295,30 @@ tfoot th, tfoot td {
         padding: 1rem;
         height: auto;
     }
+    /* Both dropdown groups (Documentações/Cadastros) render permanently expanded —
+       keep the items in normal flow instead of position:absolute, otherwise two
+       open groups land on the same coordinates and cover each other's links. */
+    .nav-dropdown-group {
+        flex: 1 1 100%;
+        width: 100%;
+    }
     .nav-dropdown-items {
-        position: absolute;
-        top: 100%;
-        left: 0;
         background-color: var(--bg-card);
         border: 1px solid var(--border-color);
-        backdrop-filter: var(--glass-blur);
-        -webkit-backdrop-filter: var(--glass-blur);
         padding: 0.5rem;
         border-radius: var(--border-radius-md);
-        box-shadow: var(--card-shadow);
-        z-index: 101;
+    }
+
+    /* .header-actions holds 5+ buttons/badges in a single nowrap flex row —
+       fine on desktop, but it overflows the viewport well past its own box
+       on phones/tablets since nothing here was allowed to wrap. */
+    .app-header {
+        flex-wrap: wrap;
+        row-gap: 0.75rem;
+    }
+    .header-actions {
+        flex-wrap: wrap;
+        width: 100%;
     }
 }
 
@@ -2449,19 +2464,31 @@ tfoot th, tfoot td {
 /* Responsive */
 @media (max-width: 1100px) {
     .viab-kpi-grid {
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 
 @media (max-width: 700px) {
     .viab-kpi-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
     }
     .viab-form-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
     }
     .viab-span-2 {
         grid-column: span 1;
+    }
+}
+
+/* .results-tab-bar has no wrap, and 3 long labels (Importação Simplificada /
+   Importação Formal / Comparação de Mercado) overflow narrow screens. */
+@media (max-width: 640px) {
+    .results-tab-bar {
+        flex-wrap: wrap;
+    }
+    .results-tab-btn {
+        padding: 0.5rem 0.85rem;
+        font-size: 0.8rem;
     }
 }
 
