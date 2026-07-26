@@ -3561,7 +3561,7 @@ function initFeasibilityModule() {
             return;
         }
 
-        const data = await mlApiFetch(`/api/ml/category?q=${encodeURIComponent(query)}`);
+        const data = await mlApiFetch(`/api/ml-category?q=${encodeURIComponent(query)}`);
         mktCategoryInfoEl.classList.remove('hidden');
         if (data && data.categoryId) {
             resolvedCategoryId = data.categoryId;
@@ -3585,7 +3585,7 @@ function initFeasibilityModule() {
         const price = num('mkt-f-price');
         if (!resolvedCategoryId || price <= 0) return;
 
-        const data = await mlApiFetch(`/api/ml/fee?price=${encodeURIComponent(price)}&category=${encodeURIComponent(resolvedCategoryId)}`);
+        const data = await mlApiFetch(`/api/ml-fee?price=${encodeURIComponent(price)}&category=${encodeURIComponent(resolvedCategoryId)}`);
         if (data && feeInput) {
             feeInput.value = data.percentageFee;
             if (feeNote) feeNote.textContent = `Taxa real da API para "${resolvedCategoryName}", anúncio ${data.listingTypeName}: ${data.percentageFee}%.`;
@@ -3619,7 +3619,7 @@ function initFeasibilityModule() {
             mktBestSellerInfoEl.className = 'ncm-preview warning';
             mktBestSellerInfoEl.innerHTML = '<div>Consultando o ranking de mais vendidos...</div>';
 
-            const data = await mlApiFetch(`/api/ml/best-seller?category=${encodeURIComponent(resolvedCategoryId)}`);
+            const data = await mlApiFetch(`/api/ml-best-seller?category=${encodeURIComponent(resolvedCategoryId)}`);
             if (data && data.id) {
                 mktBestSellerInfoEl.className = 'ncm-preview success';
                 mktBestSellerInfoEl.innerHTML = `
@@ -3653,7 +3653,7 @@ function initFeasibilityModule() {
         // Tenta o valor real via API (precisa de um preço de venda para simular a cobrança)
         if (price > 0) {
             const data = await mlApiFetch(
-                `/api/ml/freight?weight=${weightG}&length=${lengthCm}&width=${widthCm}&height=${heightCm}&price=${price}`
+                `/api/ml-freight?weight=${weightG}&length=${lengthCm}&width=${widthCm}&height=${heightCm}&price=${price}`
             );
             if (data && typeof data.cost === 'number') {
                 if (noteEl) {
