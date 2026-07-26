@@ -17,6 +17,10 @@ module.exports = async (req, res) => {
     const client = new MercadoPagoConfig({ accessToken: process.env.MP_ACCESS_TOKEN });
     const preference = new Preference(client);
 
+    // Usa o domínio estável configurado, ou cai para o host da própria requisição
+    // (evita depender da URL de deployment que muda a cada deploy na Vercel).
+    const baseUrl = process.env.SITE_URL || `https://${req.headers.host}`;
+
     try {
         const result = await preference.create({
             body: {
@@ -31,13 +35,13 @@ module.exports = async (req, res) => {
                 // O external_reference é o nosso salva-vidas para saber quem pagou!
                 external_reference: userId,
                 back_urls: {
-                    success: 'https://impoclick-b4mys5bbs-tengustavociac-hues-projects.vercel.app',
-                    failure: 'https://impoclick-b4mys5bbs-tengustavociac-hues-projects.vercel.app',
-                    pending: 'https://impoclick-b4mys5bbs-tengustavociac-hues-projects.vercel.app'
+                    success: baseUrl,
+                    failure: baseUrl,
+                    pending: baseUrl
                 },
                 auto_return: 'approved',
                 // O webhook url deve ser HTTPS público (a vercel fornece isso)
-                notification_url: 'https://impoclick-b4mys5bbs-tengustavociac-hues-projects.vercel.app/api/mp-webhook'
+                notification_url: `${baseUrl}/api/mp-webhook`
             }
         });
 

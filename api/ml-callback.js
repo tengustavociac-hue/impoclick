@@ -80,6 +80,6 @@ module.exports = async (req, res) => {
         
     } catch (err) {
         console.error('Erro no callback do ML:', err);
-        res.status(500).send('Erro interno no servidor ao processar o callback do Mercado Livre.');
+        res.status(500).send('Erro interno no servidor ao processar o callback do Mercado Livre: ' + err.message);
     }
 };

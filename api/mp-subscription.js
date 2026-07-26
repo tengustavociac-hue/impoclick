@@ -14,21 +14,25 @@ module.exports = async (req, res) => {
     const client = new MercadoPagoConfig({ accessToken: process.env.MP_ACCESS_TOKEN });
     const preApproval = new PreApproval(client);
 
+    // Usa o domínio estável configurado, ou cai para o host da própria requisição
+    // (evita depender da URL de deployment que muda a cada deploy na Vercel).
+    const baseUrl = process.env.SITE_URL || `https://${req.headers.host}`;
+
     try {
         const result = await preApproval.create({
             body: {
                 reason: 'Assinatura Mensal PRO',
                 external_reference: userId,
-                // O email do pagador é obrigatório no SDK antigo, mas no novo geralmente não, 
+                // O email do pagador é obrigatório no SDK antigo, mas no novo geralmente não,
                 // porém vamos colocar um placeholder caso o MP exija.
-                payer_email: "cliente@impoclick.com", 
+                payer_email: "cliente@impoclick.com",
                 auto_recurring: {
                     frequency: 1,
                     frequency_type: 'months',
                     transaction_amount: 29.90,
                     currency_id: 'BRL'
                 },
-                back_url: 'https://impoclick-b4mys5bbs-tengustavociac-hues-projects.vercel.app/index.html'
+                back_url: `${baseUrl}/index.html`
             }
         });
 
