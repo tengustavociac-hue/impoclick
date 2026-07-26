@@ -1729,9 +1729,15 @@
                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                         Pesquisar Concorrente no Mercado Livre
                     </h2>
-                    <p class="small" style="color: var(--text-muted); margin-bottom: 1.25rem;">
-                        Conectado à sua conta Mercado Livre via servidor local: a categoria é detectada automaticamente pelo nome do produto e a taxa de venda vem direto da calculadora oficial. O preço do concorrente ainda precisa ser conferido manualmente — a API não libera o preço de outros vendedores para este app.
-                    </p>
+                    <div id="viab-ml-status-container" style="background-color: var(--bg-app); border: 1px solid var(--border-color); border-radius: var(--border-radius-md); padding: 0.75rem 1rem; font-size: 0.85rem; display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem;">
+                        <div>
+                            <strong>Status Mercado Livre</strong>
+                            <p id="viab-ml-status-text" style="margin: 0; color: var(--text-muted); font-size: 0.75rem;">Verificando conexão...</p>
+                        </div>
+                        <button type="button" id="btn-viab-connect-ml" class="btn btn-primary btn-sm" style="background-color: #FFE600; color: #2D3277; border: none; font-weight: bold; display: none;">
+                            Conectar Conta ML
+                        </button>
+                    </div>
                     <div class="viab-form-grid">
                         <div class="form-group viab-span-2">
                             <label>Nome / Tipo do Produto</label>
@@ -1763,7 +1769,7 @@
                         Frete da Plataforma (Mercado Envios) — por Peso e Dimensões
                     </h2>
                     <p class="small" style="color: var(--text-muted); margin-bottom: 1.25rem;">
-                        Conectado à sua conta: o frete é calculado pela calculadora oficial do Mercado Livre (mesma regra do peso faturável — o maior valor entre peso real e <strong>peso cubado</strong>, comprimento × largura × altura ÷ 6000), usando a reputação e o tipo de logística da sua conta. Se o servidor local não estiver disponível, usamos uma estimativa por faixa de peso como alternativa.
+                        O frete é calculado pela calculadora oficial do Mercado Livre (mesma regra do peso faturável — o maior valor entre peso real e <strong>peso cubado</strong>, comprimento × largura × altura ÷ 6000), usando a reputação e o tipo de logística da sua conta. Se o servidor local não estiver disponível, usamos uma estimativa por faixa de peso como alternativa.
                     </p>
                     <div class="viab-form-grid">
                         <div class="form-group">
