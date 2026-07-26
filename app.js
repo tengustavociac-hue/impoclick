@@ -252,6 +252,17 @@ function drawSparkline(container, data) {
 
 // INICIALIZAÇÃO
 document.addEventListener('DOMContentLoaded', async () => {
+    // Check if coming back from ML oauth
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('ml_connected') === 'true') {
+        alert('Conta do Mercado Livre conectada com sucesso!');
+        window.history.replaceState({}, document.title, window.location.pathname);
+        // Switch to settings view
+        setTimeout(() => {
+            const btnSettings = document.querySelector('[data-view="view-settings"]');
+            if (btnSettings) btnSettings.click();
+        }, 500);
+    }
     await checkAuthSession();
     await loadState();
     registerEventListeners();
@@ -3222,21 +3233,25 @@ function initDocumentsModule() {
 // 5. IMPORT VIABILITY CALCULATOR MODULE (Previsibilidade de Custo)
 // Regras fiscais alinhadas às usadas na Calculadora de Rateio (ver getProductTaxRates / calculateItemTaxes acima).
 
-// Backend local (server/) que guarda as credenciais OAuth do Mercado Livre e faz proxy
-// autenticado para /domain_discovery, /highlights, /listing_prices e /shipping_options.
-// Se não estiver rodando, o app cai automaticamente nas tabelas de referência abaixo.
-const ML_SERVER_URL = 'http://localhost:4000';
-
+// Backend online (Vercel) que gerencia os tokens OAuth do Mercado Livre
+// para o usuário atualmente logado.
 async function mlApiFetch(path) {
+    if (!state.currentUser) return null;
+    
     try {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 4000);
-        const resp = await fetch(`${ML_SERVER_URL}${path}`, { signal: controller.signal });
+        const timeout = setTimeout(() => controller.abort(), 6000); // Mercado Livre pode demorar
+        const resp = await fetch(path, { 
+            headers: {
+                'user-token': state.currentUser.id
+            },
+            signal: controller.signal 
+        });
         clearTimeout(timeout);
         if (!resp.ok) return null;
         return await resp.json();
     } catch (err) {
-        return null; // servidor local indisponível — quem chamou decide o fallback
+        return null; // backend indisponível ou erro de rede — quem chamou decide o fallback
     }
 }
 
@@ -3999,6 +4014,34 @@ function syncSettingsUI() {
     } else {
         btnLight.className = 'btn btn-secondary btn-sm';
         btnDark.className = 'btn btn-primary btn-sm';
+    }
+
+    // Sincronizar status do Mercado Livre
+    const btnConnectMl = document.getElementById('btn-connect-ml');
+    const statusTextMl = document.getElementById('ml-connection-status');
+    if (btnConnectMl && statusTextMl && state.currentUser) {
+        btnConnectMl.onclick = () => {
+            window.location.href = `/api/ml-auth?userId=${state.currentUser.id}`;
+        };
+        
+        statusTextMl.textContent = 'Verificando conexão...';
+        statusTextMl.style.color = 'var(--text-muted)';
+        
+        mlApiFetch('/api/ml-status').then(res => {
+            if (res && res.connected) {
+                statusTextMl.textContent = `Conectado como: ${res.nickname}`;
+                statusTextMl.style.color = 'var(--success)';
+                btnConnectMl.textContent = 'Reconectar';
+                btnConnectMl.className = 'btn btn-secondary btn-sm';
+            } else {
+                statusTextMl.textContent = 'Não conectado';
+                statusTextMl.style.color = 'var(--text-muted)';
+                btnConnectMl.textContent = 'Conectar Conta';
+                btnConnectMl.className = 'btn btn-primary btn-sm';
+                btnConnectMl.style.backgroundColor = '#FFE600';
+                btnConnectMl.style.color = '#2D3277';
+            }
+        });
     }
 
     btnLight.onclick = () => {
