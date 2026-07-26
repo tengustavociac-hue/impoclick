@@ -3990,7 +3990,18 @@ function syncSettingsUI() {
     }
     
         });
-    }
+    // Delegated click handler for "Conectar Conta ML" in Viabilidade
+    // This works even if the button is re‑created by any UI update.
+    document.addEventListener('click', (e) => {
+      if (e.target && e.target.id === 'btn-viab-connect-ml') {
+        e.preventDefault();
+        const url = (state.currentUser && state.currentUser.id)
+          ? `/api/ml-auth?userId=${state.currentUser.id}`
+          : '/api/ml-auth';
+        window.location.href = url;
+      }
+    });
+
     const btnLight = document.getElementById('btn-theme-light-choice');
     const btnDark = document.getElementById('btn-theme-dark-choice');
     
@@ -4039,11 +4050,6 @@ function syncSettingsUI() {
     const btnViabConnectMl = document.getElementById('btn-viab-connect-ml');
     const statusTextViabMl = document.getElementById('viab-ml-status-text');
     if (btnViabConnectMl && statusTextViabMl) {
-        btnViabConnectMl.addEventListener('click', (e) => {
-            e.preventDefault();
-            const url = (state.currentUser && state.currentUser.id)
-                ? `/api/ml-auth?userId=${state.currentUser.id}`
-                : '/api/ml-auth';
             window.location.href = url;
         });
         
