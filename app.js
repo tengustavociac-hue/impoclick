@@ -2715,6 +2715,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // 1. MENU ROUTING & DROPDOWN ACCORDION
 function initDashboardNavigation() {
+    // Mobile nav drawer (hamburger toggle) — collapsed by default on narrow
+    // screens so the user doesn't have to scroll past the whole menu to
+    // reach the page content.
+    const navMenu = document.getElementById('nav-menu');
+    const navToggleBtn = document.getElementById('btn-mobile-nav-toggle');
+    if (navToggleBtn && navMenu) {
+        navToggleBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isOpen = navMenu.classList.toggle('nav-menu-open');
+            navToggleBtn.setAttribute('aria-expanded', String(isOpen));
+            navToggleBtn.classList.toggle('active', isOpen);
+        });
+    }
+    function closeMobileNavDrawer() {
+        if (navMenu) navMenu.classList.remove('nav-menu-open');
+        if (navToggleBtn) {
+            navToggleBtn.setAttribute('aria-expanded', 'false');
+            navToggleBtn.classList.remove('active');
+        }
+    }
+
     // Dropdown toggles
     document.querySelectorAll('.nav-dropdown-toggle').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -2777,7 +2798,8 @@ function initDashboardNavigation() {
             e.stopPropagation();
             const viewId = btn.getAttribute('data-view');
             switchView(viewId);
-            
+            closeMobileNavDrawer();
+
             if (viewId === 'view-settings') {
                 syncSettingsUI();
             }

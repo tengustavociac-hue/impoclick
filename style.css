@@ -2028,6 +2028,31 @@ tfoot th, tfoot td {
     letter-spacing: -0.01em;
 }
 
+/* Hamburger toggle: only shown on mobile (see media query below) */
+.mobile-nav-toggle {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    margin-left: auto;
+    background: var(--secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    color: var(--text-primary);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+.mobile-nav-toggle .icon-close {
+    display: none;
+}
+.mobile-nav-toggle.active .icon-burger {
+    display: none;
+}
+.mobile-nav-toggle.active .icon-close {
+    display: block;
+}
+
 .nav-menu {
     display: flex;
     flex-direction: column;
@@ -2278,17 +2303,41 @@ tfoot th, tfoot td {
         padding: 1rem;
     }
     .nav-logo {
-        margin-bottom: 1rem;
-        padding-bottom: 0.5rem;
+        margin-bottom: 0;
+        padding-bottom: 0;
+        border-bottom: none;
     }
+    .mobile-nav-toggle {
+        display: flex;
+    }
+    /* Collapsed by default on mobile — tapping the hamburger reveals it as a
+       full-width dropdown list instead of dumping every nav item above the
+       page content. Bigger rows (min 48px tall) are easier to tap than the
+       old wrapped pill row. */
     .nav-menu {
-        flex-direction: row;
-        flex-wrap: wrap;
-        gap: 0.5rem;
+        display: none;
+        flex-direction: column;
+        flex-wrap: nowrap;
+        gap: 0.25rem;
+        width: 100%;
+        margin-top: 1rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--border-color);
+        max-height: 70vh;
+        overflow-y: auto;
+    }
+    .nav-menu.nav-menu-open {
+        display: flex;
     }
     .nav-item {
-        width: auto;
-        padding: 0.5rem 0.75rem;
+        width: 100%;
+        min-height: 48px;
+        padding: 0.75rem 1rem;
+        font-size: 1rem;
+    }
+    .nav-subitem {
+        min-height: 44px;
+        padding: 0.7rem 0.85rem;
     }
     .main-content {
         max-width: 100%;
