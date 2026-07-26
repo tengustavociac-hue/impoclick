@@ -19,49 +19,63 @@
 <body>
     <!-- AUTHENTICATION SCREEN -->
     <div id="auth-container" class="auth-screen">
-        <div class="auth-card">
-            <div class="auth-header">
-                <img src="impoclick_logo.png" alt="Impoclick Logo" style="width: 72px; height: 72px; border-radius: var(--border-radius-lg); margin-bottom: 0.75rem; object-fit: cover; display: block; margin-left: auto; margin-right: auto;">
-                <h2>Impoclick</h2>
-                <p>Simulador inteligente de rateio e viabilidade</p>
+        <canvas id="auth-art-canvas" class="auth-art-canvas" aria-hidden="true"></canvas>
+        <div class="auth-split">
+            <div class="auth-art-half">
+                <div class="auth-logo-wrap" id="auth-logo-wrap">
+                    <img id="auth-logo-source" src="impoclick_logo.png" alt="" style="display:none;">
+                    <canvas id="auth-logo-canvas" role="img" aria-label="Impoclick"></canvas>
+                </div>
+                <div class="auth-art-copy">
+                    <p class="auth-kicker">Do desembaraço ao lucro</p>
+                    <h4>Sua importação, sob controle — do frete ao ICMS, em um só painel.</h4>
+                </div>
             </div>
-            
-            <div class="auth-tabs">
-                <button id="tab-login" class="auth-tab active">Entrar</button>
-                <button id="tab-register" class="auth-tab">Cadastrar</button>
+            <div class="auth-form-half">
+                <div class="auth-card">
+                    <div class="auth-header">
+                        <h2>Impoclick</h2>
+                        <p>Simulador inteligente de rateio e viabilidade</p>
+                    </div>
+
+                    <div class="auth-tabs">
+                        <button id="tab-login" class="auth-tab active">Entrar</button>
+                        <button id="tab-register" class="auth-tab">Cadastrar</button>
+                    </div>
+
+                    <!-- Login Form -->
+                    <form id="form-login" class="auth-form">
+                        <div class="form-group">
+                            <label for="login-email">E-mail</label>
+                            <input type="email" id="login-email" class="form-control" placeholder="seuemail@exemplo.com" required autocomplete="username">
+                        </div>
+                        <div class="form-group">
+                            <label for="login-password">Senha</label>
+                            <input type="password" id="login-password" class="form-control" placeholder="••••••••" required autocomplete="current-password">
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block">Acessar Sistema</button>
+                        <div id="login-alert" class="auth-alert hidden"></div>
+                    </form>
+
+                    <!-- Register Form -->
+                    <form id="form-register" class="auth-form hidden">
+                        <div class="form-group">
+                            <label for="reg-name">Nome Completo</label>
+                            <input type="text" id="reg-name" class="form-control" placeholder="Ex: Gustavo Silva" required autocomplete="name">
+                        </div>
+                        <div class="form-group">
+                            <label for="reg-email">E-mail</label>
+                            <input type="email" id="reg-email" class="form-control" placeholder="seuemail@exemplo.com" required autocomplete="email">
+                        </div>
+                        <div class="form-group">
+                            <label for="reg-password">Senha (mín. 6 caracteres)</label>
+                            <input type="password" id="reg-password" class="form-control" placeholder="••••••••" minlength="6" required autocomplete="new-password">
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block">Criar Conta</button>
+                        <div id="register-alert" class="auth-alert hidden"></div>
+                    </form>
+                </div>
             </div>
-
-            <!-- Login Form -->
-            <form id="form-login" class="auth-form">
-                <div class="form-group">
-                    <label for="login-email">E-mail</label>
-                    <input type="email" id="login-email" class="form-control" placeholder="seuemail@exemplo.com" required autocomplete="username">
-                </div>
-                <div class="form-group">
-                    <label for="login-password">Senha</label>
-                    <input type="password" id="login-password" class="form-control" placeholder="••••••••" required autocomplete="current-password">
-                </div>
-                <button type="submit" class="btn btn-primary btn-block">Acessar Sistema</button>
-                <div id="login-alert" class="auth-alert hidden"></div>
-            </form>
-
-            <!-- Register Form -->
-            <form id="form-register" class="auth-form hidden">
-                <div class="form-group">
-                    <label for="reg-name">Nome Completo</label>
-                    <input type="text" id="reg-name" class="form-control" placeholder="Ex: Gustavo Silva" required autocomplete="name">
-                </div>
-                <div class="form-group">
-                    <label for="reg-email">E-mail</label>
-                    <input type="email" id="reg-email" class="form-control" placeholder="seuemail@exemplo.com" required autocomplete="email">
-                </div>
-                <div class="form-group">
-                    <label for="reg-password">Senha (mín. 6 caracteres)</label>
-                    <input type="password" id="reg-password" class="form-control" placeholder="••••••••" minlength="6" required autocomplete="new-password">
-                </div>
-                <button type="submit" class="btn btn-primary btn-block">Criar Conta</button>
-                <div id="register-alert" class="auth-alert hidden"></div>
-            </form>
         </div>
     </div>
 

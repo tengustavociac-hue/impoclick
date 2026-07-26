@@ -263,6 +263,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (btnSettings) btnSettings.click();
         }, 500);
     }
+    initAuthArt();
     await checkAuthSession();
     await loadState();
     registerEventListeners();
@@ -2316,6 +2317,242 @@ function clearAuthAlerts() {
         registerAlert.className = 'auth-alert hidden';
         registerAlert.textContent = '';
     }
+}
+
+// Ilustração animada da tela de login: contêiner do logo sem o fundo branco,
+// rotas marítimas pontilhadas com mini navios, e faíscas saindo da ponta da seta do logo.
+function initAuthArt() {
+    const canvas = document.getElementById('auth-art-canvas');
+    const logoWrap = document.getElementById('auth-logo-wrap');
+    const logoSource = document.getElementById('auth-logo-source');
+    const logoCanvas = document.getElementById('auth-logo-canvas');
+    if (!canvas || !logoWrap || !logoSource || !logoCanvas) return;
+
+    const ctx = canvas.getContext('2d');
+    const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const TEAL_DEEP = '#0f5c58';
+    const NEON_A = '255,90,140';  // neon pink core
+    const NEON_B = '255,150,60';  // warm orange halo
+    const BLUE = '70,150,255';    // ocean-blue accent mixed into the sparks
+
+    function dpr() { return Math.max(1, window.devicePixelRatio || 1); }
+
+    // Remove o fundo branco chapado do PNG do logo (chroma-key por luminosidade)
+    function processLogo() {
+        const iw = logoSource.naturalWidth, ih = logoSource.naturalHeight;
+        if (!iw || !ih) return;
+        const off = document.createElement('canvas');
+        off.width = iw; off.height = ih;
+        const octx = off.getContext('2d');
+        octx.drawImage(logoSource, 0, 0, iw, ih);
+        const imgData = octx.getImageData(0, 0, iw, ih);
+        const d = imgData.data;
+        const lo = 235, hi = 250; // faixa de transição para não deixar serrilhado
+        for (let i = 0; i < d.length; i += 4) {
+            const whiteness = Math.min(d[i], d[i+1], d[i+2]);
+            if (whiteness >= hi) {
+                d[i+3] = 0;
+            } else if (whiteness > lo) {
+                const f = (whiteness - lo) / (hi - lo);
+                d[i+3] = d[i+3] * (1 - f);
+            }
+        }
+        octx.putImageData(imgData, 0, 0);
+        logoCanvas.width = iw; logoCanvas.height = ih;
+        logoCanvas.getContext('2d').drawImage(off, 0, 0);
+    }
+    if (logoSource.complete && logoSource.naturalWidth) {
+        processLogo();
+    } else {
+        logoSource.addEventListener('load', processLogo);
+    }
+
+    let W = 0, H = 0;
+    function resize() {
+        const rect = canvas.parentElement.getBoundingClientRect();
+        W = rect.width; H = rect.height;
+        const d = dpr();
+        canvas.width = W * d; canvas.height = H * d;
+        canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+        ctx.setTransform(d, 0, 0, d, 0, 0);
+    }
+
+    function anchors() {
+        const stageRect = canvas.parentElement.getBoundingClientRect();
+        const logoRect = logoWrap.getBoundingClientRect();
+        // geometria aproximada da seta dentro da arte quadrada do logo
+        const tip = {
+            x: (logoRect.left - stageRect.left) + logoRect.width * 0.81,
+            y: (logoRect.top - stageRect.top) + logoRect.height * 0.15
+        };
+        const base = {
+            x: (logoRect.left - stageRect.left) + logoRect.width * 0.40,
+            y: (logoRect.top - stageRect.top) + logoRect.height * 0.74
+        };
+        const dx = tip.x - base.x, dy = tip.y - base.y;
+        const len = Math.sqrt(dx*dx + dy*dy) || 1;
+        return { tip, dir: { x: dx/len, y: dy/len } };
+    }
+
+    function drawShip(x, y, scale, rotation) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(rotation || 0);
+        ctx.scale(scale, scale);
+        ctx.globalAlpha = 0.6;
+        ctx.beginPath();
+        ctx.moveTo(-11, 0); ctx.lineTo(11, 0); ctx.lineTo(7, 6); ctx.lineTo(-7, 6);
+        ctx.closePath();
+        ctx.fillStyle = TEAL_DEEP;
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(-1, 0); ctx.lineTo(-1, -13); ctx.lineTo(8, -3);
+        ctx.closePath();
+        ctx.fillStyle = TEAL_DEEP;
+        ctx.globalAlpha = 0.5;
+        ctx.fill();
+        ctx.restore();
+    }
+
+    function drawDottedPath(pts, dashOffset, color, alpha) {
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.6;
+        ctx.setLineDash([2, 8]);
+        ctx.lineDashOffset = dashOffset;
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        ctx.bezierCurveTo(pts[1].x, pts[1].y, pts[2].x, pts[2].y, pts[3].x, pts[3].y);
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    function drawRoute(t) {
+        const routeA = [{x:0,y:H*0.80},{x:W*0.28,y:H*0.58},{x:W*0.62,y:H*0.98},{x:W,y:H*0.30}];
+        const routeB = [{x:0,y:H*0.18},{x:W*0.22,y:H*0.34},{x:W*0.58,y:H*0.02},{x:W,y:H*0.16}];
+        drawDottedPath(routeA, -(t/45), TEAL_DEEP, 0.22);
+        drawDottedPath(routeB, -(t/60), TEAL_DEEP, 0.15);
+
+        [[0,0.80],[0.34,0.66],[0.68,0.86]].forEach(p => {
+            ctx.save();
+            ctx.globalAlpha = 0.4;
+            ctx.fillStyle = TEAL_DEEP;
+            ctx.beginPath();
+            ctx.arc(W*p[0], H*p[1], 2.8, 0, Math.PI*2);
+            ctx.fill();
+            ctx.restore();
+        });
+        drawShip(W*1, H*0.30, 1, -0.35);
+
+        ctx.save();
+        ctx.globalAlpha = 0.32;
+        ctx.fillStyle = TEAL_DEEP;
+        ctx.beginPath();
+        ctx.arc(W*0.22, H*0.34, 2.4, 0, Math.PI*2);
+        ctx.fill();
+        ctx.restore();
+        drawShip(W*0.58, H*0.10, 0.8, -0.12);
+    }
+
+    let particles = [];
+    function spawnParticle(anchor) {
+        const jitter = (Math.random()-0.5)*0.6;
+        const perp = { x: -anchor.dir.y, y: anchor.dir.x };
+        particles.push({
+            x: anchor.tip.x + perp.x*jitter*10,
+            y: anchor.tip.y + perp.y*jitter*10,
+            dx: anchor.dir.x*(1.6+Math.random()*1.1) + perp.x*jitter*0.5,
+            dy: anchor.dir.y*(1.6+Math.random()*1.1) + perp.y*jitter*0.5,
+            life: 0,
+            maxLife: 55+Math.random()*40,
+            size: 2.2+Math.random()*2.8,
+            blue: Math.random() < 0.35
+        });
+    }
+
+    function drawParticles(anchor) {
+        if (Math.random() < 0.4) spawnParticle(anchor);
+        particles = particles.filter(p => p.life < p.maxLife);
+        particles.forEach(p => {
+            p.x += p.dx; p.y += p.dy; p.life++;
+            const t = p.life / p.maxLife;
+            const alpha = (1-t) * 0.5;
+            const col = p.blue ? `rgb(${BLUE})` : (t < 0.45 ? `rgb(${NEON_A})` : `rgb(${NEON_B})`);
+            ctx.save();
+            ctx.globalAlpha = Math.max(0, alpha);
+            ctx.fillStyle = col;
+            ctx.shadowColor = col;
+            ctx.shadowBlur = 6;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size*0.7*(1-t*0.35), 0, Math.PI*2);
+            ctx.fill();
+            ctx.restore();
+        });
+    }
+
+    function drawNeon(anchor, t) {
+        ctx.save();
+        [[46,0.10],[26,0.15],[12,0.20]].forEach(layer => {
+            const g = ctx.createRadialGradient(anchor.tip.x, anchor.tip.y, 0, anchor.tip.x, anchor.tip.y, layer[0]);
+            g.addColorStop(0, `rgba(${NEON_A},${layer[1]})`);
+            g.addColorStop(0.6, `rgba(${NEON_B},${layer[1]*0.5})`);
+            g.addColorStop(1, `rgba(${NEON_B},0)`);
+            ctx.fillStyle = g;
+            ctx.beginPath();
+            ctx.arc(anchor.tip.x, anchor.tip.y, layer[0], 0, Math.PI*2);
+            ctx.fill();
+        });
+        ctx.fillStyle = 'rgba(255,235,225,0.55)';
+        ctx.shadowColor = `rgba(${NEON_A},0.6)`;
+        ctx.shadowBlur = 9;
+        ctx.beginPath();
+        ctx.arc(anchor.tip.x, anchor.tip.y, 2.2, 0, Math.PI*2);
+        ctx.fill();
+        ctx.restore();
+
+        const period = 3800;
+        const phase = (t % period) / period;
+        const eased = Math.sin(phase*Math.PI);
+        const r = 18 + phase*70;
+        const band = 24;
+        const alpha = eased*0.18;
+        ctx.save();
+        const pg = ctx.createRadialGradient(anchor.tip.x, anchor.tip.y, Math.max(0,r-band), anchor.tip.x, anchor.tip.y, r+band);
+        pg.addColorStop(0, `rgba(${NEON_A},0)`);
+        pg.addColorStop(0.5, `rgba(${NEON_A},${alpha})`);
+        pg.addColorStop(1, `rgba(${NEON_B},0)`);
+        ctx.fillStyle = pg;
+        ctx.beginPath();
+        ctx.arc(anchor.tip.x, anchor.tip.y, r+band, 0, Math.PI*2);
+        ctx.fill();
+        ctx.restore();
+    }
+
+    function render(t) {
+        if (W === 0) resize();
+        ctx.clearRect(0, 0, W, H);
+        const anchor = anchors();
+        drawRoute(t);
+        drawNeon(anchor, t);
+        drawParticles(anchor);
+    }
+
+    if (reduceMotion) {
+        resize();
+        render(0);
+    } else {
+        let start = null;
+        function loop(ts) {
+            if (start === null) start = ts;
+            render(ts - start);
+            requestAnimationFrame(loop);
+        }
+        requestAnimationFrame(loop);
+    }
+
+    window.addEventListener('resize', resize);
 }
 
 // ==========================================
