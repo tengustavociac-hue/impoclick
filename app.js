@@ -3319,9 +3319,9 @@ function estimatePlatformFreight(weightG, lengthCm, widthCm, heightCm) {
 }
 
 function calcSimplifiedImport({ valueUSD, freightUSD, qty, exchangeRate, icmsPct }) {
-    const valueBRL = valueUSD * exchangeRate;
+    const valueBRL = valueUSD * qty * exchangeRate;
     const freightBRL = freightUSD * exchangeRate;
-    const totalUSD = valueUSD + freightUSD;
+    const totalUSD = valueUSD * qty + freightUSD;
     const vaBRL = valueBRL + freightBRL;
     const icmsRate = icmsPct / 100;
 
@@ -3344,7 +3344,7 @@ function calcSimplifiedImport({ valueUSD, freightUSD, qty, exchangeRate, icmsPct
 }
 
 function calcFormalImport({ valueUSD, freightUSD, qty, exchangeRate, icmsPct, otherFeesBRL, ncm }) {
-    const vaBRL = (valueUSD + freightUSD) * exchangeRate;
+    const vaBRL = (valueUSD * qty + freightUSD) * exchangeRate;
     const rates = getProductTaxRates(ncm);
     const icmsRate = icmsPct / 100;
 
