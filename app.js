@@ -3989,19 +3989,8 @@ function syncSettingsUI() {
         }
     }
     
-    // ---- Botão “Conectar Conta ML” na aba de Viabilidade ----
-    const btnViabConnectMl = document.getElementById('btn-viab-connect-ml');
-    if (btnViabConnectMl) {
-        btnViabConnectMl.addEventListener('click', (e) => {
-            e.preventDefault();
-            if (state.currentUser && state.currentUser.id) {
-                window.location.href = `/api/ml-auth?userId=${state.currentUser.id}`;
-            } else {
-                alert('Faça login para conectar sua conta Mercado Livre.');
-            }
         });
     }
-
     const btnLight = document.getElementById('btn-theme-light-choice');
     const btnDark = document.getElementById('btn-theme-dark-choice');
     
@@ -4017,10 +4006,14 @@ function syncSettingsUI() {
     // Sincronizar status do Mercado Livre
     const btnConnectMl = document.getElementById('btn-connect-ml');
     const statusTextMl = document.getElementById('ml-connection-status');
-    if (btnConnectMl && statusTextMl && state.currentUser) {
-        btnConnectMl.onclick = () => {
-            window.location.href = `/api/ml-auth?userId=${state.currentUser.id}`;
-        };
+    if (btnConnectMl && statusTextMl) {
+        btnConnectMl.addEventListener('click', (e) => {
+            e.preventDefault();
+            const url = (state.currentUser && state.currentUser.id)
+                ? `/api/ml-auth?userId=${state.currentUser.id}`
+                : '/api/ml-auth';
+            window.location.href = url;
+        });
         
         statusTextMl.textContent = 'Verificando conexão...';
         statusTextMl.style.color = 'var(--text-muted)';
@@ -4045,10 +4038,13 @@ function syncSettingsUI() {
     // Sincronizar status do Mercado Livre (Aba Viabilidade)
     const btnViabConnectMl = document.getElementById('btn-viab-connect-ml');
     const statusTextViabMl = document.getElementById('viab-ml-status-text');
-    if (btnViabConnectMl && statusTextViabMl && state.currentUser) {
+    if (btnViabConnectMl && statusTextViabMl) {
         btnViabConnectMl.addEventListener('click', (e) => {
             e.preventDefault();
-            window.location.href = `/api/ml-auth?userId=${state.currentUser.id}`;
+            const url = (state.currentUser && state.currentUser.id)
+                ? `/api/ml-auth?userId=${state.currentUser.id}`
+                : '/api/ml-auth';
+            window.location.href = url;
         });
         
         mlApiFetch('/api/ml-status').then(res => {
