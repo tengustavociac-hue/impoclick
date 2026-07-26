@@ -3989,6 +3989,19 @@ function syncSettingsUI() {
         }
     }
     
+    // ---- Botão “Conectar Conta ML” na aba de Viabilidade ----
+    const btnViabConnectMl = document.getElementById('btn-viab-connect-ml');
+    if (btnViabConnectMl) {
+        btnViabConnectMl.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (state.currentUser && state.currentUser.id) {
+                window.location.href = `/api/ml-auth?userId=${state.currentUser.id}`;
+            } else {
+                alert('Faça login para conectar sua conta Mercado Livre.');
+            }
+        });
+    }
+
     const btnLight = document.getElementById('btn-theme-light-choice');
     const btnDark = document.getElementById('btn-theme-dark-choice');
     
@@ -4033,9 +4046,10 @@ function syncSettingsUI() {
     const btnViabConnectMl = document.getElementById('btn-viab-connect-ml');
     const statusTextViabMl = document.getElementById('viab-ml-status-text');
     if (btnViabConnectMl && statusTextViabMl && state.currentUser) {
-        btnViabConnectMl.onclick = () => {
+        btnViabConnectMl.addEventListener('click', (e) => {
+            e.preventDefault();
             window.location.href = `/api/ml-auth?userId=${state.currentUser.id}`;
-        };
+        });
         
         mlApiFetch('/api/ml-status').then(res => {
             if (res && res.connected) {
