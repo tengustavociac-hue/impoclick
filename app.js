@@ -116,7 +116,7 @@ async function loadState() {
     }
     
     // Load theme
-    const theme = localStorage.getItem('theme') || 'dark';
+    const theme = localStorage.getItem('theme') || 'light';
     document.documentElement.setAttribute('data-theme', theme);
     updateThemeIcon(theme);
 }
@@ -4004,7 +4004,7 @@ function syncSettingsUI() {
     const btnLight = document.getElementById('btn-theme-light-choice');
     const btnDark = document.getElementById('btn-theme-dark-choice');
     
-    const theme = document.documentElement.getAttribute('data-theme') || 'dark';
+    const theme = document.documentElement.getAttribute('data-theme') || 'light';
     if (theme === 'light') {
         btnLight.className = 'btn btn-primary btn-sm';
         btnDark.className = 'btn btn-secondary btn-sm';

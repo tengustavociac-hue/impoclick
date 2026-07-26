@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Impoclick - Simulador de Rateio e Viabilidade de Importação</title>
+    <script>
+        document.documentElement.setAttribute('data-theme', localStorage.getItem('theme') || 'light');
+    </script>
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1964,8 +1967,8 @@
                         Escolha o contraste do tema do simulador para melhor leitura.
                     </p>
                     <div style="display: flex; gap: 1rem;">
-                        <button id="btn-theme-light-choice" class="btn btn-secondary btn-sm">Tema Claro</button>
-                        <button id="btn-theme-dark-choice" class="btn btn-primary btn-sm">Tema Escuro</button>
+                        <button id="btn-theme-light-choice" class="btn btn-primary btn-sm">Tema Claro</button>
+                        <button id="btn-theme-dark-choice" class="btn btn-secondary btn-sm">Tema Escuro</button>
                     </div>
                 </div>
                 <div class="form-group" style="border-bottom: 1px solid var(--border-color); padding-bottom: 1.5rem; margin-bottom: 1.5rem;">
