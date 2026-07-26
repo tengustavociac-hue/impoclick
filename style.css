@@ -205,6 +205,31 @@ h1, h2, h3, .card-title, .modal-header h3, .auth-header h2, .nav-logo span, .bra
     gap: 0.75rem;
 }
 
+/* Calculadora de Rateio — toolbar (Salvar Lote / Carregar Exemplo / Limpar
+   Tudo) lives inside this view only, not in the global header. */
+.calc-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+.calc-toolbar-title {
+    font-family: var(--font-primary);
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.calc-toolbar-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
 /* Buttons */
 .btn {
     display: inline-flex;
@@ -1578,10 +1603,7 @@ tfoot th, tfoot td {
     font-size: 0.85rem;
     font-weight: 700;
     color: var(--text-primary);
-    max-width: 110px;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 .btn-logout {
