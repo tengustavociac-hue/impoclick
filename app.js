@@ -1100,7 +1100,7 @@ function updateUI() {
         if (authContainer) authContainer.classList.remove('hidden');
         if (paywallScreen) paywallScreen.classList.add('hidden');
         if (appContainer) appContainer.classList.add('hidden');
-        return; // Don't proceed to render the table if not logged in
+        return; 
     }
     
     // Check subscription / trial status
@@ -2155,9 +2155,13 @@ async function checkAuthSession() {
         } else {
             state.currentUser = null;
         }
+        
+        // Atualiza a tabela de histórico assim que confirmar o status de login
+        if (typeof renderHistoryTable === 'function') renderHistoryTable();
     } catch (e) {
         console.error('Erro ao verificar sessão de login no Supabase:', e);
         state.currentUser = null;
+        if (typeof renderHistoryTable === 'function') renderHistoryTable();
     }
 }
 
@@ -3773,7 +3777,11 @@ function initHistoryModule() {
             
             if (state.currentUser) {
                 try {
-                    await window.db.saveHistory(finalName, state);
+                    const result = await window.db.saveHistory(finalName, state);
+                    if (result && result.error) {
+                        alert('Erro técnico do Banco de Dados: ' + result.error.message + '\n\nCertifique-se de que rodou o script SQL no painel do Supabase corretamente.');
+                        return;
+                    }
                 } catch(e) {
                     console.error('Erro ao salvar no Supabase:', e);
                 }

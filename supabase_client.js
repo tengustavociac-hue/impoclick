@@ -71,20 +71,31 @@ window.db = {
 
     // Histórico
     async saveHistory(name, stateData) {
-        const { data: session } = await supabaseClient.auth.getSession();
-        if (!session?.session?.user) return;
+        const { data, error } = await supabaseClient.auth.getSession();
+        if (error || !data.session) {
+            return { error: new Error('Sua sessão expirou. Por favor, atualize a página e faça login novamente.') };
+        }
+        
+        // Adicionando .select() para forçar o retorno do erro se o RLS bloquear o insert
         return await supabaseClient
             .from('import_history')
-            .insert({ user_id: session.session.user.id, name: name, state_data: stateData });
+            .insert({ user_id: data.session.user.id, name: name, state_data: stateData })
+            .select();
     },
     async getHistory() {
-        const { data: session } = await supabaseClient.auth.getSession();
-        if (!session?.session?.user) return [];
-        const { data } = await supabaseClient
+        const { data: authData, error: authError } = await supabaseClient.auth.getSession();
+        if (authError || !authData.session) return [];
+        
+        const { data, error } = await supabaseClient
             .from('import_history')
             .select('*')
-            .eq('user_id', session.session.user.id)
+            .eq('user_id', authData.session.user.id)
             .order('created_at', { ascending: false });
+            
+        if (error) {
+            console.error('Erro getHistory Supabase:', error);
+            alert('Erro ao buscar histórico: ' + error.message);
+        }
         return data || [];
     },
     async deleteHistory(id) {
