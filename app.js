@@ -3545,22 +3545,7 @@ function initFeasibilityModule() {
     }
 
     // --- Status de conexão com a conta Mercado Livre (via servidor local) ---
-    const apiStatusEl = document.getElementById('mkt-api-status');
-    (async () => {
-        if (!apiStatusEl) return;
-        const status = await mlApiFetch('/api/ml/status');
-        apiStatusEl.classList.remove('hidden');
-        if (status && status.connected) {
-            apiStatusEl.className = 'ncm-preview success';
-            apiStatusEl.innerHTML = `<div>🟢 <strong>Conectado à sua conta Mercado Livre:</strong> ${status.nickname} (nível ${status.sellerLevel || '—'})</div>`;
-        } else {
-            apiStatusEl.className = 'ncm-preview warning';
-            apiStatusEl.innerHTML = `
-                <div>🟡 <strong>Servidor local não encontrado.</strong> Taxa de venda e frete vão usar valores de referência.</div>
-                <div style="font-size:0.72rem; color:var(--text-muted); margin-top:0.25rem;">Para usar dados reais da sua conta: abra um terminal em <code>IMPOCLICK/server</code> e rode <code>npm start</code>.</div>
-            `;
-        }
-    })();
+    // (Removido, status agora é gerenciado pelo syncSettingsUI no topo da aba)
 
     // --- Detecção de categoria real pelo nome do produto ---
     const mktQueryInput = document.getElementById('mkt-f-query');
