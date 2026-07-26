@@ -4015,6 +4015,7 @@ function syncSettingsUI() {
 
     // Sincronizar status do Mercado Livre
     const btnConnectMl = document.getElementById('btn-connect-ml');
+    const btnDisconnectMl = document.getElementById('btn-disconnect-ml');
     const statusTextMl = document.getElementById('ml-connection-status');
     if (btnConnectMl && statusTextMl) {
         btnConnectMl.addEventListener('click', (e) => {
@@ -4024,16 +4025,37 @@ function syncSettingsUI() {
                 : '/api/ml-auth';
             window.location.href = url;
         });
-        
+
+        if (btnDisconnectMl) {
+            btnDisconnectMl.addEventListener('click', async (e) => {
+                e.preventDefault();
+                if (!state.currentUser) return;
+                if (!confirm('Desconectar sua conta do Mercado Livre? As simulações voltarão a usar estimativas padrão até você reconectar.')) return;
+
+                btnDisconnectMl.disabled = true;
+                try {
+                    await fetch('/api/ml-disconnect', {
+                        method: 'POST',
+                        headers: { 'user-token': state.currentUser.id }
+                    });
+                } catch (err) {
+                    console.error('Erro ao desconectar ML:', err);
+                }
+                btnDisconnectMl.disabled = false;
+                syncSettingsUI();
+            });
+        }
+
         statusTextMl.textContent = 'Verificando conexão...';
         statusTextMl.style.color = 'var(--text-muted)';
-        
+
         mlApiFetch('/api/ml-status').then(res => {
             if (res && res.connected) {
                 statusTextMl.textContent = `Conectado como: ${res.nickname}`;
                 statusTextMl.style.color = 'var(--success)';
                 btnConnectMl.textContent = 'Reconectar';
                 btnConnectMl.className = 'btn btn-secondary btn-sm';
+                if (btnDisconnectMl) btnDisconnectMl.classList.remove('hidden');
             } else {
                 statusTextMl.textContent = 'Não conectado';
                 statusTextMl.style.color = 'var(--text-muted)';
@@ -4041,6 +4063,7 @@ function syncSettingsUI() {
                 btnConnectMl.className = 'btn btn-primary btn-sm';
                 btnConnectMl.style.backgroundColor = '#FFE600';
                 btnConnectMl.style.color = '#2D3277';
+                if (btnDisconnectMl) btnDisconnectMl.classList.add('hidden');
             }
         });
     }
