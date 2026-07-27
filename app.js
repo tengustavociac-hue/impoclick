@@ -4054,7 +4054,7 @@ function initFeasibilityModule() {
             return;
         }
 
-        const data = await mlApiFetch(`/api/ml-category?q=${encodeURIComponent(query)}`);
+        const data = await mlApiFetch(`/api/ml-market?action=category&q=${encodeURIComponent(query)}`);
         mktCategoryInfoEl.classList.remove('hidden');
         if (data && data.categoryId) {
             resolvedCategoryId = data.categoryId;
@@ -4081,7 +4081,7 @@ function initFeasibilityModule() {
         // para já trazer a taxa assim que a categoria for detectada.
         const price = num('mkt-f-price') || 100;
 
-        const data = await mlApiFetch(`/api/ml-fee?price=${encodeURIComponent(price)}&category=${encodeURIComponent(resolvedCategoryId)}`);
+        const data = await mlApiFetch(`/api/ml-market?action=fee&price=${encodeURIComponent(price)}&category=${encodeURIComponent(resolvedCategoryId)}`);
         if (data && feeInput) {
             feeInput.value = data.percentageFee;
             if (feeNote) feeNote.textContent = `Taxa real da API para "${resolvedCategoryName}", anúncio ${data.listingTypeName}: ${data.percentageFee}%.`;
@@ -4115,7 +4115,7 @@ function initFeasibilityModule() {
             mktBestSellerInfoEl.className = 'ncm-preview warning';
             mktBestSellerInfoEl.innerHTML = '<div>Consultando o ranking de mais vendidos...</div>';
 
-            const data = await mlApiFetch(`/api/ml-best-seller?category=${encodeURIComponent(resolvedCategoryId)}`);
+            const data = await mlApiFetch(`/api/ml-market?action=bestseller&category=${encodeURIComponent(resolvedCategoryId)}`);
             if (data && data.id) {
                 mktBestSellerInfoEl.className = 'ncm-preview success';
                 mktBestSellerInfoEl.innerHTML = `
@@ -4129,6 +4129,102 @@ function initFeasibilityModule() {
             }
         });
     }
+
+    // --- Busca por Imagem — Fábrica no 1688 via Rakumart (protótipo, baixo volume) ---
+    (function initImportSearch() {
+        const fileInput = document.getElementById('import-search-file');
+        const previewWrap = document.getElementById('import-search-preview');
+        const previewImg = document.getElementById('import-search-preview-img');
+        const searchBtn = document.getElementById('btn-import-search');
+        const statusEl = document.getElementById('import-search-status');
+        const resultsEl = document.getElementById('import-search-results');
+        if (!fileInput || !searchBtn) return;
+
+        let selectedBase64 = null;
+
+        fileInput.addEventListener('change', () => {
+            const file = fileInput.files && fileInput.files[0];
+            selectedBase64 = null;
+            searchBtn.disabled = true;
+            previewWrap.classList.add('hidden');
+            if (!file) return;
+            if (file.size > 4 * 1024 * 1024) {
+                showToast('Imagem muito grande (máx. 4MB).', 'error');
+                fileInput.value = '';
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = () => {
+                selectedBase64 = reader.result;
+                previewImg.src = selectedBase64;
+                previewWrap.classList.remove('hidden');
+                searchBtn.disabled = false;
+            };
+            reader.readAsDataURL(file);
+        });
+
+        searchBtn.addEventListener('click', async () => {
+            if (!selectedBase64) return;
+            if (!state.currentUser) {
+                showToast('Faça login para usar a busca por imagem.', 'error');
+                return;
+            }
+
+            searchBtn.disabled = true;
+            statusEl.classList.remove('hidden');
+            statusEl.className = 'ncm-preview warning';
+            statusEl.innerHTML = '<div>Buscando produtos parecidos direto na fábrica... pode levar até 20 segundos.</div>';
+            resultsEl.classList.add('hidden');
+            resultsEl.innerHTML = '';
+
+            try {
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 45000);
+                const resp = await fetch('/api/import-search', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'user-token': state.currentUser.id,
+                    },
+                    body: JSON.stringify({ imageBase64: selectedBase64 }),
+                    signal: controller.signal,
+                });
+                clearTimeout(timeout);
+                const data = await resp.json().catch(() => null);
+
+                if (!resp.ok || !data) {
+                    statusEl.className = 'ncm-preview warning';
+                    statusEl.innerHTML = `<div>${escapeHtml((data && data.error) || 'Busca indisponível no momento. Tente novamente em instantes.')}</div>`;
+                    return;
+                }
+
+                if (!data.results || data.results.length === 0) {
+                    statusEl.className = 'ncm-preview warning';
+                    statusEl.innerHTML = '<div>Nenhum produto parecido foi encontrado para essa imagem.</div>';
+                    return;
+                }
+
+                statusEl.className = 'ncm-preview success';
+                statusEl.innerHTML = `<div>${data.results.length} produto(s) encontrado(s), do mais barato para o mais caro. ${escapeHtml(data.disclaimer || '')}</div>`;
+
+                resultsEl.classList.remove('hidden');
+                resultsEl.innerHTML = data.results.map((r, i) => `
+                    <div class="import-search-item${i === 0 ? ' import-search-best' : ''}">
+                        <img src="${escapeHtml(r.imageUrl || '')}" alt="${escapeHtml(r.title || 'Produto')}" loading="lazy" onerror="this.style.display='none'">
+                        <div class="import-search-item-title">${escapeHtml(r.title || 'Produto sem título')}</div>
+                        <div class="import-search-item-price">≈ ${brl(r.priceBRLEstimate)} <span style="font-size:0.65rem; color:var(--text-muted); font-weight:400;">(¥${r.priceCNY})</span></div>
+                        <div class="import-search-item-meta">${(r.monthSold || 0).toLocaleString('pt-BR')} vendidos/mês</div>
+                        <a class="btn btn-secondary btn-sm" href="${escapeHtml(r.productUrl)}" target="_blank" rel="noopener">Ver no 1688 ↗</a>
+                    </div>
+                `).join('');
+            } catch (err) {
+                statusEl.className = 'ncm-preview warning';
+                statusEl.innerHTML = '<div>Busca indisponível no momento (tempo esgotado ou erro de conexão). Tente novamente.</div>';
+            } finally {
+                searchBtn.disabled = false;
+            }
+        });
+    })();
 
     // --- Frete real por peso/dimensão (com fallback para a tabela de referência local) ---
     async function updateWeightEstimate() {
