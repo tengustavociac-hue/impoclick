@@ -203,6 +203,8 @@ async function saveState() {
 async function fetchDollarRate() {
     const usdValEl = document.getElementById('ticker-usd-value');
     const usdChangeEl = document.getElementById('ticker-usd-change');
+    const usdMinEl = document.getElementById('ticker-usd-min');
+    const usdMaxEl = document.getElementById('ticker-usd-max');
     const sparklineEl = document.getElementById('ticker-usd-chart');
     const exRateInput = document.getElementById('input-exchange-rate');
 
@@ -233,7 +235,12 @@ async function fetchDollarRate() {
         if (usdValEl) {
             usdValEl.textContent = `R$ ${bid.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 3 })}`;
         }
-        
+
+        const dayLow = parseFloat(usdData.low);
+        const dayHigh = parseFloat(usdData.high);
+        if (usdMinEl && !isNaN(dayLow)) usdMinEl.textContent = `R$ ${dayLow.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`;
+        if (usdMaxEl && !isNaN(dayHigh)) usdMaxEl.textContent = `R$ ${dayHigh.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`;
+
         if (usdChangeEl) {
             const isDown = pctChange < 0;
             usdChangeEl.className = `ticker-change ${isDown ? 'down' : 'up'}`;
@@ -4516,31 +4523,7 @@ async function renderHomeDashboard() {
     const view = document.getElementById('view-home');
     if (!view) return;
 
-    const rateEl = document.getElementById('home-kpi-rate');
-    const rateChangeEl = document.getElementById('home-kpi-rate-change');
-    if (rateEl) {
-        if (typeof state.lastDollarBid === 'number') {
-            rateEl.textContent = `R$ ${state.lastDollarBid.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 3 })}`;
-            if (rateChangeEl) {
-                const pct = state.lastDollarPctChange || 0;
-                const isDown = pct < 0;
-                rateChangeEl.textContent = `${isDown ? '▼' : '▲'} ${pct > 0 ? '+' : ''}${pct.toFixed(2)}% hoje`;
-                rateChangeEl.style.color = isDown ? 'var(--success)' : 'var(--danger)';
-            }
-        } else {
-            rateEl.textContent = `R$ ${state.exchangeRate.toFixed(2)}`;
-            if (rateChangeEl) rateChangeEl.textContent = 'câmbio manual';
-        }
-    }
-
     const historyList = await getHistorySummaryList();
-
-    const countEl = document.getElementById('home-kpi-count');
-    if (countEl) countEl.textContent = historyList.length;
-
-    const totalFob = historyList.reduce((acc, item) => acc + (item.fobBRL || 0), 0);
-    const fobEl = document.getElementById('home-kpi-fob');
-    if (fobEl) fobEl.textContent = formatBRL(totalFob);
 
     const continueCard = document.getElementById('home-continue-card');
     if (continueCard) {

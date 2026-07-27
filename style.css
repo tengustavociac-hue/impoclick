@@ -2362,6 +2362,7 @@ tfoot th, tfoot td {
 .ticker-left, .ticker-right {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 0.75rem;
 }
 
@@ -2406,6 +2407,23 @@ tfoot th, tfoot td {
     background-color: var(--success-bg);
     color: var(--success);
     border: 1px solid var(--success-border);
+}
+
+.ticker-divider {
+    color: var(--border-color);
+    font-size: 0.8rem;
+}
+
+.ticker-minmax {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.ticker-minmax strong {
+    color: var(--text-primary);
+    font-weight: 700;
 }
 
 .ticker-trend-label {
