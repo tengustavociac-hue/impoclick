@@ -858,6 +858,41 @@ async function preloadOfficialNcmDatabase() {
 // NCM TAX LOOKUP & CÁLCULOS TRIBUTÁRIOS
 // ==========================================
 
+// Consulta a API do IBPT (mesma ja usada para descricao de NCM) e guarda em
+// cache o campo "importadosfederal" — carga tributaria federal aproximada
+// para produtos importados (metodologia da Lei da Transparencia Fiscal,
+// calculada pelo IBPT a partir das tabelas oficiais TEC/TIPI/PIS-COFINS).
+// Nao e a mesma coisa que a quebra exata II/IPI/PIS/COFINS: e uma
+// estimativa agregada, usada so quando o NCM nao esta na base curada
+// (ncm_db.js) nem tem alíquotas manuais cadastradas.
+async function fetchIbptTaxEstimate(cleanNcm) {
+    if (!cleanNcm || cleanNcm.length !== 8) return null;
+    state.ncmRateEstimateCache = state.ncmRateEstimateCache || {};
+    if (Object.prototype.hasOwnProperty.call(state.ncmRateEstimateCache, cleanNcm)) {
+        return state.ncmRateEstimateCache[cleanNcm];
+    }
+    try {
+        // A API do IBPT não envia cabeçalhos CORS, então o navegador não pode
+        // chamá-la direto — passa por um proxy do próprio backend (Vercel).
+        const resp = await fetch(`/api/ncm-tax-estimate?ncm=${cleanNcm}`);
+        if (resp.ok) {
+            const data = await resp.json();
+            const value = (data && typeof data.importadosFederalPct === 'number') ? data.importadosFederalPct : null;
+            state.ncmRateEstimateCache[cleanNcm] = value;
+            if (data && data.descricao) {
+                state.ncmCache = state.ncmCache || {};
+                state.ncmCache[cleanNcm] = data.descricao;
+            }
+            saveState();
+            return value;
+        }
+    } catch (err) {
+        console.warn('Falha ao consultar estimativa de alíquota IBPT:', err);
+    }
+    state.ncmRateEstimateCache[cleanNcm] = null;
+    return null;
+}
+
 function getProductTaxRates(ncmCode) {
     const cleanNcm = ncmCode ? ncmCode.toString().replace(/[^0-9]/g, '') : '';
     // Busca na base local de NCMs (de ncm_db.js)
@@ -874,7 +909,21 @@ function getProductTaxRates(ncmCode) {
             };
         }
     }
-    
+
+    // Estimativa do IBPT (populada de forma assíncrona por fetchIbptTaxEstimate,
+    // disparada pelas telas de preview de NCM). Aplicada como II para refletir
+    // o custo total aproximado, já que o IBPT não discrimina por tributo.
+    if (state.ncmRateEstimateCache && state.ncmRateEstimateCache[cleanNcm] != null) {
+        return {
+            name: (state.ncmCache && state.ncmCache[cleanNcm]) || 'NCM fora da base curada (estimativa IBPT)',
+            ii: state.ncmRateEstimateCache[cleanNcm],
+            ipi: 0,
+            pis: 0,
+            cofins: 0,
+            source: 'ibpt-estimate'
+        };
+    }
+
     // Busca na base cacheada online pesquisada anteriormente
     if (state.ncmCache && state.ncmCache[cleanNcm]) {
         return {
@@ -886,7 +935,7 @@ function getProductTaxRates(ncmCode) {
             source: 'online'
         };
     }
-    
+
     // NCM não cadastrado na base local: retorna alíquotas zeradas
     return {
         name: "NCM Não Cadastrado na Base",
@@ -969,24 +1018,37 @@ function calculateItemTaxes(itemVABRL, itemFeesBRL, ncm, taxation, totalVAUSD, t
     return { iiBRL, ipiBRL, pisBRL, cofinsBRL, icmsBRL, ratesUsed };
 }
 
+function renderNcmRateFooter(estimatedPct) {
+    if (estimatedPct == null) {
+        return `
+            <div style="font-size:0.72rem; color:var(--text-muted); margin-top:0.25rem;">
+                NCM sem alíquotas locais cadastradas. Alíquotas aplicadas: II = 0% | IPI = 0% | PIS = 0% | COFINS = 0%
+            </div>`;
+    }
+    return `
+        <div style="font-size:0.72rem; color:var(--text-muted); margin-top:0.25rem;">
+            Carga tributária federal aproximada (estimativa IBPT): <strong>${estimatedPct.toFixed(2)}%</strong>, aplicada como Imposto de Importação (IPI/PIS/COFINS não discriminados nesta estimativa).
+        </div>`;
+}
+
 async function handleNcmPreview(ncmValue) {
     const previewEl = document.getElementById('ncm-lookup-preview');
     if (!previewEl) return;
-    
+
     if (!ncmValue) {
         previewEl.classList.add('hidden');
         return;
     }
-    
+
     const cleanNcm = ncmValue.toString().replace(/[^0-9]/g, '');
-    
+
     if (cleanNcm.length < 4) {
         previewEl.classList.add('hidden');
         return;
     }
-    
+
     previewEl.classList.remove('hidden');
-    
+
     // 1. Busca Local
     if (typeof lookupLocalNcm === 'function') {
         const localMatch = lookupLocalNcm(cleanNcm);
@@ -1004,100 +1066,67 @@ async function handleNcmPreview(ncmValue) {
             return;
         }
     }
-    
-    // 1.5. Busca na base cacheada/pré-carregada
-    if (state.ncmCache && state.ncmCache[cleanNcm]) {
-        const desc = state.ncmCache[cleanNcm];
-        previewEl.className = "ncm-preview success";
+
+    if (cleanNcm.length !== 8) {
+        previewEl.className = "ncm-preview error";
         previewEl.innerHTML = `
-            <div><strong>NCM Detectado (Cache/Oficial):</strong> <span class="ncm-badge">${cleanNcm}</span> - ${desc}</div>
+            <div><strong>NCM Incompleto:</strong> O NCM deve possuir 8 dígitos para consulta (ex: 85235190).</div>
+        `;
+        return;
+    }
+
+    // 1.5. Já temos descrição e/ou estimativa de alíquota em cache?
+    let desc = (state.ncmCache && state.ncmCache[cleanNcm]) || null;
+    let rateSourceLabel = 'Base oficial pré-carregada do Portal Único Siscomex / GitHub.';
+
+    if (!desc) {
+        // 2. Consulta API Siscomex/BrasilAPI (só descrição)
+        previewEl.className = "ncm-preview warning";
+        previewEl.innerHTML = `<div>Consultando NCM <span class="ncm-badge">${cleanNcm}</span> na base da Receita Federal (BrasilAPI)...</div>`;
+        try {
+            const response = await fetch(`https://brasilapi.com.br/api/ncm/v1/${cleanNcm}`);
+            if (response.status === 200) {
+                const data = await response.json();
+                desc = data.descricao;
+                state.ncmCache = state.ncmCache || {};
+                state.ncmCache[cleanNcm] = desc;
+                saveState();
+                rateSourceLabel = 'Base descritiva oficial da Receita Federal do Brasil (consulta via API Siscomex / BrasilAPI).';
+            }
+        } catch (err) {
+            console.warn('Falha ao consultar BrasilAPI:', err);
+        }
+    }
+
+    // 3. Estimativa de alíquota (IBPT) — busca (ou usa cache) independente de
+    // onde veio a descrição, já que a API IBPT também devolve a descrição.
+    previewEl.className = "ncm-preview warning";
+    previewEl.innerHTML = `<div>Consultando alíquota estimada de NCM <span class="ncm-badge">${cleanNcm}</span> (IBPT)...</div>`;
+    const estimatedPct = await fetchIbptTaxEstimate(cleanNcm);
+    if (!desc && state.ncmCache && state.ncmCache[cleanNcm]) {
+        desc = state.ncmCache[cleanNcm];
+        rateSourceLabel = 'Base descritiva do IBPT (consulta em tempo real via API Seu Negócio na Nuvem).';
+    }
+
+    if (!desc) {
+        previewEl.className = "ncm-preview error";
+        previewEl.innerHTML = `
+            <div><strong>NCM Não Encontrado:</strong> <span class="ncm-badge">${cleanNcm}</span> não localizado em nenhuma das bases (BrasilAPI / IBPT).</div>
             <div style="font-size:0.72rem; color:var(--text-muted); margin-top:0.25rem;">
-                NCM sem alíquotas locais cadastradas. Alíquotas aplicadas: II = 0% | IPI = 0% | PIS = 0% | COFINS = 0%
-            </div>
-            <div style="font-size:0.68rem; color:var(--success); margin-top:0.35rem; font-weight: 500; display: flex; align-items: center; gap: 0.25rem;">
-                <span>ℹ️</span> <span><strong>Fonte do Dado:</strong> Base oficial pré-carregada do Portal Único Siscomex / GitHub.</span>
+                Nenhum imposto de importação formal será aplicado para este item (alíquotas zeradas).
             </div>
         `;
         return;
     }
 
-    // 2. Consulta API Siscomex se tiver 8 dígitos
-    if (cleanNcm.length === 8) {
-        previewEl.className = "ncm-preview warning";
-        previewEl.innerHTML = `
-            <div>Consultando NCM <span class="ncm-badge">${cleanNcm}</span> na base da Receita Federal (BrasilAPI)...</div>
-        `;
-        
-        try {
-            const response = await fetch(`https://brasilapi.com.br/api/ncm/v1/${cleanNcm}`);
-            if (response.status === 200) {
-                const data = await response.json();
-                
-                // Salva no cache do estado para uso nos cálculos síncronos
-                state.ncmCache = state.ncmCache || {};
-                state.ncmCache[cleanNcm] = data.descricao;
-                saveState();
-                
-                previewEl.className = "ncm-preview success";
-                previewEl.innerHTML = `
-                    <div><strong>NCM Encontrado (Siscomex):</strong> <span class="ncm-badge">${cleanNcm}</span> - ${data.descricao}</div>
-                    <div style="font-size:0.72rem; color:var(--text-muted); margin-top:0.25rem;">
-                        NCM sem alíquotas locais cadastradas. Alíquotas aplicadas: II = 0% | IPI = 0% | PIS = 0% | COFINS = 0%
-                    </div>
-                    <div style="font-size:0.68rem; color:var(--warning); margin-top:0.35rem; font-weight: 500; display: flex; align-items: center; gap: 0.25rem;">
-                        <span>ℹ️</span> <span><strong>Fonte do Dado:</strong> Base descritiva oficial da Receita Federal do Brasil (consulta via API Siscomex / BrasilAPI).</span>
-                    </div>
-                `;
-            } else {
-                throw new Error('NCM não encontrado na BrasilAPI');
-            }
-        } catch (err) {
-            // Tenta consultar a segunda base (API IBPT - Seu Negócio na Nuvem)
-            previewEl.className = "ncm-preview warning";
-            previewEl.innerHTML = `
-                <div>Consultando NCM <span class="ncm-badge">${cleanNcm}</span> na base de dados secundária (IBPT)...</div>
-            `;
-            
-            try {
-                const responseSec = await fetch(`https://api-ibpt.seunegocionanuvem.com.br/api_ibpt.php?codigo=${cleanNcm}&uf=SP`);
-                if (responseSec.status === 200) {
-                    const dataSec = await responseSec.json();
-                    if (dataSec && dataSec.descricao) {
-                        // Salva no cache do estado para uso nos cálculos síncronos
-                        state.ncmCache = state.ncmCache || {};
-                        state.ncmCache[cleanNcm] = dataSec.descricao;
-                        saveState();
-
-                        previewEl.className = "ncm-preview success";
-                        previewEl.innerHTML = `
-                            <div><strong>NCM Encontrado (IBPT):</strong> <span class="ncm-badge">${cleanNcm}</span> - ${dataSec.descricao}</div>
-                            <div style="font-size:0.72rem; color:var(--text-muted); margin-top:0.25rem;">
-                                NCM sem alíquotas locais cadastradas. Alíquotas aplicadas: II = 0% | IPI = 0% | PIS = 0% | COFINS = 0%
-                            </div>
-                            <div style="font-size:0.68rem; color:var(--warning); margin-top:0.35rem; font-weight: 500; display: flex; align-items: center; gap: 0.25rem;">
-                                <span>ℹ️</span> <span><strong>Fonte do Dado:</strong> Base descritiva do IBPT (consulta em tempo real via API Seu Negócio na Nuvem).</span>
-                            </div>
-                        `;
-                        return;
-                    }
-                }
-                throw new Error('NCM não encontrado na API IBPT');
-            } catch (errSec) {
-                previewEl.className = "ncm-preview error";
-                previewEl.innerHTML = `
-                    <div><strong>NCM Não Encontrado:</strong> <span class="ncm-badge">${cleanNcm}</span> não localizado em nenhuma das bases (BrasilAPI / IBPT).</div>
-                    <div style="font-size:0.72rem; color:var(--text-muted); margin-top:0.25rem;">
-                        Nenhum imposto de importação formal será aplicado para este item (alíquotas zeradas).
-                    </div>
-                `;
-            }
-        }
-    } else {
-        previewEl.className = "ncm-preview error";
-        previewEl.innerHTML = `
-            <div><strong>NCM Incompleto:</strong> O NCM deve possuir 8 dígitos para consulta (ex: 85235190).</div>
-        `;
-    }
+    previewEl.className = "ncm-preview success";
+    previewEl.innerHTML = `
+        <div><strong>NCM Encontrado:</strong> <span class="ncm-badge">${cleanNcm}</span> - ${desc}</div>
+        ${renderNcmRateFooter(estimatedPct)}
+        <div style="font-size:0.68rem; color:var(--warning); margin-top:0.35rem; font-weight: 500; display: flex; align-items: center; gap: 0.25rem;">
+            <span>ℹ️</span> <span><strong>Fonte do Dado:</strong> ${rateSourceLabel}</span>
+        </div>
+    `;
 }
 
 // MAIN CALCULATION & UI RE-RENDER
@@ -3838,7 +3867,7 @@ function initFeasibilityModule() {
         renderMercado();
     }
 
-    function updateNcmPreview() {
+    async function updateNcmPreview() {
         if (!ncmPreviewEl) return;
         const raw = ncmInput ? ncmInput.value : '';
         const clean = raw.replace(/[^0-9]/g, '');
@@ -3856,10 +3885,51 @@ function initFeasibilityModule() {
                 <div style="font-size:0.72rem; color:var(--text-muted); margin-top:0.25rem;">
                     Alíquotas: II ${match.ii}% | IPI ${match.ipi}% | PIS ${match.pis}% | COFINS ${match.cofins}%
                 </div>`;
-        } else {
+            renderFormal();
+            return;
+        }
+
+        if (clean.length !== 8) {
             ncmPreviewEl.className = 'ncm-preview warning';
             ncmPreviewEl.innerHTML = `
-                <div>NCM <span class="ncm-badge">${clean}</span> não encontrado na base local.</div>
+                <div>NCM <span class="ncm-badge">${clean}</span> incompleto — o código precisa ter 8 dígitos para consultar a estimativa.</div>`;
+            renderFormal();
+            return;
+        }
+
+        // Já tem estimativa em cache (consulta anterior)?
+        const cached = state.ncmRateEstimateCache && state.ncmRateEstimateCache[clean];
+        if (cached != null) {
+            ncmPreviewEl.className = 'ncm-preview warning';
+            ncmPreviewEl.innerHTML = `
+                <div><strong>NCM fora da base curada:</strong> <span class="ncm-badge">${clean}</span> — usando estimativa do IBPT.</div>
+                <div style="font-size:0.72rem; color:var(--text-muted); margin-top:0.25rem;">
+                    Carga tributária federal aproximada para produtos importados: <strong>${cached.toFixed(2)}%</strong> (aplicada como Imposto de Importação — o IBPT não discrimina II/IPI/PIS/COFINS separadamente). Fonte: IBPT, não substitui a alíquota exata da TEC/TIPI.
+                </div>`;
+            renderFormal();
+            return;
+        }
+
+        ncmPreviewEl.className = 'ncm-preview warning';
+        ncmPreviewEl.innerHTML = `<div>NCM <span class="ncm-badge">${clean}</span> não está na base curada. Consultando estimativa (IBPT)...</div>`;
+        renderFormal();
+
+        const estimatedPct = await fetchIbptTaxEstimate(clean);
+        // O usuário pode ter mudado o campo enquanto a consulta rodava
+        const stillCurrent = ncmInput && ncmInput.value.replace(/[^0-9]/g, '') === clean;
+        if (!stillCurrent) return;
+
+        if (estimatedPct != null) {
+            ncmPreviewEl.className = 'ncm-preview warning';
+            ncmPreviewEl.innerHTML = `
+                <div><strong>NCM fora da base curada:</strong> <span class="ncm-badge">${clean}</span> — usando estimativa do IBPT.</div>
+                <div style="font-size:0.72rem; color:var(--text-muted); margin-top:0.25rem;">
+                    Carga tributária federal aproximada para produtos importados: <strong>${estimatedPct.toFixed(2)}%</strong> (aplicada como Imposto de Importação — o IBPT não discrimina II/IPI/PIS/COFINS separadamente). Fonte: IBPT, não substitui a alíquota exata da TEC/TIPI.
+                </div>`;
+        } else {
+            ncmPreviewEl.className = 'ncm-preview error';
+            ncmPreviewEl.innerHTML = `
+                <div>NCM <span class="ncm-badge">${clean}</span> não encontrado na base local nem na estimativa do IBPT.</div>
                 <div style="font-size:0.72rem; color:var(--text-muted); margin-top:0.25rem;">
                     Alíquotas aplicadas: II 0% | IPI 0% | PIS 0% | COFINS 0% (informe um NCM cadastrado para tributação real).
                 </div>`;
@@ -3923,8 +3993,11 @@ function initFeasibilityModule() {
     async function updateFeeFromApi() {
         const feeInput = document.getElementById('mkt-f-fee');
         const feeNote = document.getElementById('mkt-f-fee-note');
-        const price = num('mkt-f-price');
-        if (!resolvedCategoryId || price <= 0) return;
+        if (!resolvedCategoryId) return;
+        // O preço só serve pra API achar a faixa/tipo de anúncio certo; enquanto o
+        // usuário não preenche o preço do mais vendido, usa um valor de referência
+        // para já trazer a taxa assim que a categoria for detectada.
+        const price = num('mkt-f-price') || 100;
 
         const data = await mlApiFetch(`/api/ml-fee?price=${encodeURIComponent(price)}&category=${encodeURIComponent(resolvedCategoryId)}`);
         if (data && feeInput) {
