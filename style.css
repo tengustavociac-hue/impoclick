@@ -2338,9 +2338,6 @@ tfoot th, tfoot td {
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
-    padding-left: 1.75rem;
-    margin-top: 0.25rem;
-    margin-bottom: 0.5rem;
 }
 
 .nav-dropdown-items.hidden {
