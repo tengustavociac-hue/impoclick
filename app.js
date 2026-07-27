@@ -2779,6 +2779,19 @@ function updateHeaderForView(viewId) {
     if (subtitleEl) subtitleEl.textContent = meta.subtitle;
 }
 
+// Delegated click handler for "Conectar Conta ML" in Viabilidade. Registered
+// once here (not inside syncSettingsUI, which only ever runs after the user
+// visits Configurações) so the button works the first time, from any page.
+document.addEventListener('click', (e) => {
+    if (e.target && e.target.id === 'btn-viab-connect-ml') {
+        e.preventDefault();
+        const url = (state.currentUser && state.currentUser.id)
+            ? `/api/ml-auth?userId=${state.currentUser.id}`
+            : '/api/ml-auth';
+        window.location.href = url;
+    }
+});
+
 // 1. MENU ROUTING & DROPDOWN ACCORDION
 function initDashboardNavigation() {
     // Mobile nav drawer (hamburger toggle) — collapsed by default on narrow
@@ -4315,18 +4328,6 @@ function syncSettingsUI() {
             expWrapper.style.display = 'none';
         }
     }
-
-    // Delegated click handler for "Conectar Conta ML" in Viabilidade
-    // This works even if the button is re‑created by any UI update.
-    document.addEventListener('click', (e) => {
-      if (e.target && e.target.id === 'btn-viab-connect-ml') {
-        e.preventDefault();
-        const url = (state.currentUser && state.currentUser.id)
-          ? `/api/ml-auth?userId=${state.currentUser.id}`
-          : '/api/ml-auth';
-        window.location.href = url;
-      }
-    });
 
     const btnLight = document.getElementById('btn-theme-light-choice');
     const btnDark = document.getElementById('btn-theme-dark-choice');
