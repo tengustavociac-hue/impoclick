@@ -1487,17 +1487,22 @@ tfoot th, tfoot td {
     }
     #auth-container .auth-art-half {
         flex: 0 0 auto;
+        flex-direction: column;
         min-height: 0;
-        padding: 2.5rem 1.5rem 2rem;
+        padding: 2rem 1.5rem 1.75rem;
+        gap: 0.25rem;
     }
     #auth-container .auth-logo-wrap {
-        width: 44%;
-        max-width: 200px;
+        width: 40%;
+        max-width: 170px;
     }
     #auth-container .auth-art-copy {
         position: static;
-        margin-top: 1.25rem;
+        margin-top: 1rem;
         text-align: center;
+    }
+    #auth-container .auth-form-half {
+        padding: 1rem 1.5rem 2rem;
     }
 }
 
