@@ -4488,7 +4488,7 @@ function syncViabMlStatus() {
 
             btnViabDisconnectMl.disabled = true;
             try {
-                await fetch('/api/ml-disconnect', {
+                await fetch('/api/ml-status', {
                     method: 'POST',
                     headers: { 'user-token': state.currentUser.id }
                 });
@@ -4567,7 +4567,7 @@ function syncSettingsUI() {
 
                 btnDisconnectMl.disabled = true;
                 try {
-                    await fetch('/api/ml-disconnect', {
+                    await fetch('/api/ml-status', {
                         method: 'POST',
                         headers: { 'user-token': state.currentUser.id }
                     });
