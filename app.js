@@ -265,6 +265,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     initAuthArt();
     await checkAuthSession();
+    syncViabMlStatus();
     await loadState();
     registerEventListeners();
     registerAuthEventListeners();
@@ -4314,6 +4315,55 @@ async function loadSavedImport(id) {
 }
 
 // 7. SETTINGS AND THEME SELECTION UTILITIES
+// Sincroniza o status do Mercado Livre mostrado na aba Viabilidade. Roda uma
+// vez no carregamento (nao apenas quando o usuario visita Configuracoes),
+// senao o status/botao ficam presos no estado padrao ate a primeira visita.
+function syncViabMlStatus() {
+    const btnViabConnectMl = document.getElementById('btn-viab-connect-ml');
+    const btnViabDisconnectMl = document.getElementById('btn-viab-disconnect-ml');
+    const statusTextViabMl = document.getElementById('viab-ml-status-text');
+    if (!btnViabConnectMl || !statusTextViabMl) return;
+
+    if (btnViabDisconnectMl && !btnViabDisconnectMl.dataset.bound) {
+        btnViabDisconnectMl.dataset.bound = 'true';
+        btnViabDisconnectMl.addEventListener('click', async (e) => {
+            e.preventDefault();
+            if (!state.currentUser) return;
+            if (!confirm('Desconectar sua conta do Mercado Livre? As simulações voltarão a usar estimativas padrão até você reconectar.')) return;
+
+            btnViabDisconnectMl.disabled = true;
+            try {
+                await fetch('/api/ml-disconnect', {
+                    method: 'POST',
+                    headers: { 'user-token': state.currentUser.id }
+                });
+            } catch (err) {
+                console.error('Erro ao desconectar ML:', err);
+            }
+            btnViabDisconnectMl.disabled = false;
+            syncViabMlStatus();
+        });
+    }
+
+    mlApiFetch('/api/ml-status').then(res => {
+        if (res && res.connected) {
+            statusTextViabMl.textContent = `Conectado como: ${res.nickname}`;
+            statusTextViabMl.style.color = 'var(--success)';
+            btnViabConnectMl.textContent = 'Reconectar';
+            btnViabConnectMl.className = 'btn btn-secondary btn-sm';
+            if (btnViabDisconnectMl) btnViabDisconnectMl.classList.remove('hidden');
+        } else {
+            statusTextViabMl.textContent = 'Não conectado. Algumas simulações automáticas usarão estimativas padrão.';
+            statusTextViabMl.style.color = 'var(--danger)';
+            btnViabConnectMl.textContent = 'Conectar Conta ML';
+            btnViabConnectMl.className = 'btn btn-primary btn-sm';
+            btnViabConnectMl.style.backgroundColor = '#FFE600';
+            btnViabConnectMl.style.color = '#2D3277';
+            if (btnViabDisconnectMl) btnViabDisconnectMl.classList.add('hidden');
+        }
+    });
+}
+
 function syncSettingsUI() {
     if (state.currentUser) {
         document.getElementById('settings-user-email').textContent = state.currentUser.email;
@@ -4396,26 +4446,7 @@ function syncSettingsUI() {
         });
     }
 
-    // Sincronizar status do Mercado Livre (Aba Viabilidade)
-    const btnViabConnectMl = document.getElementById('btn-viab-connect-ml');
-    const statusTextViabMl = document.getElementById('viab-ml-status-text');
-    if (btnViabConnectMl && statusTextViabMl) {
-        mlApiFetch('/api/ml-status').then(res => {
-            if (res && res.connected) {
-                statusTextViabMl.textContent = `Conectado como: ${res.nickname}`;
-                statusTextViabMl.style.color = 'var(--success)';
-                btnViabConnectMl.textContent = 'Reconectar';
-                btnViabConnectMl.className = 'btn btn-secondary btn-sm';
-            } else {
-                statusTextViabMl.textContent = 'Não conectado. Algumas simulações automáticas usarão estimativas padrão.';
-                statusTextViabMl.style.color = 'var(--danger)';
-                btnViabConnectMl.textContent = 'Conectar Conta ML';
-                btnViabConnectMl.className = 'btn btn-primary btn-sm';
-                btnViabConnectMl.style.backgroundColor = '#FFE600';
-                btnViabConnectMl.style.color = '#2D3277';
-            }
-        });
-    }
+    syncViabMlStatus();
 
     btnLight.onclick = () => {
         document.documentElement.setAttribute('data-theme', 'light');
