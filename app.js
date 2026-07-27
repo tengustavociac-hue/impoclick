@@ -4542,28 +4542,6 @@ async function renderHomeDashboard() {
     const fobEl = document.getElementById('home-kpi-fob');
     if (fobEl) fobEl.textContent = formatBRL(totalFob);
 
-    const ncmCounts = {};
-    historyList.forEach(item => {
-        const products = (item.stateData && item.stateData.products) || [];
-        products.forEach(p => {
-            const code = (p.ncm || '').trim();
-            if (!code) return;
-            ncmCounts[code] = (ncmCounts[code] || 0) + 1;
-        });
-    });
-    const topNcmEntry = Object.entries(ncmCounts).sort((a, b) => b[1] - a[1])[0];
-    const ncmEl = document.getElementById('home-kpi-ncm');
-    const ncmCountEl = document.getElementById('home-kpi-ncm-count');
-    if (ncmEl) {
-        if (topNcmEntry) {
-            ncmEl.textContent = topNcmEntry[0];
-            if (ncmCountEl) ncmCountEl.textContent = `em ${topNcmEntry[1]} produto(s) do histórico`;
-        } else {
-            ncmEl.textContent = '—';
-            if (ncmCountEl) ncmCountEl.textContent = 'sem lotes salvos ainda';
-        }
-    }
-
     const continueCard = document.getElementById('home-continue-card');
     if (continueCard) {
         if (historyList.length > 0) {
