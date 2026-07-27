@@ -834,6 +834,26 @@ th, td {
     border-bottom: 1px solid var(--border-color);
 }
 
+/* Tabela de resultados (Distribuição de Custos por Produto): os valores em
+   R$ não podem quebrar no meio ("R$" numa linha, o número na outra) em
+   nenhum zoom/resolução. white-space:nowrap garante isso linha a linha —
+   a segunda linha ("Total: R$ ...", já um <span> à parte) continua podendo
+   ficar embaixo, só não quebra dentro de si mesma. A fonte também encolhe
+   um pouco em telas/zooms mais apertados antes de precisar de scroll (que
+   o .table-container já garante como último recurso). */
+.table-results {
+    font-size: clamp(0.7rem, 0.62rem + 0.35vw, 0.875rem);
+}
+
+td.text-right {
+    white-space: nowrap;
+}
+
+td.text-right span,
+td.text-right div {
+    white-space: nowrap;
+}
+
 th {
     background-color: var(--bg-input);
     color: var(--text-muted);
@@ -985,11 +1005,12 @@ tfoot th, tfoot td {
 }
 
 .kpi-value {
-    font-size: 1.5rem;
+    font-size: clamp(1.05rem, 0.8rem + 1vw, 1.5rem);
     font-weight: 800;
     color: var(--text-primary);
     margin: 0.35rem 0;
     line-height: 1.2;
+    white-space: nowrap;
 }
 
 .kpi-sub {
@@ -2109,6 +2130,7 @@ tfoot th, tfoot td {
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.05em;
+    white-space: nowrap;
 }
 
 .ticker-value {
@@ -2116,6 +2138,7 @@ tfoot th, tfoot td {
     font-size: 1.1rem;
     font-weight: 800;
     font-variant-numeric: tabular-nums;
+    white-space: nowrap;
     background: var(--gradient-brand);
     -webkit-background-clip: text;
     background-clip: text;
