@@ -7,16 +7,19 @@ module.exports = async (req, res) => {
         return res.status(200).send('OK');
     }
 
-    // Inicializa clientes
-    const client = new MercadoPagoConfig({ accessToken: process.env.MP_ACCESS_TOKEN });
-    const payment = new Payment(client);
-    
-    const supabaseAdmin = createClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY
-    );
-
     try {
+        // Inicializa clientes aqui dentro: se faltar alguma env var (ex:
+        // SUPABASE_URL), isso agora vira um 500 tratado em vez de derrubar a
+        // função inteira sem log (mesma classe de bug já corrigida em
+        // api/_ml-helper.js).
+        const client = new MercadoPagoConfig({ accessToken: process.env.MP_ACCESS_TOKEN });
+        const payment = new Payment(client);
+
+        const supabaseAdmin = createClient(
+          process.env.SUPABASE_URL,
+          process.env.SUPABASE_SERVICE_ROLE_KEY
+        );
+
         const { type, data, action } = req.body;
 
         // PAGAMENTO ÚNICO (PIX OU CARTÃO - 1 MÊS)
@@ -39,12 +42,10 @@ module.exports = async (req, res) => {
         // ASSINATURA RECORRENTE (CARTÃO - PREAPPROVAL)
         if ((type === 'subscription_preapproval' || action === 'subscription_preapproval.created') && data && data.id) {
             // No SDK v2, podemos fazer um fetch direto ou usar a API preapproval
-            // Para simplificar, como o ID da subscription (data.id) vem no corpo, 
-            // e infelizmente o SDK v2 do node não expõe facilmente get() de preapproval, 
-            // vamos fazer fetch direto na API REST do MP
-            const fetch = require('node-fetch'); // O Vercel Node 18+ suporta fetch nativo, então não precisamos instalar node-fetch no package.json, vamos usar fetch() global
-            
-            const response = await globalThis.fetch(`https://api.mercadopago.com/preapproval/${data.id}`, {
+            // Para simplificar, como o ID da subscription (data.id) vem no corpo,
+            // e infelizmente o SDK v2 do node não expõe facilmente get() de preapproval,
+            // vamos fazer fetch direto na API REST do MP (fetch nativo do Node 18+)
+            const response = await fetch(`https://api.mercadopago.com/preapproval/${data.id}`, {
                 headers: { 'Authorization': `Bearer ${process.env.MP_ACCESS_TOKEN}` }
             });
             const subData = await response.json();

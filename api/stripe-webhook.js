@@ -8,12 +8,6 @@ const config = {
   },
 };
 
-const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
-const supabaseAdmin = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
-
 // Helper function to read the raw body from the request stream
 async function buffer(readable) {
   const chunks = [];
@@ -32,7 +26,18 @@ module.exports = async (req, res) => {
   const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
   let event;
+  let stripe;
+  let supabaseAdmin;
   try {
+    // Instanciados aqui dentro (não no topo do módulo): se faltar alguma env
+    // var, isso agora vira um 500 tratado em vez de derrubar a função inteira
+    // sem log assim que o Vercel carrega o módulo.
+    stripe = Stripe(process.env.STRIPE_SECRET_KEY);
+    supabaseAdmin = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    );
+
     const rawBody = await buffer(req);
     event = stripe.webhooks.constructEvent(rawBody, sig, endpointSecret);
   } catch (err) {

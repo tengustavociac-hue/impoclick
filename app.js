@@ -30,6 +30,19 @@ let state = {
 
 let editingProductId = null;
 
+// Escapa texto livre digitado pelo usuário (nome/descrição de produto, nome do
+// lote, etc.) antes de inserir via innerHTML — sem isso, algo como
+// "<img src=x onerror=...>" digitado como nome executaria ao renderizar.
+function escapeHtml(value) {
+    if (value === null || value === undefined) return '';
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 // LOAD PERSISTED STATE
 async function loadState() {
     let savedState = null;
@@ -1306,8 +1319,8 @@ function updateUI() {
                 <div style="display: flex; align-items: center; gap: 0.75rem;">
                     ${photoHTML}
                     <div>
-                        <div style="font-weight: 600; color: var(--text-color);">${p.name}</div>
-                        ${p.description ? `<div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 400; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${p.description}</div>` : ''}
+                        <div style="font-weight: 600; color: var(--text-color);">${escapeHtml(p.name)}</div>
+                        ${p.description ? `<div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 400; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(p.description)}</div>` : ''}
                     </div>
                 </div>
             </td>
@@ -1547,7 +1560,7 @@ function updateUI() {
         }
 
         tr.innerHTML = `
-            <td style="font-weight:600;">${item.product.name}</td>
+            <td style="font-weight:600;">${escapeHtml(item.product.name)}</td>
             <td class="text-right">
                 <span style="font-size:0.8rem; color:var(--text-muted); display:block;">
                     ${formatCurrency(item.product.unitPrice, state.currency)} un.
@@ -1648,7 +1661,7 @@ function updateUI() {
             
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td style="font-weight:600;">${item.product.name}</td>
+                <td style="font-weight:600;">${escapeHtml(item.product.name)}</td>
                 <td class="text-center"><span class="ncm-badge">${item.product.ncm || '-'}</span></td>
                 <td class="text-right">R$ ${item.vaBRL.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                 <td class="text-right">
@@ -1754,7 +1767,7 @@ function updateUI() {
         
         barItem.innerHTML = `
             <div class="bar-header">
-                <span class="bar-name">${item.product.name} (x${item.product.qty})</span>
+                <span class="bar-name">${escapeHtml(item.product.name)} (x${item.product.qty})</span>
                 <span class="bar-value">
                     <span class="original">R$ ${itemUnitOriginal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                     R$ ${itemUnitFinal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} un.
@@ -3045,7 +3058,7 @@ function renderCatalogTable() {
     state.catalog.forEach(p => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td><strong>${p.name}</strong><br><span style="font-size:0.7rem; color:var(--text-muted);">NCM: ${p.ncm || 'N/A'}</span></td>
+            <td><strong>${escapeHtml(p.name)}</strong><br><span style="font-size:0.7rem; color:var(--text-muted);">NCM: ${escapeHtml(p.ncm) || 'N/A'}</span></td>
             <td>${p.ncm || '-'}</td>
             <td>${p.weight.toFixed(3)} kg</td>
             <td>${p.currency === 'USD' ? '$' : p.currency === 'EUR' ? '€' : 'R$'} ${p.price.toFixed(2)}</td>
@@ -3216,8 +3229,8 @@ function initDocumentsModule() {
                 tr.innerHTML = `
                     <td style="padding: 0.4rem; text-align: center; border: 1px solid #0f172a;">${index + 1}</td>
                     <td style="padding: 0.4rem; text-align: center; border: 1px solid #0f172a;">${photoHTML}</td>
-                    <td style="padding: 0.4rem; border: 1px solid #0f172a;"><strong>${p.name}</strong></td>
-                    <td style="padding: 0.4rem; border: 1px solid #0f172a; color: #475569; font-size: 0.65rem;">${p.description || '-'}</td>
+                    <td style="padding: 0.4rem; border: 1px solid #0f172a;"><strong>${escapeHtml(p.name)}</strong></td>
+                    <td style="padding: 0.4rem; border: 1px solid #0f172a; color: #475569; font-size: 0.65rem;">${escapeHtml(p.description) || '-'}</td>
                     <td style="padding: 0.4rem; text-align: center; border: 1px solid #0f172a;">${p.ncm || '-'}</td>
                     <td style="padding: 0.4rem; text-align: center; border: 1px solid #0f172a; font-weight: 600;">${p.qty}</td>
                     <td style="padding: 0.4rem; text-align: right; border: 1px solid #0f172a;">${p.unitPrice.toLocaleString('en-US', {style:'currency', currency: state.currency})}</td>
@@ -3391,8 +3404,8 @@ function initDocumentsModule() {
                 tr.innerHTML = `
                     <td style="padding: 0.4rem; text-align: center; border: 1px solid #0f172a;">${index + 1}</td>
                     <td style="padding: 0.4rem; text-align: center; border: 1px solid #0f172a;">${photoHTML}</td>
-                    <td style="padding: 0.4rem; border: 1px solid #0f172a;"><strong>${p.name}</strong></td>
-                    <td style="padding: 0.4rem; border: 1px solid #0f172a; color: #475569; font-size: 0.65rem;">${p.description || '-'}</td>
+                    <td style="padding: 0.4rem; border: 1px solid #0f172a;"><strong>${escapeHtml(p.name)}</strong></td>
+                    <td style="padding: 0.4rem; border: 1px solid #0f172a; color: #475569; font-size: 0.65rem;">${escapeHtml(p.description) || '-'}</td>
                     <td style="padding: 0.4rem; text-align: center; border: 1px solid #0f172a;">${p.ncm || '-'}</td>
                     <td style="padding: 0.4rem; text-align: center; border: 1px solid #0f172a; font-weight: 600;">${p.qty}</td>
                     <td style="padding: 0.4rem; text-align: right; border: 1px solid #0f172a;">${p.unitPrice.toLocaleString('en-US', {style:'currency', currency: state.currency})}</td>
@@ -3563,12 +3576,12 @@ function initDocumentsModule() {
                 const totalNW = unitNW * p.qty;
                 const totalGW = unitGW * p.qty;
                 sumQty += p.qty; sumNW += totalNW; sumGW += totalGW;
-                const hsCode = p.ncm ? ' <span style="color:#64748b;font-size:0.62rem;">HS: ' + p.ncm + '</span>' : '';
-                const desc   = p.description ? '<div style="color:#64748b;font-size:0.62rem;">' + p.description + '</div>' : '';
+                const hsCode = p.ncm ? ' <span style="color:#64748b;font-size:0.62rem;">HS: ' + escapeHtml(p.ncm) + '</span>' : '';
+                const desc   = p.description ? '<div style="color:#64748b;font-size:0.62rem;">' + escapeHtml(p.description) + '</div>' : '';
                 const rowBg  = itemNum % 2 === 0 ? 'background:#f8fafc;' : '';
                 tbodyItems.innerHTML += '<tr style="' + rowBg + 'border-bottom:1px solid #e2e8f0;">'
                     + '<td style="padding:0.4rem 0.45rem;color:#64748b;">' + itemNum + '</td>'
-                    + '<td style="padding:0.4rem 0.45rem;"><strong>' + p.name + '</strong>' + hsCode + desc
+                    + '<td style="padding:0.4rem 0.45rem;"><strong>' + escapeHtml(p.name) + '</strong>' + hsCode + desc
                     + '<div style="font-size:0.62rem;color:#94a3b8;margin-top:1px;">Pkg: ' + pkgType + '</div></td>'
                     + '<td style="padding:0.4rem 0.45rem;text-align:center;">' + p.qty + '</td>'
                     + '<td style="padding:0.4rem 0.45rem;text-align:center;">' + p.qty + '</td>'
@@ -4299,7 +4312,7 @@ async function renderHistoryTable() {
     historyList.forEach(item => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td><strong>${item.name}</strong></td>
+            <td><strong>${escapeHtml(item.name)}</strong></td>
             <td>${item.date}</td>
             <td>${item.itemsCount}</td>
             <td>${item.currency}</td>
