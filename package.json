@@ -9,8 +9,6 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",
     "stripe": "^14.14.0",
-    "mercadopago": "^2.0.7",
-    "@sparticuz/chromium": "133.0.0",
-    "puppeteer-core": "^23.11.1"
+    "mercadopago": "^2.0.7"
   }
 }
