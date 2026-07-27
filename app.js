@@ -353,6 +353,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     initAuthArt();
     await checkAuthSession();
+
+    // Se a sessão veio de um link de confirmação de e-mail (type=signup),
+    // avisa a pessoa em vez de simplesmente abrir o app em silêncio.
+    if (state.currentUser && /type=signup/.test(window.__authRedirectHash || '')) {
+        showToast('E-mail confirmado com sucesso! Bem-vindo(a) ao Impoclick.', 'success', 6000);
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
     syncViabMlStatus();
     await loadState();
     registerEventListeners();
@@ -2427,22 +2435,28 @@ function registerAuthEventListeners() {
     }
 
     // Login Form Submit
+    const resendBtn = document.getElementById('btn-resend-confirmation');
     if (formLogin) {
         formLogin.addEventListener('submit', async (e) => {
             e.preventDefault();
             const email = document.getElementById('login-email').value.trim().toLowerCase();
             const password = document.getElementById('login-password').value;
             const alertEl = document.getElementById('login-alert');
+            if (resendBtn) resendBtn.classList.add('hidden');
 
             try {
                 showAuthAlert(alertEl, 'success', 'Conectando ao servidor...');
-                
+
                 const { data, error } = await window.db.signIn(email, password);
-                
+
                 if (error) {
                     let msg = 'E-mail ou senha incorretos.';
                     if (error.message && error.message.includes('Email not confirmed')) {
-                        msg = 'Por favor, confirme seu e-mail (verifique a caixa de entrada).';
+                        msg = 'Confirme seu e-mail antes de entrar — verifique sua caixa de entrada (e o spam).';
+                        if (resendBtn) {
+                            resendBtn.classList.remove('hidden');
+                            resendBtn.dataset.email = email;
+                        }
                     } else if (error.message) {
                         msg = error.message.includes('Invalid login') ? msg : error.message;
                     }
@@ -2467,6 +2481,28 @@ function registerAuthEventListeners() {
         });
     }
 
+    if (resendBtn) {
+        resendBtn.addEventListener('click', async () => {
+            const email = resendBtn.dataset.email;
+            const alertEl = document.getElementById('login-alert');
+            if (!email) return;
+            resendBtn.disabled = true;
+            try {
+                const { error } = await window.db.resendConfirmation(email);
+                if (error) {
+                    showAuthAlert(alertEl, 'error', 'Não foi possível reenviar agora: ' + error.message);
+                } else {
+                    showAuthAlert(alertEl, 'success', `E-mail de confirmação reenviado para ${email}. Verifique sua caixa de entrada (e o spam).`);
+                    resendBtn.classList.add('hidden');
+                }
+            } catch (err) {
+                showAuthAlert(alertEl, 'error', 'Erro ao reenviar o e-mail.');
+            } finally {
+                resendBtn.disabled = false;
+            }
+        });
+    }
+
     // Register Form Submit
     if (formRegister) {
         formRegister.addEventListener('submit', async (e) => {
@@ -2483,15 +2519,24 @@ function registerAuthEventListeners() {
 
             try {
                 showAuthAlert(alertEl, 'success', 'Criando conta no servidor...');
-                
+
                 const { data, error } = await window.db.signUp(email, password, name);
-                
+
                 if (error) {
                     showAuthAlert(alertEl, 'error', error.message || 'Erro ao criar conta. O e-mail pode já estar em uso.');
                     return;
                 }
 
-                // Log in automatically
+                // Se a confirmação de e-mail estiver ativa no Supabase, a conta é
+                // criada mas não vem com sessão — o acesso só libera depois que a
+                // pessoa clicar no link enviado por e-mail.
+                if (data.user && !data.session) {
+                    formRegister.reset();
+                    showAuthAlert(alertEl, 'success', `Conta criada! Enviamos um e-mail de confirmação para ${email}. Clique no link recebido para liberar o acesso (confira também a caixa de spam).`);
+                    return;
+                }
+
+                // Confirmação de e-mail desativada — sessão já vem pronta, loga direto
                 await checkAuthSession();
 
                 showAuthAlert(alertEl, 'success', 'Conta criada com sucesso! Carregando...');
@@ -2532,6 +2577,7 @@ function showAuthAlert(element, type, message) {
 function clearAuthAlerts() {
     const loginAlert = document.getElementById('login-alert');
     const registerAlert = document.getElementById('register-alert');
+    const resendBtn = document.getElementById('btn-resend-confirmation');
     if (loginAlert) {
         loginAlert.className = 'auth-alert hidden';
         loginAlert.textContent = '';
@@ -2540,6 +2586,7 @@ function clearAuthAlerts() {
         registerAlert.className = 'auth-alert hidden';
         registerAlert.textContent = '';
     }
+    if (resendBtn) resendBtn.classList.add('hidden');
 }
 
 // Ilustração animada da tela de login: contêiner do logo sem o fundo branco,

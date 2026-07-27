@@ -1,6 +1,11 @@
 const SUPABASE_URL = 'https://qmwvzhpyxrkyxvekcazs.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_5xxYDOzIcWWpz2J37MuVaw_XJCpQM5i';
 
+// Guarda o hash original ANTES do supabase-js processá-lo/limpá-lo, para o
+// app.js saber depois se essa sessão veio de um link de confirmação de e-mail
+// (type=signup) e mostrar uma mensagem de boas-vindas apropriada.
+window.__authRedirectHash = window.location.hash || '';
+
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Funções Helpers Globais para Banco de Dados
@@ -11,7 +16,8 @@ window.db = {
             email: email,
             password: password,
             options: {
-                data: { name: name }
+                data: { name: name },
+                emailRedirectTo: window.location.origin
             }
         });
     },
@@ -19,6 +25,13 @@ window.db = {
         return await supabaseClient.auth.signInWithPassword({
             email: email,
             password: password,
+        });
+    },
+    async resendConfirmation(email) {
+        return await supabaseClient.auth.resend({
+            type: 'signup',
+            email: email,
+            options: { emailRedirectTo: window.location.origin }
         });
     },
     async signOut() {
