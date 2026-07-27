@@ -308,8 +308,25 @@ h1, h2, h3, .card-title, .modal-header h3, .auth-header h2, .nav-logo span, .bra
 
 .package-diagram {
     width: 100%;
-    max-width: 260px;
+    max-width: 160px;
     height: auto;
+}
+
+.input-with-hint {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.input-compact {
+    max-width: 100px;
+    flex-shrink: 0;
+}
+
+.input-hint {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    white-space: nowrap;
 }
 
 .package-diagram-caption {
