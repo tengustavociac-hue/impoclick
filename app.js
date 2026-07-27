@@ -3981,6 +3981,10 @@ function initFeasibilityModule() {
     // Custo final de cada regime, mantido atualizado para a aba de Comparação de Mercado
     let lastSimpUnitCost = 0;
     let lastFormalUnitCost = 0;
+    // Se o usuário editar manualmente o campo de custo final na Comparação de
+    // Mercado, paramos de sobrescrevê-lo com o valor automático das outras abas.
+    let simplesRefTouched = false;
+    let formalRefTouched = false;
 
     // --- IMPORTAÇÃO SIMPLIFICADA ---
     function renderSimples() {
@@ -4308,12 +4312,13 @@ function initFeasibilityModule() {
     function renderMercado() {
         const sourceRadio = document.querySelector('input[name="mkt-cost-source"]:checked');
         const source = sourceRadio ? sourceRadio.value : 'simples';
-        const refCost = source === 'formal' ? lastFormalUnitCost : lastSimpUnitCost;
 
         const refSimplesEl = document.getElementById('mkt-ref-simples');
         const refFormalEl = document.getElementById('mkt-ref-formal');
-        if (refSimplesEl) refSimplesEl.value = brl(lastSimpUnitCost);
-        if (refFormalEl) refFormalEl.value = brl(lastFormalUnitCost);
+        if (refSimplesEl && !simplesRefTouched) refSimplesEl.value = lastSimpUnitCost.toFixed(2);
+        if (refFormalEl && !formalRefTouched) refFormalEl.value = lastFormalUnitCost.toFixed(2);
+
+        const refCost = source === 'formal' ? num('mkt-ref-formal') : num('mkt-ref-simples');
 
         const price = num('mkt-f-price');
         const feePct = num('mkt-f-fee', 13);
@@ -4371,6 +4376,22 @@ function initFeasibilityModule() {
         const el = document.getElementById(id);
         if (el) el.addEventListener('input', renderMercado);
     });
+
+    const refSimplesInput = document.getElementById('mkt-ref-simples');
+    const refFormalInput = document.getElementById('mkt-ref-formal');
+    if (refSimplesInput) {
+        refSimplesInput.addEventListener('input', () => {
+            simplesRefTouched = true;
+            renderMercado();
+        });
+    }
+    if (refFormalInput) {
+        refFormalInput.addEventListener('input', () => {
+            formalRefTouched = true;
+            renderMercado();
+        });
+    }
+
     renderMercado();
 }
 

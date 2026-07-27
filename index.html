@@ -1875,15 +1875,15 @@
                                     <span>Importação Formal</span>
                                 </label>
                             </div>
-                            <small class="helper-text">Valores calculados automaticamente a partir das outras duas abas — preencha-as primeiro.</small>
+                            <small class="helper-text">Preenchido automaticamente a partir das outras duas abas — ajuste manualmente se quiser usar outro valor.</small>
                         </div>
                         <div class="form-group">
-                            <label>Custo Final Simplificada (R$/un.)</label>
-                            <input type="text" id="mkt-ref-simples" class="form-control" value="R$ 0,00" disabled>
+                            <label for="mkt-ref-simples">Custo Final Simplificada (R$/un.)</label>
+                            <input type="number" id="mkt-ref-simples" class="form-control" value="0" step="0.01" min="0">
                         </div>
                         <div class="form-group">
-                            <label>Custo Final Formal (R$/un.)</label>
-                            <input type="text" id="mkt-ref-formal" class="form-control" value="R$ 0,00" disabled>
+                            <label for="mkt-ref-formal">Custo Final Formal (R$/un.)</label>
+                            <input type="number" id="mkt-ref-formal" class="form-control" value="0" step="0.01" min="0">
                         </div>
                     </div>
                 </section>
@@ -1940,6 +1940,30 @@
                     <p class="small" style="color: var(--text-muted); margin-bottom: 1.25rem;">
                         O frete é calculado pela calculadora oficial do Mercado Livre (mesma regra do peso faturável — o maior valor entre peso real e <strong>peso cubado</strong>, comprimento × largura × altura ÷ 6000), usando a reputação e o tipo de logística da sua conta. Se o servidor local não estiver disponível, usamos uma estimativa por faixa de peso como alternativa.
                     </p>
+
+                    <div class="package-diagram-wrap">
+                        <svg class="package-diagram" viewBox="0 0 260 210" xmlns="http://www.w3.org/2000/svg">
+                            <defs>
+                                <marker id="pkg-dim-arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                                    <path d="M0,0 L10,5 L0,10 z" fill="var(--text-muted)"/>
+                                </marker>
+                            </defs>
+                            <polygon points="45,155 155,155 155,70 45,70" fill="#eab308" fill-opacity="0.28" stroke="var(--border-color)" stroke-width="1.5"/>
+                            <polygon points="45,70 80,45 190,45 155,70" fill="#eab308" fill-opacity="0.5" stroke="var(--border-color)" stroke-width="1.5"/>
+                            <polygon points="155,70 190,45 190,130 155,155" fill="#eab308" fill-opacity="0.16" stroke="var(--border-color)" stroke-width="1.5"/>
+
+                            <line x1="45" y1="172" x2="155" y2="172" stroke="var(--text-muted)" stroke-width="1.25" marker-start="url(#pkg-dim-arrow)" marker-end="url(#pkg-dim-arrow)"/>
+                            <text x="100" y="190" text-anchor="middle" font-size="12" font-weight="600" fill="var(--text-muted)">Comprimento</text>
+
+                            <line x1="26" y1="70" x2="26" y2="155" stroke="var(--text-muted)" stroke-width="1.25" marker-start="url(#pkg-dim-arrow)" marker-end="url(#pkg-dim-arrow)"/>
+                            <text x="0" y="0" text-anchor="middle" font-size="12" font-weight="600" fill="var(--text-muted)" transform="translate(14,112) rotate(-90)">Altura</text>
+
+                            <line x1="163" y1="164" x2="198" y2="139" stroke="var(--text-muted)" stroke-width="1.25" marker-start="url(#pkg-dim-arrow)" marker-end="url(#pkg-dim-arrow)"/>
+                            <text x="228" y="128" text-anchor="middle" font-size="12" font-weight="600" fill="var(--text-muted)">Largura</text>
+                        </svg>
+                        <p class="package-diagram-caption">Meça sempre a <strong>embalagem fechada</strong> (a caixa que será enviada), não só o produto.</p>
+                    </div>
+
                     <div class="viab-form-grid">
                         <div class="form-group">
                             <label>Peso do Produto (g)</label>
