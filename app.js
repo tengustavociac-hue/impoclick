@@ -33,6 +33,60 @@ let editingProductId = null;
 // Escapa texto livre digitado pelo usuário (nome/descrição de produto, nome do
 // lote, etc.) antes de inserir via innerHTML — sem isso, algo como
 // "<img src=x onerror=...>" digitado como nome executaria ao renderizar.
+// Notificação não bloqueante (substitui alert()) — some sozinha depois de
+// alguns segundos, não trava o resto da página como o alert() nativo.
+function showToast(message, type = 'info', duration = 4500) {
+    const container = document.getElementById('toast-container');
+    if (!container) { console.log(message); return; }
+    const el = document.createElement('div');
+    el.className = `toast toast-${type}`;
+    el.textContent = message;
+    container.appendChild(el);
+    setTimeout(() => {
+        el.classList.add('toast-hide');
+        setTimeout(() => el.remove(), 200);
+    }, duration);
+}
+
+// Modal de confirmação assíncrono (substitui confirm()) — devolve uma
+// Promise<boolean>, então quem chama precisa de "await".
+function showConfirm(message, options = {}) {
+    return new Promise(resolve => {
+        const modal = document.getElementById('confirm-modal');
+        const titleEl = document.getElementById('confirm-modal-title');
+        const msgEl = document.getElementById('confirm-modal-message');
+        const okBtn = document.getElementById('confirm-modal-ok');
+        const cancelBtn = document.getElementById('confirm-modal-cancel');
+        if (!modal || !msgEl || !okBtn || !cancelBtn) { resolve(window.confirm(message)); return; }
+
+        titleEl.textContent = options.title || 'Confirmar ação';
+        msgEl.textContent = message;
+        okBtn.textContent = options.confirmText || 'Confirmar';
+        okBtn.className = options.danger ? 'btn btn-danger btn-sm' : 'btn btn-primary btn-sm';
+
+        modal.classList.remove('hidden');
+
+        function cleanup(result) {
+            modal.classList.add('hidden');
+            okBtn.removeEventListener('click', onOk);
+            cancelBtn.removeEventListener('click', onCancel);
+            modal.removeEventListener('click', onOverlayClick);
+            document.removeEventListener('keydown', onKeydown);
+            resolve(result);
+        }
+        function onOk() { cleanup(true); }
+        function onCancel() { cleanup(false); }
+        function onOverlayClick(e) { if (e.target === modal) cleanup(false); }
+        function onKeydown(e) { if (e.key === 'Escape') cleanup(false); }
+
+        okBtn.addEventListener('click', onOk);
+        cancelBtn.addEventListener('click', onCancel);
+        modal.addEventListener('click', onOverlayClick);
+        document.addEventListener('keydown', onKeydown);
+        okBtn.focus();
+    });
+}
+
 function escapeHtml(value) {
     if (value === null || value === undefined) return '';
     return String(value)
@@ -268,7 +322,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Check if coming back from ML oauth
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('ml_connected') === 'true') {
-        alert('Conta do Mercado Livre conectada com sucesso!');
+        showToast('Conta do Mercado Livre conectada com sucesso!', 'success');
         window.history.replaceState({}, document.title, window.location.pathname);
         // Switch to settings view
         setTimeout(() => {
@@ -585,8 +639,9 @@ function registerEventListeners() {
     });
 
     // Clean all button
-    document.getElementById('btn-clear-all').addEventListener('click', () => {
-        if (confirm('Tem certeza de que deseja apagar todos os produtos e zerar as configurações?')) {
+    document.getElementById('btn-clear-all').addEventListener('click', async () => {
+        const ok = await showConfirm('Tem certeza de que deseja apagar todos os produtos e zerar as configurações?', { title: 'Limpar tudo', confirmText: 'Limpar', danger: true });
+        if (ok) {
             state.products = [];
             state.freight = 0;
             state.insurance = 0;
@@ -819,7 +874,19 @@ function exitEditMode() {
 // PRE-CARREGAMENTO DA BASE OFICIAL DE NCMS
 // ==========================================
 
+const NCM_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 dias
+
 async function preloadOfficialNcmDatabase() {
+    // Evita rebaixar a base inteira de NCMs (às vezes vários MB) toda vez que
+    // o app abre — só refaz o download se o cache local estiver vazio ou
+    // tiver mais de 7 dias.
+    const cacheSize = state.ncmCache ? Object.keys(state.ncmCache).length : 0;
+    const cacheAge = state.ncmCacheUpdatedAt ? (Date.now() - state.ncmCacheUpdatedAt) : Infinity;
+    if (cacheSize > 100 && cacheAge < NCM_CACHE_MAX_AGE_MS) {
+        console.log(`Base de NCMs já em cache (${cacheSize} códigos, atualizada há ${Math.round(cacheAge / 86400000)} dia(s)) — pulando novo download.`);
+        return;
+    }
+
     // 1. Tenta carregar a base oficial do Portal Único Siscomex
     try {
         const response = await fetch('https://portalunico.siscomex.gov.br/classif/api/publico/nomenclatura/download/json');
@@ -833,6 +900,7 @@ async function preloadOfficialNcmDatabase() {
                         state.ncmCache[cleanCode] = item.Descricao;
                     }
                 });
+                state.ncmCacheUpdatedAt = Date.now();
                 saveState();
                 console.log("Base de NCMs oficial do Siscomex pré-carregada e mesclada ao cache.");
                 return;
@@ -859,6 +927,7 @@ async function preloadOfficialNcmDatabase() {
                     }
                 }
             });
+            state.ncmCacheUpdatedAt = Date.now();
             saveState();
             console.log("Base de NCMs do GitHub CSV pré-carregada e mesclada ao cache.");
         }
@@ -1331,10 +1400,10 @@ function updateUI() {
             <td class="text-right" style="font-weight: 500;">${formatCurrency(itemFobForeign, state.currency)}</td>
             <td class="text-right">R$ ${itemFobBRL.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
             <td class="text-center" style="white-space: nowrap;">
-                <button class="btn-icon-edit btn-edit-item" data-id="${p.id}" title="Editar produto">
+                <button class="btn-icon-edit btn-edit-item" data-id="${p.id}" title="Editar produto" aria-label="Editar produto">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                 </button>
-                <button class="btn-icon-danger btn-delete-item" data-id="${p.id}" title="Excluir produto">
+                <button class="btn-icon-danger btn-delete-item" data-id="${p.id}" title="Excluir produto" aria-label="Excluir produto">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
                 </button>
             </td>
@@ -2333,7 +2402,7 @@ function registerAuthEventListeners() {
     // Logout Button
     if (btnLogout) {
         btnLogout.addEventListener('click', async () => {
-            if (confirm('Tem certeza de que deseja sair?')) {
+            if (await showConfirm('Tem certeza de que deseja sair?', { title: 'Sair do sistema', confirmText: 'Sair' })) {
                 await window.db.signOut();
                 state.currentUser = null;
                 updateUI();
@@ -2693,7 +2762,7 @@ function registerSubscriptionEventListeners() {
     const handleMpClick = async (apiEndpoint, btnElement) => {
         const session = await window.db.getSession();
         if (!session || !session.id) {
-            alert("Você precisa estar logado para assinar o plano.");
+            showToast("Você precisa estar logado para assinar o plano.", 'error');
             return;
         }
         
@@ -2714,14 +2783,14 @@ function registerSubscriptionEventListeners() {
             if (data.init_point) {
                 window.location.href = data.init_point;
             } else {
-                alert('Erro ao gerar link de pagamento: ' + (data.error || 'Erro desconhecido'));
+                showToast('Erro ao gerar link de pagamento: ' + (data.error || 'Erro desconhecido'), 'error');
                 if(btnMpCheckout) btnMpCheckout.disabled = false;
                 if(btnMpSubscription) btnMpSubscription.disabled = false;
                 if(mpLoading) mpLoading.style.display = 'none';
             }
         } catch (error) {
             console.error('Erro na chamada MP:', error);
-            alert('Erro de conexão ao gerar pagamento.');
+            showToast('Erro de conexão ao gerar pagamento.', 'error');
             if(btnMpCheckout) btnMpCheckout.disabled = false;
             if(btnMpSubscription) btnMpSubscription.disabled = false;
             if(mpLoading) mpLoading.style.display = 'none';
@@ -3071,7 +3140,7 @@ function renderCatalogTable() {
 }
 
 async function deleteCatalogItem(id) {
-    if (confirm('Deseja realmente excluir este produto do catálogo?')) {
+    if (await showConfirm('Deseja realmente excluir este produto do catálogo?', { title: 'Excluir produto', confirmText: 'Excluir', danger: true })) {
         await window.db.deleteCatalogItem(id);
         state.catalog = await window.db.getCatalog();
         renderCatalogTable();
@@ -3126,7 +3195,7 @@ function initCompanyModule() {
             state.company = { name, tradingName, cnpj, ie, email, address, phone, zip, attn };
             await window.db.saveCompany(state.company);
             
-            alert('Dados da empresa salvos com sucesso!');
+            showToast('Dados da empresa salvos com sucesso!', 'success');
             populateImporterSelectors();
         });
     }
@@ -4029,7 +4098,7 @@ function initFeasibilityModule() {
         mktSearchBtn.addEventListener('click', async () => {
             const query = (mktQueryInput ? mktQueryInput.value : '').trim();
             if (!query) {
-                alert('Informe o nome/tipo do produto para pesquisar.');
+                showToast('Informe o nome/tipo do produto para pesquisar.', 'error');
                 return;
             }
             const url = 'https://lista.mercadolivre.com.br/' + encodeURIComponent(query);
@@ -4192,7 +4261,7 @@ function initHistoryModule() {
     if (btnSave) {
         btnSave.addEventListener('click', async () => {
             if (state.products.length === 0) {
-                alert('Adicione pelo menos um produto na calculadora antes de salvar a importação.');
+                showToast('Adicione pelo menos um produto na calculadora antes de salvar a importação.', 'error');
                 return;
             }
             
@@ -4206,7 +4275,7 @@ function initHistoryModule() {
                 try {
                     const result = await window.db.saveHistory(finalName, state);
                     if (result && result.error) {
-                        alert('Erro técnico do Banco de Dados: ' + result.error.message + '\n\nCertifique-se de que rodou o script SQL no painel do Supabase corretamente.');
+                        showToast('Erro técnico do Banco de Dados: ' + result.error.message + '\n\nCertifique-se de que rodou o script SQL no painel do Supabase corretamente.', 'error', 8000);
                         return;
                     }
                 } catch(e) {
@@ -4245,7 +4314,7 @@ function initHistoryModule() {
                 localStorage.setItem('import_rateio_history', JSON.stringify(historyList));
             }
             
-            alert(`Lote "${finalName}" salvo no histórico com sucesso!`);
+            showToast(`Lote "${finalName}" salvo no histórico com sucesso!`, 'success');
             renderHistoryTable();
         });
     }
@@ -4328,7 +4397,7 @@ async function renderHistoryTable() {
 }
 
 async function deleteSavedImport(id) {
-    if (confirm('Deseja realmente excluir este lote do histórico?')) {
+    if (await showConfirm('Deseja realmente excluir este lote do histórico?', { title: 'Excluir lote', confirmText: 'Excluir', danger: true })) {
         if (state.currentUser) {
             try { await window.db.deleteHistory(id); } catch(e) {}
         } else {
@@ -4366,7 +4435,7 @@ async function loadSavedImport(id) {
     }
     
     if (item && item.stateData) {
-        if (confirm(`Deseja carregar a importação "${item.name}" na calculadora? Isso substituirá seus dados atuais.`)) {
+        if (await showConfirm(`Deseja carregar a importação "${item.name}" na calculadora? Isso substituirá seus dados atuais.`, { title: 'Carregar lote' })) {
             const savedUser = state.currentUser;
             state = { ...state, ...item.stateData };
             state.currentUser = savedUser;
@@ -4395,7 +4464,7 @@ async function loadSavedImport(id) {
             document.querySelectorAll('.nav-item, .nav-subitem').forEach(btn => btn.classList.remove('active'));
             document.querySelector('[data-view="view-calculator"]').classList.add('active');
             
-            alert(`Lote "${item.name}" carregado com sucesso na calculadora!`);
+            showToast(`Lote "${item.name}" carregado com sucesso na calculadora!`, 'success');
         }
     }
 }
@@ -4415,7 +4484,7 @@ function syncViabMlStatus() {
         btnViabDisconnectMl.addEventListener('click', async (e) => {
             e.preventDefault();
             if (!state.currentUser) return;
-            if (!confirm('Desconectar sua conta do Mercado Livre? As simulações voltarão a usar estimativas padrão até você reconectar.')) return;
+            if (!await showConfirm('Desconectar sua conta do Mercado Livre? As simulações voltarão a usar estimativas padrão até você reconectar.', { title: 'Desconectar Mercado Livre', confirmText: 'Desconectar', danger: true })) return;
 
             btnViabDisconnectMl.disabled = true;
             try {
@@ -4494,7 +4563,7 @@ function syncSettingsUI() {
             btnDisconnectMl.addEventListener('click', async (e) => {
                 e.preventDefault();
                 if (!state.currentUser) return;
-                if (!confirm('Desconectar sua conta do Mercado Livre? As simulações voltarão a usar estimativas padrão até você reconectar.')) return;
+                if (!await showConfirm('Desconectar sua conta do Mercado Livre? As simulações voltarão a usar estimativas padrão até você reconectar.', { title: 'Desconectar Mercado Livre', confirmText: 'Desconectar', danger: true })) return;
 
                 btnDisconnectMl.disabled = true;
                 try {
@@ -4548,11 +4617,15 @@ function syncSettingsUI() {
         syncSettingsUI();
     };
     
-    document.getElementById('btn-reset-database').onclick = () => {
-        if (confirm('ATENÇÃO: Isso apagará TODOS os dados salvos locais no navegador, incluindo histórico de lotes, produtos catalogados e empresa importadora. Deseja realmente resetar a base de dados?')) {
+    document.getElementById('btn-reset-database').onclick = async () => {
+        const ok = await showConfirm(
+            'Isso apagará TODOS os dados salvos localmente no navegador, incluindo histórico de lotes, produtos catalogados e empresa importadora.',
+            { title: 'Resetar base de dados', confirmText: 'Resetar', danger: true }
+        );
+        if (ok) {
             localStorage.clear();
-            alert('Toda a base de dados foi apagada. A página será reiniciada.');
-            location.reload();
+            showToast('Toda a base de dados foi apagada. A página será reiniciada.', 'success');
+            setTimeout(() => location.reload(), 900);
         }
     };
     

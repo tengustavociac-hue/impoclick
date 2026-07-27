@@ -4,6 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Impoclick - Simulador de Rateio e Viabilidade de Importação</title>
+    <link rel="icon" type="image/png" href="impoclick_logo.png">
+    <link rel="apple-touch-icon" href="impoclick_logo.png">
+    <meta name="description" content="Simulador inteligente de rateio de custos e viabilidade de importação: calcule impostos, frete, ICMS e o preço ideal de revenda antes de importar.">
+    <meta name="theme-color" content="#b8860b">
+    <meta property="og:title" content="Impoclick - Simulador de Rateio e Viabilidade de Importação">
+    <meta property="og:description" content="Simule custos, impostos e viabilidade de importação antes de fechar o pedido.">
+    <meta property="og:image" content="impoclick_logo.png">
+    <meta property="og:type" content="website">
     <script>
         document.documentElement.setAttribute('data-theme', localStorage.getItem('theme') || 'light');
     </script>
@@ -123,12 +131,29 @@
         </div>
     </div>
 
+    <!-- TOAST CONTAINER (substitui alert()) -->
+    <div id="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+    <!-- CONFIRM MODAL (substitui confirm()) -->
+    <div id="confirm-modal" class="modal-overlay hidden" role="alertdialog" aria-modal="true" aria-labelledby="confirm-modal-title">
+        <div class="modal-card" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3 id="confirm-modal-title">Confirmar ação</h3>
+            </div>
+            <p id="confirm-modal-message" style="color: var(--text-primary); font-size: 0.9rem; line-height: 1.5; margin-bottom: 1.5rem; white-space: pre-line;"></p>
+            <div style="display: flex; gap: 0.75rem; justify-content: flex-end;">
+                <button type="button" id="confirm-modal-cancel" class="btn btn-secondary btn-sm">Cancelar</button>
+                <button type="button" id="confirm-modal-ok" class="btn btn-primary btn-sm">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- PAYMENT MODAL -->
     <div id="payment-modal" class="modal-overlay hidden">
         <div class="modal-card">
             <div class="modal-header">
                 <h3>Assinatura Impoclick</h3>
-                <button id="btn-close-payment" class="modal-close-btn">&times;</button>
+                <button id="btn-close-payment" class="modal-close-btn" aria-label="Fechar">&times;</button>
             </div>
             
             <!-- Panel for Card (Recorrente) -->
@@ -237,12 +262,12 @@
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                     </div>
                     <span id="user-display-name">Olá!</span>
-                    <button id="btn-logout" class="btn-logout" title="Sair do Sistema">
+                    <button id="btn-logout" class="btn-logout" title="Sair do Sistema" aria-label="Sair do sistema">
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
                     </button>
                 </div>
                 <div class="theme-toggle">
-                    <button id="btn-theme" title="Alternar Tema">
+                    <button id="btn-theme" title="Alternar Tema" aria-label="Alternar entre tema claro e escuro">
                         <svg id="theme-icon-sun" class="hidden" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
                         <svg id="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
                     </button>
