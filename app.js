@@ -2713,6 +2713,72 @@ document.addEventListener('DOMContentLoaded', () => {
     initHistoryModule();
 });
 
+// Cabecalho passa a mostrar a view atual (icone + titulo + subtitulo) em vez
+// de repetir sempre "Impoclick" (que ja aparece fixo na barra lateral).
+const VIEW_HEADER_META = {
+    'view-home': {
+        title: 'Painel Inicial',
+        subtitle: 'Visão geral e atalhos rápidos',
+        icon: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>'
+    },
+    'view-calculator': {
+        title: 'Calculadora de Rateio',
+        subtitle: 'Simule custos, impostos e rateio da importação',
+        icon: '<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>'
+    },
+    'view-imports': {
+        title: 'Histórico de Importação',
+        subtitle: 'Reabra lotes salvos anteriormente',
+        icon: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>'
+    },
+    'view-feasibility': {
+        title: 'Viabilidade de Importação',
+        subtitle: 'Compare regimes e simule o preço ideal de revenda',
+        icon: '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>'
+    },
+    'view-doc-proforma': {
+        title: 'Proforma Invoice',
+        subtitle: 'Documento de cotação para o importador',
+        icon: '<path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/>'
+    },
+    'view-doc-commercial': {
+        title: 'Commercial Invoice',
+        subtitle: 'Fatura comercial para o desembaraço aduaneiro',
+        icon: '<path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/>'
+    },
+    'view-doc-packing': {
+        title: 'Packing List',
+        subtitle: 'Detalhamento de volumes e pesos da carga',
+        icon: '<path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/>'
+    },
+    'view-cad-empresa': {
+        title: 'Cadastro de Empresa',
+        subtitle: 'Dados da sua empresa usados nos documentos',
+        icon: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>'
+    },
+    'view-cad-produtos': {
+        title: 'Catálogo de Produtos',
+        subtitle: 'Produtos cadastrados para reutilizar na calculadora',
+        icon: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>'
+    },
+    'view-settings': {
+        title: 'Configurações',
+        subtitle: 'Conecte o Mercado Livre e ajuste preferências',
+        icon: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>'
+    }
+};
+
+function updateHeaderForView(viewId) {
+    const meta = VIEW_HEADER_META[viewId];
+    if (!meta) return;
+    const badge = document.getElementById('header-view-badge');
+    const titleEl = document.getElementById('header-view-title');
+    const subtitleEl = document.getElementById('header-view-subtitle');
+    if (badge) badge.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${meta.icon}</svg>`;
+    if (titleEl) titleEl.textContent = meta.title;
+    if (subtitleEl) subtitleEl.textContent = meta.subtitle;
+}
+
 // 1. MENU ROUTING & DROPDOWN ACCORDION
 function initDashboardNavigation() {
     // Mobile nav drawer (hamburger toggle) — collapsed by default on narrow
@@ -2765,7 +2831,9 @@ function initDashboardNavigation() {
         if (targetPanel) {
             targetPanel.classList.remove('hidden');
         }
-        
+
+        updateHeaderForView(targetViewId);
+
         // Update active class on nav links
         document.querySelectorAll('.nav-item, .nav-subitem').forEach(item => {
             item.classList.remove('active');
