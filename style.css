@@ -225,6 +225,141 @@ h1, h2, h3, .card-title, .modal-header h3, .auth-header h2, .nav-logo span, .bra
 
 /* Calculadora de Rateio — toolbar (Salvar Lote / Carregar Exemplo / Limpar
    Tudo) lives inside this view only, not in the global header. */
+/* Importação em lote (CSV) de produtos na Calculadora */
+.bulk-import-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.bulk-import-label {
+    cursor: pointer;
+    margin: 0;
+}
+
+/* Onboarding — tour de boas-vindas no primeiro acesso */
+.onboarding-card {
+    text-align: center;
+}
+
+.onboarding-icon {
+    width: 56px;
+    height: 56px;
+    margin: 0.5rem auto 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--gradient-brand);
+    color: var(--on-gradient);
+    border-radius: var(--border-radius-lg);
+}
+
+.onboarding-text {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    line-height: 1.55;
+    margin-bottom: 1.5rem;
+    min-height: 3.3em;
+}
+
+.onboarding-dots {
+    display: flex;
+    justify-content: center;
+    gap: 0.4rem;
+    margin-bottom: 1.5rem;
+}
+
+.onboarding-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--border-color);
+    transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.onboarding-dot.active {
+    background: var(--gradient-brand);
+    transform: scale(1.3);
+}
+
+.onboarding-actions {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.onboarding-actions .btn {
+    flex: 1;
+}
+
+/* Central de Ajuda — accordion de FAQ (usa <details>/<summary> nativos) */
+.faq-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.faq-item {
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    background: var(--bg-app);
+    overflow: hidden;
+}
+
+.faq-item summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 0.9rem 1.1rem;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.faq-item summary::-webkit-details-marker {
+    display: none;
+}
+
+.faq-item summary::after {
+    content: '+';
+    font-size: 1.2rem;
+    font-weight: 400;
+    color: var(--text-muted);
+    flex-shrink: 0;
+    transition: transform 0.15s ease;
+}
+
+.faq-item[open] summary::after {
+    content: '−';
+}
+
+.faq-item summary:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: -2px;
+}
+
+.faq-answer {
+    padding: 0 1.1rem 1rem;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    line-height: 1.55;
+}
+
+.faq-answer p {
+    margin: 0 0 0.6rem;
+}
+
+.faq-answer p:last-child {
+    margin-bottom: 0;
+}
+
+.faq-answer strong {
+    color: var(--text-primary);
+}
+
 .calc-toolbar {
     display: flex;
     align-items: center;
@@ -406,7 +541,98 @@ h1, h2, h3, .card-title, .modal-header h3, .auth-header h2, .nav-logo span, .bra
     display: flex;
     justify-content: space-between;
     align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
     margin-bottom: 1.25rem;
+}
+
+/* Home / Painel Inicial — KPIs reais */
+.home-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+@media (max-width: 900px) {
+    .home-kpi-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 480px) {
+    .home-kpi-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.home-kpi-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-lg);
+    padding: 1rem 1.15rem;
+    box-shadow: var(--card-shadow);
+}
+
+.home-kpi-label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.home-kpi-value {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.home-kpi-sub {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+
+.home-continue-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.5rem;
+    background: var(--gradient-brand);
+    color: var(--on-gradient);
+}
+
+.home-continue-card #home-continue-meta {
+    color: var(--on-gradient);
+    opacity: 0.85;
+}
+
+.home-continue-card .btn {
+    background: var(--on-gradient);
+    color: #fff8e7;
+    border: none;
+    flex-shrink: 0;
+}
+
+.home-continue-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.home-continue-label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    opacity: 0.8;
 }
 
 /* Home / Painel Inicial — quick-launch cards */
@@ -755,15 +981,30 @@ label {
     align-items: end;
 }
 
+.desc-field {
+    grid-column: span 3;
+}
+
+.ncm-field {
+    grid-column: span 1;
+}
+
+.image-field {
+    grid-column: span 2;
+}
+
 @media (max-width: 900px) {
     .product-form {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
-    .name-field {
+    .name-field,
+    .add-button-group,
+    .desc-field,
+    .image-field {
         grid-column: span 2;
     }
-    .add-button-group {
-        grid-column: span 2;
+    .ncm-field {
+        grid-column: span 1;
     }
 }
 

@@ -215,7 +215,20 @@ async function fetchDollarRate() {
         
         const bid = parseFloat(usdData.bid);
         const pctChange = parseFloat(usdData.pctChange);
-        
+
+        state.lastDollarBid = bid;
+        state.lastDollarPctChange = pctChange;
+
+        // Alerta de câmbio favorável (uma vez por dia): dólar caiu de forma
+        // relevante, pode ser um bom momento para fechar a importação.
+        if (pctChange <= -1) {
+            const todayKey = new Date().toISOString().slice(0, 10);
+            if (localStorage.getItem('impoclick_rate_alert_shown') !== todayKey) {
+                localStorage.setItem('impoclick_rate_alert_shown', todayKey);
+                showToast(`Dólar caiu ${Math.abs(pctChange).toFixed(2)}% hoje (R$ ${bid.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}) — pode ser um bom momento para fechar câmbio.`, 'success', 8000);
+            }
+        }
+
         // Update current price UI
         if (usdValEl) {
             usdValEl.textContent = `R$ ${bid.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 3 })}`;
@@ -253,6 +266,7 @@ async function fetchDollarRate() {
             drawSparkline(sparklineEl, history);
         }
 
+        renderHomeDashboard();
     } catch (error) {
         console.error('Erro ao buscar cotação do dólar:', error);
         if (usdValEl) {
@@ -339,7 +353,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     registerSubscriptionEventListeners();
     fetchDollarRate();
     preloadOfficialNcmDatabase();
+    renderHomeDashboard();
     updateUI();
+    initOnboardingTour();
 });
 
 // THEME TOGGLE
@@ -637,6 +653,94 @@ function registerEventListeners() {
         saveState();
         updateUI();
     });
+
+    // Importação em lote (CSV) — baixar modelo
+    const btnBulkTemplate = document.getElementById('btn-bulk-template');
+    if (btnBulkTemplate) {
+        btnBulkTemplate.addEventListener('click', () => {
+            const header = 'nome;quantidade;preco_unitario;peso_unitario_kg;ncm;descricao;tributacao';
+            const example = 'Fone de Ouvido Bluetooth;50;8,50;0,05;85183000;Fone de ouvido bluetooth intra-auricular;taxable';
+            const csvContent = 'data:text/csv;charset=utf-8,﻿sep=;\n' + header + '\n' + example;
+            const link = document.createElement('a');
+            link.setAttribute('href', encodeURI(csvContent));
+            link.setAttribute('download', 'modelo_importacao_produtos.csv');
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        });
+    }
+
+    // Importação em lote (CSV) — ler planilha e adicionar produtos de uma vez
+    const inputBulkCsv = document.getElementById('input-bulk-csv');
+    const bulkStatusEl = document.getElementById('bulk-import-status');
+    function parseFlexibleNumber(str) {
+        if (typeof str !== 'string') return NaN;
+        return parseFloat(str.trim().replace(',', '.'));
+    }
+    if (inputBulkCsv) {
+        inputBulkCsv.addEventListener('change', () => {
+            const file = inputBulkCsv.files && inputBulkCsv.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = () => {
+                const text = String(reader.result || '').replace(/^﻿/, '');
+                const lines = text.split(/\r\n|\n/).filter(l => l.trim() && !l.trim().toLowerCase().startsWith('sep='));
+                lines.shift(); // remove cabeçalho
+
+                let added = 0;
+                let errors = 0;
+                lines.forEach(line => {
+                    const cols = line.split(';');
+                    const name = (cols[0] || '').trim();
+                    const qty = parseInt(cols[1], 10);
+                    const unitPrice = parseFlexibleNumber(cols[2]);
+                    const unitWeight = parseFlexibleNumber(cols[3]);
+                    const ncm = (cols[4] || '').trim() || '65050099';
+                    const description = (cols[5] || '').trim();
+                    const taxationRaw = (cols[6] || '').trim();
+                    const taxation = ['taxable', 'exempt-books', 'exempt-meds'].includes(taxationRaw) ? taxationRaw : 'taxable';
+
+                    if (!name || !qty || qty <= 0 || !unitPrice || unitPrice <= 0 || isNaN(unitWeight) || unitWeight < 0) {
+                        errors++;
+                        return;
+                    }
+
+                    state.products.push({
+                        id: Date.now() + added,
+                        name,
+                        qty,
+                        unitPrice,
+                        unitWeight,
+                        taxation,
+                        description,
+                        ncm,
+                        image: ''
+                    });
+                    added++;
+                });
+
+                if (bulkStatusEl) {
+                    bulkStatusEl.classList.remove('hidden');
+                    if (added > 0) {
+                        bulkStatusEl.className = 'ncm-preview success';
+                        bulkStatusEl.innerHTML = `<div>${added} produto(s) importado(s) com sucesso.${errors > 0 ? ` ${errors} linha(s) ignorada(s) por dados inválidos.` : ''}</div>`;
+                    } else {
+                        bulkStatusEl.className = 'ncm-preview warning';
+                        bulkStatusEl.innerHTML = '<div>Nenhum produto válido encontrado na planilha. Confira o modelo e tente novamente.</div>';
+                    }
+                }
+
+                if (added > 0) {
+                    showToast(`${added} produto(s) importado(s) da planilha!`, 'success');
+                    saveState();
+                    updateUI();
+                }
+                inputBulkCsv.value = '';
+            };
+            reader.readAsText(file, 'UTF-8');
+        });
+    }
 
     // Clean all button
     document.getElementById('btn-clear-all').addEventListener('click', async () => {
@@ -2877,6 +2981,11 @@ const VIEW_HEADER_META = {
         title: 'Configurações',
         subtitle: 'Conecte o Mercado Livre e ajuste preferências',
         icon: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>'
+    },
+    'view-help': {
+        title: 'Central de Ajuda',
+        subtitle: 'Perguntas frequentes sobre o Impoclick',
+        icon: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>'
     }
 };
 
@@ -2995,6 +3104,9 @@ function initDashboardNavigation() {
 
             if (viewId === 'view-settings') {
                 syncSettingsUI();
+            }
+            if (viewId === 'view-home') {
+                renderHomeDashboard();
             }
         });
     });
@@ -4316,16 +4428,163 @@ function initHistoryModule() {
             
             showToast(`Lote "${finalName}" salvo no histórico com sucesso!`, 'success');
             renderHistoryTable();
+            renderHomeDashboard();
         });
     }
 
     renderHistoryTable();
 }
 
-async function renderHistoryTable() {
-    const tbody = document.getElementById('tbody-saved-imports');
-    if (!tbody) return;
+// ONBOARDING — tour de boas-vindas mostrado uma única vez no primeiro acesso
+// (guardado por localStorage, não depende de coluna nova no Supabase).
+function initOnboardingTour() {
+    if (!state.currentUser) return;
+    if (localStorage.getItem('impoclick_onboarding_seen_v1')) return;
 
+    const modal = document.getElementById('onboarding-modal');
+    const titleEl = document.getElementById('onboarding-title');
+    const textEl = document.getElementById('onboarding-text');
+    const iconEl = document.getElementById('onboarding-icon');
+    const dotsEl = document.getElementById('onboarding-dots');
+    const nextBtn = document.getElementById('btn-onboarding-next');
+    const skipBtn = document.getElementById('btn-onboarding-skip');
+    const closeBtn = document.getElementById('btn-onboarding-close');
+    if (!modal || !nextBtn) return;
+
+    const steps = [
+        {
+            title: 'Bem-vindo ao Impoclick!',
+            text: 'Simule custos e impostos de importação em segundos, com câmbio em tempo real e integração com o Mercado Livre.',
+            icon: VIEW_HEADER_META['view-home'].icon
+        },
+        {
+            title: 'Painel Inicial',
+            text: 'Acompanhe o dólar em tempo real, quantos lotes você já simulou e retome o último de onde parou.',
+            icon: VIEW_HEADER_META['view-home'].icon
+        },
+        {
+            title: 'Calculadora de Rateio',
+            text: 'Cadastre os produtos do lote e veja o custo final rateado entre eles — por peso, valor ou quantidade.',
+            icon: VIEW_HEADER_META['view-calculator'].icon
+        },
+        {
+            title: 'Viabilidade de Importação',
+            text: 'Compare Simplificada x Formal e descubra se vale a pena vender aquele produto, comparando com o Mercado Livre.',
+            icon: VIEW_HEADER_META['view-feasibility'].icon
+        },
+        {
+            title: 'Documentos e Central de Ajuda',
+            text: 'Gere Proforma, Commercial Invoice e Packing List prontos para o despachante. Com dúvidas, a Central de Ajuda está sempre no menu.',
+            icon: VIEW_HEADER_META['view-doc-proforma'].icon
+        }
+    ];
+    let step = 0;
+
+    function render() {
+        const s = steps[step];
+        titleEl.textContent = s.title;
+        textEl.textContent = s.text;
+        iconEl.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${s.icon}</svg>`;
+        dotsEl.innerHTML = steps.map((_, i) => `<span class="onboarding-dot${i === step ? ' active' : ''}"></span>`).join('');
+        nextBtn.textContent = step === steps.length - 1 ? 'Concluir' : 'Próximo';
+    }
+
+    function finish() {
+        localStorage.setItem('impoclick_onboarding_seen_v1', '1');
+        modal.classList.add('hidden');
+    }
+
+    nextBtn.addEventListener('click', () => {
+        if (step === steps.length - 1) { finish(); return; }
+        step++;
+        render();
+    });
+    if (skipBtn) skipBtn.addEventListener('click', finish);
+    if (closeBtn) closeBtn.addEventListener('click', finish);
+
+    render();
+    modal.classList.remove('hidden');
+}
+
+// PAINEL INICIAL — KPIs reais (histórico, câmbio, NCM mais usado) em vez de
+// só uma grade estática de atalhos.
+function formatBRL(v) {
+    return `R$ ${(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+async function renderHomeDashboard() {
+    const view = document.getElementById('view-home');
+    if (!view) return;
+
+    const rateEl = document.getElementById('home-kpi-rate');
+    const rateChangeEl = document.getElementById('home-kpi-rate-change');
+    if (rateEl) {
+        if (typeof state.lastDollarBid === 'number') {
+            rateEl.textContent = `R$ ${state.lastDollarBid.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 3 })}`;
+            if (rateChangeEl) {
+                const pct = state.lastDollarPctChange || 0;
+                const isDown = pct < 0;
+                rateChangeEl.textContent = `${isDown ? '▼' : '▲'} ${pct > 0 ? '+' : ''}${pct.toFixed(2)}% hoje`;
+                rateChangeEl.style.color = isDown ? 'var(--success)' : 'var(--danger)';
+            }
+        } else {
+            rateEl.textContent = `R$ ${state.exchangeRate.toFixed(2)}`;
+            if (rateChangeEl) rateChangeEl.textContent = 'câmbio manual';
+        }
+    }
+
+    const historyList = await getHistorySummaryList();
+
+    const countEl = document.getElementById('home-kpi-count');
+    if (countEl) countEl.textContent = historyList.length;
+
+    const totalFob = historyList.reduce((acc, item) => acc + (item.fobBRL || 0), 0);
+    const fobEl = document.getElementById('home-kpi-fob');
+    if (fobEl) fobEl.textContent = formatBRL(totalFob);
+
+    const ncmCounts = {};
+    historyList.forEach(item => {
+        const products = (item.stateData && item.stateData.products) || [];
+        products.forEach(p => {
+            const code = (p.ncm || '').trim();
+            if (!code) return;
+            ncmCounts[code] = (ncmCounts[code] || 0) + 1;
+        });
+    });
+    const topNcmEntry = Object.entries(ncmCounts).sort((a, b) => b[1] - a[1])[0];
+    const ncmEl = document.getElementById('home-kpi-ncm');
+    const ncmCountEl = document.getElementById('home-kpi-ncm-count');
+    if (ncmEl) {
+        if (topNcmEntry) {
+            ncmEl.textContent = topNcmEntry[0];
+            if (ncmCountEl) ncmCountEl.textContent = `em ${topNcmEntry[1]} produto(s) do histórico`;
+        } else {
+            ncmEl.textContent = '—';
+            if (ncmCountEl) ncmCountEl.textContent = 'sem lotes salvos ainda';
+        }
+    }
+
+    const continueCard = document.getElementById('home-continue-card');
+    if (continueCard) {
+        if (historyList.length > 0) {
+            const latest = historyList[0];
+            continueCard.classList.remove('hidden');
+            const nameEl = document.getElementById('home-continue-name');
+            const metaEl = document.getElementById('home-continue-meta');
+            const btn = document.getElementById('home-continue-btn');
+            if (nameEl) nameEl.textContent = latest.name;
+            if (metaEl) metaEl.textContent = `${latest.date} • ${latest.itemsCount} item(ns) • ${formatBRL(latest.totalBRL)}`;
+            if (btn) btn.onclick = () => loadSavedImport(latest.rawId);
+        } else {
+            continueCard.classList.add('hidden');
+        }
+    }
+}
+
+// Busca e computa a lista de lotes salvos (Supabase ou localStorage), com os
+// totais já calculados. Compartilhada pela tabela de Histórico e pelos KPIs
+// do Painel Inicial para não duplicar a lógica de cálculo em dois lugares.
+async function getHistorySummaryList() {
     let historyList = [];
     if (state.currentUser) {
         try {
@@ -4333,12 +4592,12 @@ async function renderHistoryTable() {
             historyList = spData.map(row => {
                 const s = row.state_data || {};
                 const totalQty = s.products ? s.products.reduce((acc, p) => acc + p.qty, 0) : 0;
-                
+
                 const spread = s.exchangeMode === 'complete' ? (s.spread || 0) : 0;
                 const iof = s.exchangeMode === 'complete' ? (s.iof || 0) : 0;
                 const effectiveRate = s.currency === 'BRL' ? 1 : (s.exchangeRate || 5) * (1 + spread / 100) * (1 + iof / 100);
                 const totalFobBRL = s.products ? s.products.reduce((acc, p) => acc + (p.unitPrice * p.qty), 0) * effectiveRate : 0;
-                
+
                 const freightBRL = s.freightInBRL ? (s.freight || 0) : (s.freight || 0) * effectiveRate;
                 const insuranceBRL = s.insuranceInBRL ? (s.insurance || 0) : (s.insurance || 0) * effectiveRate;
                 const feesBRL = s.feesInBRL ? (s.fees || 0) : (s.fees || 0) * effectiveRate;
@@ -4346,13 +4605,16 @@ async function renderHistoryTable() {
                 const totalImportBRL = totalFobBRL + totalFreightInsuranceFees;
 
                 return {
-                    id: `'${row.id}'`, // String format for Supabase UUID
+                    id: `'${row.id}'`, // String pré-formatada para uso em atributos onclick="..." (ver renderHistoryTable)
+                    rawId: row.id, // valor real, use este para chamar loadSavedImport/deleteSavedImport programaticamente
                     name: row.name,
                     date: new Date(row.created_at).toLocaleDateString('pt-BR') + ' ' + new Date(row.created_at).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}),
+                    rawDate: row.created_at,
                     itemsCount: totalQty,
                     currency: s.currency || 'USD',
                     fobBRL: totalFobBRL,
-                    totalBRL: totalImportBRL
+                    totalBRL: totalImportBRL,
+                    stateData: s
                 };
             });
         } catch(e) {
@@ -4360,11 +4622,20 @@ async function renderHistoryTable() {
         }
     } else {
         try {
-            historyList = JSON.parse(localStorage.getItem('import_rateio_history')) || [];
+            const raw = JSON.parse(localStorage.getItem('import_rateio_history')) || [];
+            historyList = raw.map(item => ({ ...item, rawId: item.id, rawDate: item.id }));
         } catch(e) {
             historyList = [];
         }
     }
+    return historyList;
+}
+
+async function renderHistoryTable() {
+    const tbody = document.getElementById('tbody-saved-imports');
+    if (!tbody) return;
+
+    const historyList = await getHistorySummaryList();
 
     if (historyList.length === 0) {
         tbody.innerHTML = `
@@ -4412,6 +4683,7 @@ async function deleteSavedImport(id) {
             localStorage.setItem('import_rateio_history', JSON.stringify(historyList));
         }
         renderHistoryTable();
+        renderHomeDashboard();
     }
 }
 
@@ -4459,11 +4731,12 @@ async function loadSavedImport(id) {
             updateCurrencyPrefixes();
             updateUI();
             
+            document.querySelectorAll('.view-panel').forEach(panel => panel.classList.add('hidden'));
             document.getElementById('view-calculator').classList.remove('hidden');
-            document.getElementById('view-imports').classList.add('hidden');
             document.querySelectorAll('.nav-item, .nav-subitem').forEach(btn => btn.classList.remove('active'));
             document.querySelector('[data-view="view-calculator"]').classList.add('active');
-            
+            updateHeaderForView('view-calculator');
+
             showToast(`Lote "${item.name}" carregado com sucesso na calculadora!`, 'success');
         }
     }
