@@ -1334,8 +1334,14 @@ tfoot th, tfoot td {
     left: 0;
     width: 100vw;
     height: 100vh;
+    height: 100dvh; /* real visible height on mobile browsers, not the full-chrome-hidden 100vh */
     display: flex;
     align-items: center;
+    /* "safe" keeps centering when everything fits, but falls back to start-
+       alignment once content overflows — without it, a centered flex child
+       taller than the screen can clip its own start/end out of scroll reach
+       on mobile (exactly what made "Acessar Sistema" unreachable). */
+    align-items: safe center;
     justify-content: center;
     background:
         radial-gradient(ellipse 900px 700px at 12% 15%, rgba(245, 196, 81, 0.14), transparent 60%),
@@ -1344,6 +1350,7 @@ tfoot th, tfoot td {
     z-index: 9999;
     padding: 1.5rem;
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
     transition: var(--transition-smooth);
 }
 
@@ -1503,6 +1510,25 @@ tfoot th, tfoot td {
     }
     #auth-container .auth-form-half {
         padding: 1rem 1.5rem 2rem;
+    }
+}
+
+/* Short viewports (small phones, or any phone with the browser's address bar
+   showing) — the decorative art was pushing "Acessar Sistema" out of reach.
+   Prioritize the functional form: shrink the art further and drop the
+   tagline rather than force a scroll just to log in. */
+@media (max-height: 700px) {
+    #auth-container .auth-art-half {
+        padding: 1rem 1.5rem 0.5rem;
+    }
+    #auth-container .auth-logo-wrap {
+        max-width: 110px;
+    }
+    #auth-container .auth-art-copy {
+        display: none;
+    }
+    #auth-container .auth-card {
+        padding: 1.5rem 1.5rem;
     }
 }
 
