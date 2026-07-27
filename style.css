@@ -187,6 +187,8 @@ h1, h2, h3, .card-title, .modal-header h3, .auth-header h2, .nav-logo span, .bra
 .logo-area h1 {
     font-size: 1.35rem;
     font-weight: 700;
+    line-height: 1.3;
+    display: inline-block;
     background: linear-gradient(135deg, var(--text-primary), var(--text-muted));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -195,6 +197,8 @@ h1, h2, h3, .card-title, .modal-header h3, .auth-header h2, .nav-logo span, .bra
 
 .logo-area .subtitle {
     font-size: 0.82rem;
+    line-height: 1.4;
+    margin-top: 0.2rem;
     color: var(--text-muted);
     font-weight: 600;
 }
@@ -2457,6 +2461,18 @@ tfoot th, tfoot td {
     .header-actions {
         flex-wrap: wrap;
         width: 100%;
+    }
+    /* Title + subtitle read as cramped/overlapping on narrow screens —
+       give them a touch more breathing room and a slightly smaller title. */
+    .logo-area {
+        gap: 0.65rem;
+    }
+    .logo-area h1 {
+        font-size: 1.15rem;
+    }
+    .logo-area .subtitle {
+        font-size: 0.76rem;
+        line-height: 1.35;
     }
 }
 
