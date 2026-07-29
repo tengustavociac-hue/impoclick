@@ -104,6 +104,22 @@ async function getReviews() {
     return { reviews: data };
 }
 
+// Status de catálogo (ganhando/perdendo a competição) — mesmo endpoint de
+// avaliações, só muda o parâmetro resource=catalog.
+async function getCatalogStatus() {
+    const session = await getSession();
+    if (!session) return { error: 'not_logged_in' };
+
+    const resp = await fetch(`${IMPOCLICK_API}/ml-reviews?resource=catalog`, {
+        headers: { 'user-token': session.userId },
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) return { error: data.error || 'Não foi possível consultar o status de catálogo.' };
+    return { catalog: data };
+}
+
+// O badge do ícone soma avaliações não lidas + itens de catálogo que acabaram
+// de perder a competição — o popup detalha os dois separadamente.
 async function refreshReviewsBadge() {
     const session = await getSession();
     if (!session) {
@@ -111,11 +127,14 @@ async function refreshReviewsBadge() {
         return;
     }
 
-    const result = await getReviews();
-    const unreadCount = (result.reviews && result.reviews.unreadCount) || 0;
-    if (unreadCount > 0) {
+    const [reviewsResult, catalogResult] = await Promise.all([getReviews(), getCatalogStatus()]);
+    const reviewsUnread = (reviewsResult.reviews && reviewsResult.reviews.unreadCount) || 0;
+    const catalogUnread = (catalogResult.catalog && catalogResult.catalog.unreadCount) || 0;
+    const totalUnread = reviewsUnread + catalogUnread;
+
+    if (totalUnread > 0) {
         chrome.action.setBadgeBackgroundColor({ color: '#ef4444' });
-        chrome.action.setBadgeText({ text: unreadCount > 99 ? '99+' : String(unreadCount) });
+        chrome.action.setBadgeText({ text: totalUnread > 99 ? '99+' : String(totalUnread) });
     } else {
         chrome.action.setBadgeText({ text: '' });
     }
@@ -166,6 +185,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 break;
             case 'GET_REVIEWS':
                 sendResponse(await getReviews());
+                break;
+            case 'GET_CATALOG_STATUS':
+                sendResponse(await getCatalogStatus());
                 break;
             default:
                 sendResponse({ error: 'unknown_message_type' });

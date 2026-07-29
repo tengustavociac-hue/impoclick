@@ -357,6 +357,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (btnReviews) btnReviews.click();
         }, 500);
     }
+    if (window.location.hash === '#view-catalog') {
+        setTimeout(() => {
+            const btnCatalog = document.querySelector('[data-view="view-catalog"]');
+            if (btnCatalog) btnCatalog.click();
+        }, 500);
+    }
     initAuthArt();
     await checkAuthSession();
 
@@ -2408,6 +2414,7 @@ async function checkAuthSession() {
         // Atualiza a tabela de histórico assim que confirmar o status de login
         if (typeof renderHistoryTable === 'function') renderHistoryTable();
         if (state.currentUser && typeof loadReviews === 'function') loadReviews();
+        if (state.currentUser && typeof loadCatalogStatus === 'function') loadCatalogStatus();
     } catch (e) {
         console.error('Erro ao verificar sessão de login no Supabase:', e);
         state.currentUser = null;
@@ -2989,6 +2996,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initFeasibilityModule();
     initHistoryModule();
     initReviewsModule();
+    initCatalogModule();
 });
 
 // ==========================================
@@ -3118,6 +3126,139 @@ function initReviewsModule() {
     const btnMarkAll = document.getElementById('btn-mark-all-reviews-read');
     if (btnMarkAll) {
         btnMarkAll.addEventListener('click', () => markReviewsRead({ all: true }));
+    }
+}
+
+// ==========================================
+// STATUS DE CATÁLOGO (ganhando/perdendo a competição por anúncio)
+// ==========================================
+
+const CATALOG_STATUS_LABELS = {
+    winning: { label: 'Ganhando', color: 'var(--success)' },
+    sharing_first_place: { label: 'Empatado em 1º', color: 'var(--primary)' },
+    competing: { label: 'Perdendo', color: 'var(--danger, #ef4444)' },
+    listed: { label: 'Fora da disputa', color: 'var(--text-muted)' },
+};
+
+const CATALOG_REASON_LABELS = {
+    non_trusted_seller: 'Vendedor marcado como não confiável',
+    reputation_below_threshold: 'Reputação abaixo do mínimo exigido',
+    winner_has_better_reputation: 'O ganhador tem reputação melhor',
+    manufacturing_time: 'Anúncio com prazo de fabricação (ganhador tem estoque imediato)',
+    item_paused: 'Anúncio pausado',
+    item_not_opted_in: 'Anúncio não participa do catálogo',
+    shipping_mode: 'Modalidade de envio inferior à do ganhador',
+    newbie_program_seller: 'Limite do programa para vendedores novos atingido',
+};
+
+function updateCatalogBadge(count) {
+    const badge = document.getElementById('nav-badge-catalog');
+    if (!badge) return;
+    if (count > 0) {
+        badge.textContent = count > 99 ? '99+' : String(count);
+        badge.classList.remove('hidden');
+    } else {
+        badge.classList.add('hidden');
+    }
+}
+
+function renderCatalogList(items) {
+    const container = document.getElementById('catalog-list');
+    const emptyMsg = document.getElementById('catalog-empty');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (!items || items.length === 0) {
+        if (emptyMsg) emptyMsg.classList.remove('hidden');
+        return;
+    }
+    if (emptyMsg) emptyMsg.classList.add('hidden');
+
+    items.forEach(item => {
+        const card = document.createElement('section');
+        card.className = 'card';
+        card.style.marginBottom = '0.75rem';
+        card.style.opacity = item.is_read ? '0.7' : '1';
+
+        const header = document.createElement('div');
+        header.style.display = 'flex';
+        header.style.justifyContent = 'space-between';
+        header.style.alignItems = 'center';
+        header.style.marginBottom = '0.35rem';
+        header.style.gap = '0.75rem';
+
+        const title = document.createElement('strong');
+        title.textContent = item.item_title || item.ml_item_id;
+
+        const statusInfo = CATALOG_STATUS_LABELS[item.status] || { label: item.status, color: 'var(--text-muted)' };
+        const statusSpan = document.createElement('span');
+        statusSpan.style.color = statusInfo.color;
+        statusSpan.style.fontWeight = '700';
+        statusSpan.style.whiteSpace = 'nowrap';
+        statusSpan.textContent = statusInfo.label;
+
+        header.appendChild(title);
+        header.appendChild(statusSpan);
+
+        const detailP = document.createElement('p');
+        detailP.className = 'small';
+        detailP.style.color = 'var(--text-muted)';
+        detailP.style.marginBottom = '0.35rem';
+        const priceParts = [];
+        if (item.current_price != null) priceParts.push(`Seu preço: R$ ${Number(item.current_price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`);
+        if (item.status !== 'winning' && item.price_to_win != null) priceParts.push(`Preço pra ganhar: R$ ${Number(item.price_to_win).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`);
+        detailP.textContent = priceParts.join(' · ');
+
+        card.appendChild(header);
+        card.appendChild(detailP);
+
+        if (item.reason) {
+            const reasonP = document.createElement('p');
+            reasonP.className = 'small';
+            reasonP.style.color = 'var(--text-muted)';
+            reasonP.style.marginBottom = '0.35rem';
+            reasonP.textContent = item.reason.split(', ').map(r => CATALOG_REASON_LABELS[r] || r).join(' · ');
+            card.appendChild(reasonP);
+        }
+
+        const dateP = document.createElement('p');
+        dateP.className = 'small';
+        dateP.style.color = 'var(--text-muted)';
+        dateP.textContent = item.updated_at ? `Verificado em ${new Date(item.updated_at).toLocaleString('pt-BR')}` : '';
+        card.appendChild(dateP);
+
+        container.appendChild(card);
+    });
+}
+
+async function loadCatalogStatus() {
+    if (!state.currentUser) {
+        updateCatalogBadge(0);
+        return;
+    }
+    const data = await mlApiFetch('/api/ml-reviews?resource=catalog');
+    updateCatalogBadge(data ? data.unreadCount : 0);
+    renderCatalogList(data ? data.items : []);
+}
+
+async function markCatalogRead(payload) {
+    if (!state.currentUser) return;
+    try {
+        await fetch('/api/ml-reviews?resource=catalog', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'user-token': state.currentUser.id },
+            body: JSON.stringify(payload),
+        });
+    } catch (err) {
+        console.error('Erro ao marcar status de catálogo como lido:', err);
+    }
+    await loadCatalogStatus();
+}
+
+function initCatalogModule() {
+    const btnMarkAll = document.getElementById('btn-mark-all-catalog-read');
+    if (btnMarkAll) {
+        btnMarkAll.addEventListener('click', () => markCatalogRead({ all: true }));
     }
 }
 
@@ -3302,6 +3443,9 @@ function initDashboardNavigation() {
             }
             if (viewId === 'view-reviews') {
                 loadReviews();
+            }
+            if (viewId === 'view-catalog') {
+                loadCatalogStatus();
             }
         });
     });

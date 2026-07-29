@@ -21,12 +21,27 @@ async function refreshReviewsSummary() {
         : 'Nenhuma avaliação nova.';
 }
 
+async function refreshCatalogSummary() {
+    const countEl = document.getElementById('catalog-count');
+    if (!countEl) return;
+    const result = await sendMessage({ type: 'GET_CATALOG_STATUS' });
+    if (result.error || !result.catalog) {
+        countEl.textContent = 'Não foi possível verificar os catálogos agora.';
+        return;
+    }
+    const unread = result.catalog.unreadCount || 0;
+    countEl.textContent = unread > 0
+        ? `${unread} anúncio${unread > 1 ? 's' : ''} perdendo a competição`
+        : 'Nenhuma mudança de status em catálogo.';
+}
+
 async function refresh() {
     const { session } = await sendMessage({ type: 'GET_SESSION' });
     if (session) {
         document.getElementById('user-name').textContent = session.name;
         showView('view-session');
         refreshReviewsSummary();
+        refreshCatalogSummary();
     } else {
         showView('view-login');
     }
