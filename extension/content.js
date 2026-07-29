@@ -83,32 +83,34 @@
         `;
     }
 
-    function computeAndRenderVerdict(resultEl, price, feePct, cost) {
+    function computeAndRenderVerdict(resultEl, price, feePct, cost, freightCost, freightNote) {
         const effectiveFeePct = feePct !== null ? feePct : 13; // fallback: taxa clássica média
         const feeAmount = price * (effectiveFeePct / 100);
-        const netRevenue = price - feeAmount;
+        const freight = freightCost || 0;
+        const netRevenue = price - feeAmount - freight;
         const diff = netRevenue - cost;
         const marginPct = price > 0 ? (diff / price) * 100 : 0;
+        const freightSuffix = freightCost ? ` (já com ${formatBRL(freight)} de frete)` : ', sem contar o frete da plataforma';
 
         let verdict, verdictClass, detail;
         if (diff <= 0) {
             verdict = 'NÃO COMPENSA';
             verdictClass = 'impoclick-bad';
-            detail = `Faltariam ${formatBRL(Math.abs(diff))} para cobrir seu custo, considerando só a taxa de venda (frete da plataforma não incluído aqui).`;
+            detail = `Faltariam ${formatBRL(Math.abs(diff))} para cobrir seu custo, considerando taxa de venda${freightSuffix}.`;
         } else if (marginPct < 15) {
             verdict = 'MARGEM APERTADA';
             verdictClass = 'impoclick-warn';
-            detail = `Sobraria ${formatBRL(diff)} líquidos por unidade (${marginPct.toFixed(1)}%), sem contar o frete da plataforma.`;
+            detail = `Sobraria ${formatBRL(diff)} líquidos por unidade (${marginPct.toFixed(1)}%)${freightSuffix}.`;
         } else {
             verdict = 'COMPENSA';
             verdictClass = 'impoclick-good';
-            detail = `Sobraria ${formatBRL(diff)} líquidos por unidade (${marginPct.toFixed(1)}%), sem contar o frete da plataforma.`;
+            detail = `Sobraria ${formatBRL(diff)} líquidos por unidade (${marginPct.toFixed(1)}%)${freightSuffix}.`;
         }
 
         resultEl.innerHTML = `
             <div class="impoclick-verdict ${verdictClass}">${verdict}</div>
             <p class="impoclick-text">${detail}</p>
-            <p class="impoclick-note">Estimativa rápida (sem frete/peso). Para o cálculo completo, abra o Impoclick.</p>
+            <p class="impoclick-note">${freightNote || 'Estimativa rápida. Para o cálculo completo, abra o Impoclick.'}</p>
         `;
     }
 
@@ -131,6 +133,15 @@
             <div class="impoclick-row" id="impoclick-fee-row"><span>Taxa de venda (sua conta)</span><strong id="impoclick-fee-value">calculando...</strong></div>
             <label class="impoclick-label" for="impoclick-cost-input">Seu custo final de importação (R$/un.)</label>
             <input type="number" id="impoclick-cost-input" class="impoclick-input" step="0.01" min="0" placeholder="ex: 45.00">
+
+            <label class="impoclick-label">Peso e dimensões do seu produto (opcional, pra incluir o frete real)</label>
+            <div class="impoclick-dim-grid">
+                <input type="number" id="impoclick-weight-input" class="impoclick-input impoclick-input-sm" step="1" min="0" placeholder="Peso (g)">
+                <input type="number" id="impoclick-length-input" class="impoclick-input impoclick-input-sm" step="0.1" min="0" placeholder="Compr. (cm)">
+                <input type="number" id="impoclick-width-input" class="impoclick-input impoclick-input-sm" step="0.1" min="0" placeholder="Larg. (cm)">
+                <input type="number" id="impoclick-height-input" class="impoclick-input impoclick-input-sm" step="0.1" min="0" placeholder="Alt. (cm)">
+            </div>
+
             <button id="impoclick-calc-btn" class="impoclick-btn">Calcular viabilidade</button>
             <div id="impoclick-result"></div>
         `;
@@ -171,7 +182,7 @@
             feeValueEl.textContent = '—';
         }
 
-        document.getElementById('impoclick-calc-btn').addEventListener('click', () => {
+        document.getElementById('impoclick-calc-btn').addEventListener('click', async () => {
             const resultEl = document.getElementById('impoclick-result');
             const priceInput = document.getElementById('impoclick-price-input');
             const price = pageData.price || parseFloat(priceInput ? priceInput.value : NaN);
@@ -185,7 +196,28 @@
                 resultEl.innerHTML = '<p class="impoclick-text impoclick-error">Informe seu custo final de importação.</p>';
                 return;
             }
-            computeAndRenderVerdict(resultEl, price, feePct, cost);
+
+            const weight = parseFloat(document.getElementById('impoclick-weight-input').value);
+            const length = parseFloat(document.getElementById('impoclick-length-input').value);
+            const width = parseFloat(document.getElementById('impoclick-width-input').value);
+            const height = parseFloat(document.getElementById('impoclick-height-input').value);
+            const hasAllDims = weight > 0 && length > 0 && width > 0 && height > 0;
+
+            let freightCost = 0;
+            let freightNote = null;
+            if (hasAllDims) {
+                resultEl.innerHTML = '<p class="impoclick-text">Calculando frete real...</p>';
+                const freightResp = await sendMessage({ type: 'GET_FREIGHT', price, weight, length, width, height });
+                if (freightResp.freight && typeof freightResp.freight.cost === 'number') {
+                    freightCost = freightResp.freight.cost;
+                } else {
+                    freightNote = 'Não foi possível calcular o frete real agora — resultado abaixo sem frete.';
+                }
+            } else {
+                freightNote = 'Preencha peso e dimensões pra incluir o frete real no cálculo.';
+            }
+
+            computeAndRenderVerdict(resultEl, price, feePct, cost, freightCost, freightNote);
         });
     }
 

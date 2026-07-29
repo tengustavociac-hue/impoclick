@@ -116,6 +116,18 @@
     border-color: #b8860b;
 }
 
+.impoclick-dim-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.impoclick-input-sm {
+    margin-bottom: 0;
+    padding: 7px 8px;
+    font-size: 12px;
+}
+
 .impoclick-btn {
     all: unset;
     box-sizing: border-box;

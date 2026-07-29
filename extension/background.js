@@ -72,6 +72,19 @@ async function getFee(price, categoryId) {
     return { fee: data };
 }
 
+async function getFreight(price, weight, length, width, height) {
+    const session = await getSession();
+    if (!session) return { error: 'not_logged_in' };
+
+    const qs = new URLSearchParams({ price, weight, length, width, height });
+    const resp = await fetch(`${IMPOCLICK_API}/ml-freight?${qs.toString()}`, {
+        headers: { 'user-token': session.userId },
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) return { error: data.error || 'Não foi possível calcular o frete da plataforma.' };
+    return { freight: data };
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     (async () => {
         switch (message.type) {
@@ -89,6 +102,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 break;
             case 'GET_FEE':
                 sendResponse(await getFee(message.price, message.categoryId));
+                break;
+            case 'GET_FREIGHT':
+                sendResponse(await getFreight(message.price, message.weight, message.length, message.width, message.height));
                 break;
             default:
                 sendResponse({ error: 'unknown_message_type' });
