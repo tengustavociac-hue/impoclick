@@ -85,7 +85,7 @@ async function checkUser(userId) {
     if (rows.length > 0) {
         const { data: inserted, error } = await supabaseAdmin
             .from('ml_reviews')
-            .upsert(rows, { onConflict: 'ml_item_id,ml_review_id', ignoreDuplicates: true })
+            .upsert(rows, { onConflict: 'user_id,ml_item_id,ml_review_id', ignoreDuplicates: true })
             .select('id');
         if (error) throw new Error(error.message);
         newReviews = inserted ? inserted.length : 0;

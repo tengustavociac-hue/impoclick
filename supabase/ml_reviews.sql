@@ -13,7 +13,9 @@ create table ml_reviews (
   reviewed_at timestamptz,
   is_read boolean not null default false,
   created_at timestamptz not null default now(),
-  unique (ml_item_id, ml_review_id)
+  -- inclui user_id: duas contas Impoclick podem estar ligadas à mesma conta do
+  -- Mercado Livre (mesmos item_id), e cada uma precisa da própria cópia da avaliação
+  unique (user_id, ml_item_id, ml_review_id)
 );
 
 create index ml_reviews_user_unread_idx on ml_reviews (user_id, is_read);
