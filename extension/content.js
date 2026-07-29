@@ -43,7 +43,84 @@
             if (match) price = parseFloat(match[1].replace(/\./g, '') + '.' + match[2]);
         }
 
-        return { title, price, shipping: extractShippingInfo() };
+        return { title, price, shipping: extractShippingInfo(), dims: extractSpecDimensions() };
+    }
+
+    function parseWeightToGrams(text) {
+        const m = text.match(/([\d.,]+)\s*(kg|g|gramas?|quilos?)/i);
+        if (!m) return null;
+        let value = parseFloat(m[1].replace(',', '.'));
+        if (isNaN(value)) return null;
+        if (/kg|quilo/i.test(m[2])) value *= 1000;
+        return value;
+    }
+
+    function parseLengthToCm(text) {
+        const m = text.match(/([\d.,]+)\s*(cm|mm|metros?|m)\b/i);
+        if (!m) return null;
+        let value = parseFloat(m[1].replace(',', '.'));
+        if (isNaN(value)) return null;
+        if (/mm/i.test(m[2])) value /= 10;
+        else if (/^(m|metros?)$/i.test(m[2])) value *= 100;
+        return value;
+    }
+
+    // Não dá pra saber quanto o VENDEDOR daquele anúncio paga de frete (é
+    // dado privado da conta dele, e nem seria o número certo — depende da
+    // reputação/nível de cada vendedor). O que dá pra fazer é ler o peso e
+    // as dimensões que o próprio anúncio declara na ficha técnica, e usar
+    // isso com a taxa de frete da SUA conta — que é o número que importa
+    // pra sua decisão.
+    function extractSpecDimensions() {
+        const specs = {};
+        document.querySelectorAll('table tr, .andes-table__row').forEach((row) => {
+            const cells = row.querySelectorAll('th, td');
+            if (cells.length >= 2) {
+                const key = cells[0].textContent.trim().toLowerCase();
+                const value = cells[1].textContent.trim();
+                if (key && value) specs[key] = value;
+            }
+        });
+
+        const findValue = (patterns) => {
+            for (const [key, value] of Object.entries(specs)) {
+                if (patterns.some((p) => key.includes(p))) return value;
+            }
+            return null;
+        };
+
+        let weightText = findValue(['peso']);
+        let lengthText = findValue(['comprimento']);
+        let widthText = findValue(['largura']);
+        let heightText = findValue(['altura']);
+
+        const bodyText = document.body.innerText;
+        if (!weightText) {
+            const m = bodyText.match(/peso[^\d\n]{0,15}([\d.,]+\s*(?:kg|g|gramas?))/i);
+            if (m) weightText = m[1];
+        }
+        if (!lengthText) {
+            const m = bodyText.match(/comprimento[^\d\n]{0,15}([\d.,]+\s*(?:cm|mm|metros?|m)\b)/i);
+            if (m) lengthText = m[1];
+        }
+        if (!widthText) {
+            const m = bodyText.match(/largura[^\d\n]{0,15}([\d.,]+\s*(?:cm|mm|metros?|m)\b)/i);
+            if (m) widthText = m[1];
+        }
+        if (!heightText) {
+            const m = bodyText.match(/altura[^\d\n]{0,15}([\d.,]+\s*(?:cm|mm|metros?|m)\b)/i);
+            if (m) heightText = m[1];
+        }
+
+        const weight = weightText ? parseWeightToGrams(weightText) : null;
+        const length = lengthText ? parseLengthToCm(lengthText) : null;
+        const width = widthText ? parseLengthToCm(widthText) : null;
+        const height = heightText ? parseLengthToCm(heightText) : null;
+
+        if (weight && length && width && height) {
+            return { weight, length, width, height };
+        }
+        return null;
     }
 
     // Lê o frete mostrado no próprio anúncio (o que o COMPRADOR vê), como
@@ -158,12 +235,13 @@
             <label class="impoclick-label" for="impoclick-cost-input">Seu custo final de importação (R$/un.)</label>
             <input type="number" id="impoclick-cost-input" class="impoclick-input" step="0.01" min="0" placeholder="ex: 45.00">
 
-            <label class="impoclick-label">Peso e dimensões do seu produto (opcional, pra usar o frete real da sua conta em vez do mostrado acima)</label>
+            <label class="impoclick-label">Peso e dimensões do produto (pra calcular o frete real da sua conta)</label>
+            ${pageData.dims ? '<p class="impoclick-note">Lido automaticamente da ficha técnica do anúncio — confira antes de calcular.</p>' : ''}
             <div class="impoclick-dim-grid">
-                <input type="number" id="impoclick-weight-input" class="impoclick-input impoclick-input-sm" step="1" min="0" placeholder="Peso (g)">
-                <input type="number" id="impoclick-length-input" class="impoclick-input impoclick-input-sm" step="0.1" min="0" placeholder="Compr. (cm)">
-                <input type="number" id="impoclick-width-input" class="impoclick-input impoclick-input-sm" step="0.1" min="0" placeholder="Larg. (cm)">
-                <input type="number" id="impoclick-height-input" class="impoclick-input impoclick-input-sm" step="0.1" min="0" placeholder="Alt. (cm)">
+                <input type="number" id="impoclick-weight-input" class="impoclick-input impoclick-input-sm" step="1" min="0" placeholder="Peso (g)" value="${pageData.dims ? Math.round(pageData.dims.weight) : ''}">
+                <input type="number" id="impoclick-length-input" class="impoclick-input impoclick-input-sm" step="0.1" min="0" placeholder="Compr. (cm)" value="${pageData.dims ? pageData.dims.length : ''}">
+                <input type="number" id="impoclick-width-input" class="impoclick-input impoclick-input-sm" step="0.1" min="0" placeholder="Larg. (cm)" value="${pageData.dims ? pageData.dims.width : ''}">
+                <input type="number" id="impoclick-height-input" class="impoclick-input impoclick-input-sm" step="0.1" min="0" placeholder="Alt. (cm)" value="${pageData.dims ? pageData.dims.height : ''}">
             </div>
             <div class="impoclick-toggle-group" id="impoclick-freeshipping-toggle">
                 <span class="impoclick-toggle-label">Você oferece frete grátis?</span>
