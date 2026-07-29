@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "Impoclick — Viabilidade no Mercado Livre",
+  "version": "1.0.0",
+  "description": "Veja na hora se compensa vender um produto do Mercado Livre, comparando o preço do anúncio com o seu custo de importação salvo no Impoclick.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://www.impoclick.com.br/*",
+    "https://qmwvzhpyxrkyxvekcazs.supabase.co/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.mercadolivre.com.br/*", "*://*.mercadolibre.com/*"],
+      "js": ["content.js"],
+      "css": ["panel.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  }
+}

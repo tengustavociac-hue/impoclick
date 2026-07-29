@@ -1,0 +1,95 @@
+// Service worker — centraliza autenticação e chamadas de rede. Content
+// scripts só extraem dados da página e mandam mensagem pra cá; toda a rede
+// acontece aqui, onde o host_permissions do manifest libera fetch
+// cross-origin sem precisar de CORS configurado nos servidores de destino.
+
+const SUPABASE_URL = 'https://qmwvzhpyxrkyxvekcazs.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_5xxYDOzIcWWpz2J37MuVaw_XJCpQM5i';
+const IMPOCLICK_API = 'https://www.impoclick.com.br/api';
+
+async function getSession() {
+    const { session } = await chrome.storage.local.get('session');
+    return session || null;
+}
+
+async function login(email, password) {
+    const resp = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            apikey: SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ email, password }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+        return { error: data.error_description || data.msg || 'E-mail ou senha incorretos.' };
+    }
+    const session = {
+        userId: data.user.id,
+        email: data.user.email,
+        name: (data.user.user_metadata && data.user.user_metadata.name) || data.user.email,
+        accessToken: data.access_token,
+    };
+    await chrome.storage.local.set({ session });
+    return { session };
+}
+
+async function logout() {
+    await chrome.storage.local.remove('session');
+    return { ok: true };
+}
+
+// A API pública de itens do Mercado Livre passou a bloquear acesso anônimo
+// (403 PolicyAgent), então a consulta é feita pelo backend do Impoclick,
+// usando o token OAuth da conta ML já conectada pelo usuário — o mesmo
+// mecanismo que a Comparação de Mercado do site já usa.
+async function lookupItem(itemId) {
+    const session = await getSession();
+    if (!session) return { error: 'not_logged_in' };
+
+    const resp = await fetch(`${IMPOCLICK_API}/ml-market?action=item&itemId=${encodeURIComponent(itemId)}`, {
+        headers: { 'user-token': session.userId },
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) return { error: data.error || 'Não foi possível consultar este anúncio.' };
+    return { item: data };
+}
+
+async function getFee(price, categoryId) {
+    const session = await getSession();
+    if (!session) return { error: 'not_logged_in' };
+
+    const resp = await fetch(
+        `${IMPOCLICK_API}/ml-market?action=fee&price=${encodeURIComponent(price)}&category=${encodeURIComponent(categoryId)}`,
+        { headers: { 'user-token': session.userId } }
+    );
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) return { error: data.error || 'Não foi possível calcular a taxa de venda.' };
+    return { fee: data };
+}
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    (async () => {
+        switch (message.type) {
+            case 'GET_SESSION':
+                sendResponse({ session: await getSession() });
+                break;
+            case 'LOGIN':
+                sendResponse(await login(message.email, message.password));
+                break;
+            case 'LOGOUT':
+                sendResponse(await logout());
+                break;
+            case 'LOOKUP_ITEM':
+                sendResponse(await lookupItem(message.itemId));
+                break;
+            case 'GET_FEE':
+                sendResponse(await getFee(message.price, message.categoryId));
+                break;
+            default:
+                sendResponse({ error: 'unknown_message_type' });
+        }
+    })();
+    return true; // resposta assíncrona
+});

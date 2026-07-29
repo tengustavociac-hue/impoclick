@@ -52,6 +52,24 @@ async function handleFee(req, res, userId) {
     });
 }
 
+async function handleItem(req, res, userId) {
+    const itemId = req.query.itemId;
+    if (!itemId) return res.status(400).json({ error: 'Parâmetro itemId é obrigatório.' });
+
+    const resp = await mlFetch(userId, `/items/${encodeURIComponent(itemId)}`);
+    if (!resp.ok) return res.status(resp.status).json({ error: await resp.text() });
+
+    const data = await resp.json();
+    res.json({
+        id: data.id,
+        title: data.title,
+        price: data.price,
+        currencyId: data.currency_id,
+        categoryId: data.category_id,
+        permalink: data.permalink,
+    });
+}
+
 async function handleBestSeller(req, res, userId) {
     const category = req.query.category;
     if (!category) return res.status(400).json({ error: 'Parâmetro category é obrigatório.' });
@@ -95,8 +113,9 @@ module.exports = async (req, res) => {
         switch (req.query.action) {
             case 'category': return await handleCategory(req, res, userId);
             case 'fee': return await handleFee(req, res, userId);
+            case 'item': return await handleItem(req, res, userId);
             case 'bestseller': return await handleBestSeller(req, res, userId);
-            default: return res.status(400).json({ error: 'Parâmetro action inválido. Use category, fee ou bestseller.' });
+            default: return res.status(400).json({ error: 'Parâmetro action inválido. Use category, fee, item ou bestseller.' });
         }
     } catch (err) {
         res.status(500).json({ error: err.message });

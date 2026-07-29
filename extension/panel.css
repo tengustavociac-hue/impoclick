@@ -1,0 +1,178 @@
+#impoclick-panel {
+    all: initial;
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 2147483647;
+    width: 300px;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #fffaf0;
+    border: 1px solid #f0e0b0;
+    border-radius: 14px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
+    overflow: hidden;
+    color: #1f2937;
+}
+
+#impoclick-panel-header {
+    all: unset;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-sizing: border-box;
+    width: 100%;
+    padding: 10px 14px;
+    background: linear-gradient(135deg, #ffd873 0%, #b8860b 100%);
+    cursor: default;
+}
+
+#impoclick-panel-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #1a1305;
+}
+
+#impoclick-panel-toggle {
+    all: unset;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 700;
+    color: #1a1305;
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+}
+
+#impoclick-panel-toggle:hover {
+    background: rgba(26, 19, 5, 0.12);
+}
+
+#impoclick-panel-body {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 14px;
+    max-height: 420px;
+    overflow-y: auto;
+}
+
+#impoclick-panel-body.impoclick-hidden {
+    display: none;
+}
+
+.impoclick-item-title {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0 0 10px;
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.impoclick-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12.5px;
+    color: #4b5563;
+    margin-bottom: 6px;
+}
+
+.impoclick-row strong {
+    color: #1f2937;
+    font-weight: 700;
+}
+
+.impoclick-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin: 12px 0 4px;
+}
+
+.impoclick-input {
+    all: unset;
+    box-sizing: border-box;
+    display: block;
+    width: 100%;
+    padding: 8px 10px;
+    font-size: 13px;
+    border: 1px solid #e5d9b6;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #1f2937;
+    margin-bottom: 10px;
+}
+
+.impoclick-input:focus {
+    border-color: #b8860b;
+}
+
+.impoclick-btn {
+    all: unset;
+    box-sizing: border-box;
+    display: block;
+    width: 100%;
+    text-align: center;
+    padding: 9px 10px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #1a1305;
+    background: linear-gradient(135deg, #ffd873 0%, #b8860b 100%);
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.impoclick-btn:hover {
+    filter: brightness(1.05);
+}
+
+.impoclick-text {
+    font-size: 12.5px;
+    color: #4b5563;
+    line-height: 1.5;
+    margin: 0 0 8px;
+}
+
+.impoclick-note {
+    font-size: 11px;
+    color: #9ca3af;
+    line-height: 1.4;
+    margin-top: 8px;
+}
+
+.impoclick-error {
+    color: #b91c1c;
+}
+
+.impoclick-verdict {
+    text-align: center;
+    font-size: 15px;
+    font-weight: 800;
+    padding: 8px;
+    border-radius: 8px;
+    margin: 10px 0 6px;
+}
+
+.impoclick-verdict.impoclick-good {
+    background: #dcfce7;
+    color: #15803d;
+}
+
+.impoclick-verdict.impoclick-warn {
+    background: #fef3c7;
+    color: #b45309;
+}
+
+.impoclick-verdict.impoclick-bad {
+    background: #fee2e2;
+    color: #b91c1c;
+}
