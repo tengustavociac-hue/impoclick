@@ -426,10 +426,41 @@
 
     window.addEventListener('resize', repositionCatalogBadges);
 
+    // TEMPORÁRIO — só pra diagnosticar o card com badge duplicado. Desenha
+    // um contorno colorido + rótulo em CADA link candidato de produtos com
+    // mais de um link, sem esconder nada. Remover depois de identificar a
+    // causa real (será removido no próximo commit).
+    function debugOutlineCandidateLinks() {
+        const links = Array.from(document.querySelectorAll('a[href*="/p/MLB"]'));
+        const byProductId = new Map();
+        links.forEach((link) => {
+            const idMatch = link.href.match(/\/p\/(MLB\d+)/i);
+            const productId = idMatch ? idMatch[1] : link.href;
+            if (!byProductId.has(productId)) byProductId.set(productId, []);
+            byProductId.get(productId).push(link);
+        });
+        const colors = ['#ef4444', '#3b82f6', '#22c55e', '#a855f7', '#f59e0b'];
+        byProductId.forEach((linkList) => {
+            if (linkList.length < 2) return;
+            linkList.forEach((link, i) => {
+                const rect = link.getBoundingClientRect();
+                const color = colors[i % colors.length];
+                const outline = document.createElement('div');
+                outline.style.cssText = `all:initial; position:absolute; top:${rect.top + window.scrollY}px; left:${rect.left + window.scrollX}px; width:${rect.width}px; height:${rect.height}px; border:3px solid ${color}; z-index:999998; pointer-events:none; box-sizing:border-box;`;
+                const label = document.createElement('span');
+                label.textContent = `#${i} ${Math.round(rect.width)}x${Math.round(rect.height)} img=${!!link.querySelector('img')}`;
+                label.style.cssText = `all:initial; position:absolute; top:0; left:0; background:${color}; color:white; font-family:monospace; font-size:11px; padding:2px 5px; white-space:nowrap;`;
+                outline.appendChild(label);
+                document.body.appendChild(outline);
+            });
+        });
+    }
+
     function start() {
         removePanel();
         init();
         markCatalogLinks();
+        debugOutlineCandidateLinks();
     }
 
     start();
