@@ -244,6 +244,15 @@
     color: #6b7280;
 }
 
+.impoclick-tm-confirmed {
+    color: #15803d;
+    font-weight: 600;
+}
+
+.impoclick-tm-unconfirmed {
+    color: #b45309;
+}
+
 .impoclick-verdict {
     text-align: center;
     font-size: 15px;

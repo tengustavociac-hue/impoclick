@@ -185,6 +185,10 @@
                 : 'Classe não identificada';
             const holders = (r.holders && r.holders.length) ? escapeHtml(r.holders.join(', ')) : '—';
 
+            const confirmedNote = r.statusConfirmed
+                ? '<span class="impoclick-tm-confirmed" title="Situação conferida agora na base oficial do INPI">✓ confirmado</span>'
+                : '<span class="impoclick-tm-unconfirmed" title="Não foi possível conferir na base oficial agora — pode estar desatualizado">situação não conferida</span>';
+
             return `
                 <div class="impoclick-trademark-item">
                     <div class="impoclick-trademark-item-header">
@@ -193,6 +197,7 @@
                     </div>
                     <p class="impoclick-note">Titular: ${holders}</p>
                     <p class="impoclick-note">${classesHtml}</p>
+                    <p class="impoclick-note">${confirmedNote}</p>
                 </div>
             `;
         }).join('');
@@ -204,7 +209,7 @@
         container.innerHTML = `
             ${items}
             ${moreNote}
-            <p class="impoclick-note">Consulta informativa via base pública do INPI (ambiente beta) — confirme oficialmente no site do INPI antes de qualquer decisão.</p>
+            <p class="impoclick-note">Consulta informativa via base pública do INPI — confirme oficialmente no site do INPI antes de qualquer decisão.</p>
         `;
     }
 
