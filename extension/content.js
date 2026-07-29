@@ -378,10 +378,26 @@
         badge.style.left = `${rect.left + window.scrollX + 6}px`;
     }
 
+    // Cards do ML costumam ter DOIS links pro mesmo produto (um envolvendo a
+    // imagem, outro envolvendo o título/texto) — sem agrupar por produto,
+    // isso cria dois crachás pro mesmo card. Agrupamos por ID do produto e
+    // marcamos só o link que contém uma imagem (o "principal" do card).
     function markCatalogLinks() {
-        const links = document.querySelectorAll('a[href*="/p/MLB"]:not([data-impoclick-marked])');
+        const links = Array.from(document.querySelectorAll('a[href*="/p/MLB"]:not([data-impoclick-marked])'));
+        const byProductId = new Map();
         links.forEach((link) => {
-            link.dataset.impoclickMarked = '1';
+            const idMatch = link.href.match(/\/p\/(MLB\d+)/i);
+            const productId = idMatch ? idMatch[1] : link.href;
+            const existing = byProductId.get(productId);
+            const hasImage = !!link.querySelector('img');
+            if (!existing || (hasImage && !existing.hasImage)) {
+                byProductId.set(productId, { link, hasImage });
+            }
+        });
+
+        links.forEach((link) => { link.dataset.impoclickMarked = '1'; });
+
+        byProductId.forEach(({ link }) => {
             const badge = document.createElement('span');
             badge.className = 'impoclick-catalog-badge';
             badge.textContent = 'CATÁLOGO';
