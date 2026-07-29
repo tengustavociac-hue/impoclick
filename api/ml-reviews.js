@@ -108,7 +108,7 @@ async function runCheck(res) {
 async function handleUserGet(req, res, userId) {
     const { data: reviews, error } = await supabaseAdmin
         .from('ml_reviews')
-        .select('id, ml_item_id, item_title, rating, comment, reviewed_at, is_read')
+        .select('id, ml_item_id, ml_review_id, item_title, rating, comment, reviewed_at, is_read')
         .eq('user_id', userId)
         .order('reviewed_at', { ascending: false })
         .limit(50);

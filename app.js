@@ -3008,6 +3008,27 @@ function updateReviewsBadge(count) {
 
 // As avaliações vêm de compradores (texto livre) — nunca usar innerHTML com esses
 // campos, sempre textContent, para não abrir XSS armazenado no painel.
+// O Mercado Livre replica a mesma avaliação em todas as publicações vinculadas
+// como variação de cor/tamanho (não dá pra saber pela API qual variação foi
+// realmente comprada) — agrupamos aqui pra não mostrar o mesmo comentário 3x.
+function groupReviews(reviews) {
+    const groups = [];
+    const byKey = new Map();
+    reviews.forEach(r => {
+        const key = `${r.rating}|${r.reviewed_at}|${r.comment}`;
+        const existing = byKey.get(key);
+        if (existing) {
+            existing.itemTitles.push(r.item_title || r.ml_item_id);
+            existing.allRead = existing.allRead && r.is_read;
+        } else {
+            const group = { ...r, itemTitles: [r.item_title || r.ml_item_id], allRead: r.is_read };
+            byKey.set(key, group);
+            groups.push(group);
+        }
+    });
+    return groups;
+}
+
 function renderReviewsList(reviews) {
     const container = document.getElementById('reviews-list');
     const emptyMsg = document.getElementById('reviews-empty');
@@ -3020,11 +3041,11 @@ function renderReviewsList(reviews) {
     }
     if (emptyMsg) emptyMsg.classList.add('hidden');
 
-    reviews.forEach(r => {
+    groupReviews(reviews).forEach(r => {
         const card = document.createElement('section');
         card.className = 'card';
         card.style.marginBottom = '0.75rem';
-        card.style.opacity = r.is_read ? '0.7' : '1';
+        card.style.opacity = r.allRead ? '0.7' : '1';
 
         const header = document.createElement('div');
         header.style.display = 'flex';
@@ -3033,7 +3054,7 @@ function renderReviewsList(reviews) {
         header.style.marginBottom = '0.35rem';
 
         const title = document.createElement('strong');
-        title.textContent = r.item_title || r.ml_item_id;
+        title.textContent = r.itemTitles[0];
 
         const stars = document.createElement('span');
         stars.style.color = 'var(--primary)';
@@ -3053,6 +3074,16 @@ function renderReviewsList(reviews) {
         commentP.textContent = r.comment || 'Sem comentário.';
 
         card.appendChild(header);
+
+        if (r.itemTitles.length > 1) {
+            const alsoP = document.createElement('p');
+            alsoP.className = 'small';
+            alsoP.style.color = 'var(--text-muted)';
+            alsoP.style.marginBottom = '0.35rem';
+            alsoP.textContent = `O Mercado Livre também mostra esta avaliação em: ${r.itemTitles.slice(1).join(', ')}`;
+            card.appendChild(alsoP);
+        }
+
         card.appendChild(dateP);
         card.appendChild(commentP);
         container.appendChild(card);
