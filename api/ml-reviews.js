@@ -80,18 +80,20 @@ async function runCheck(res) {
     let itemsChecked = 0;
     let newReviews = 0;
     const errors = [];
+    const perUser = [];
 
     for (const profile of profiles || []) {
         try {
             const result = await checkUser(profile.id);
             itemsChecked += result.itemsChecked;
             newReviews += result.newReviews;
+            perUser.push({ userId: profile.id, ...result });
         } catch (err) {
             errors.push({ userId: profile.id, error: err.message });
         }
     }
 
-    return res.json({ usersChecked: (profiles || []).length, itemsChecked, newReviews, errors });
+    return res.json({ usersChecked: (profiles || []).length, itemsChecked, newReviews, errors, perUser });
 }
 
 async function handleUserGet(req, res, userId) {
