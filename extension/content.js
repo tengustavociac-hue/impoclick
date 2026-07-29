@@ -413,6 +413,17 @@
         });
     }
 
+    // Limpa qualquer crachá remanescente de uma marcação anterior (ex: uma
+    // corrida em que markCatalogLinks rodou antes do h1/preço existirem no
+    // DOM e looksLikeProductPage() ainda não detectava a página de produto).
+    function removeCatalogBadges() {
+        catalogBadges.forEach((badge) => badge.remove());
+        catalogBadges.clear();
+        document.querySelectorAll('a[data-impoclick-marked]').forEach((link) => {
+            delete link.dataset.impoclickMarked;
+        });
+    }
+
     function repositionCatalogBadges() {
         catalogBadges.forEach((badge, link) => {
             if (!link.isConnected) {
@@ -426,41 +437,21 @@
 
     window.addEventListener('resize', repositionCatalogBadges);
 
-    // TEMPORÁRIO — só pra diagnosticar o card com badge duplicado. Desenha
-    // um contorno colorido + rótulo em CADA link candidato de produtos com
-    // mais de um link, sem esconder nada. Remover depois de identificar a
-    // causa real (será removido no próximo commit).
-    function debugOutlineCandidateLinks() {
-        const links = Array.from(document.querySelectorAll('a[href*="/p/MLB"]'));
-        const byProductId = new Map();
-        links.forEach((link) => {
-            const idMatch = link.href.match(/\/p\/(MLB\d+)/i);
-            const productId = idMatch ? idMatch[1] : link.href;
-            if (!byProductId.has(productId)) byProductId.set(productId, []);
-            byProductId.get(productId).push(link);
-        });
-        const colors = ['#ef4444', '#3b82f6', '#22c55e', '#a855f7', '#f59e0b'];
-        byProductId.forEach((linkList) => {
-            if (linkList.length < 2) return;
-            linkList.forEach((link, i) => {
-                const rect = link.getBoundingClientRect();
-                const color = colors[i % colors.length];
-                const outline = document.createElement('div');
-                outline.style.cssText = `all:initial; position:absolute; top:${rect.top + window.scrollY}px; left:${rect.left + window.scrollX}px; width:${rect.width}px; height:${rect.height}px; border:3px solid ${color}; z-index:999998; pointer-events:none; box-sizing:border-box;`;
-                const label = document.createElement('span');
-                label.textContent = `#${i} ${Math.round(rect.width)}x${Math.round(rect.height)} img=${!!link.querySelector('img')}`;
-                label.style.cssText = `all:initial; position:absolute; top:0; left:0; background:${color}; color:white; font-family:monospace; font-size:11px; padding:2px 5px; white-space:nowrap;`;
-                outline.appendChild(label);
-                document.body.appendChild(outline);
-            });
-        });
-    }
-
     function start() {
         removePanel();
         init();
-        markCatalogLinks();
-        debugOutlineCandidateLinks();
+        // Marcar links de catálogo só faz sentido em páginas de RESULTADOS
+        // (busca, listas, carrosséis) — numa página de produto/catálogo
+        // individual (a que o usuário já está vendo), a própria página tem
+        // vários links "/p/MLB..." pra coisas como título, cor, tamanho, que
+        // não são cards de busca e confundiam a marcação (ex: o link do
+        // título é uma barra larga e baixa, com mais área que a miniatura
+        // da foto, e "ganhava" o crachá por engano).
+        if (looksLikeProductPage()) {
+            removeCatalogBadges();
+        } else {
+            markCatalogLinks();
+        }
     }
 
     start();
@@ -487,7 +478,9 @@
     const observer = new MutationObserver(() => {
         clearTimeout(markDebounce);
         markDebounce = setTimeout(() => {
-            markCatalogLinks();
+            if (!looksLikeProductPage()) {
+                markCatalogLinks();
+            }
             repositionCatalogBadges();
         }, 300);
     });
