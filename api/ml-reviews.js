@@ -155,6 +155,11 @@ module.exports = async (req, res) => {
     const userId = req.headers['user-token'];
     if (!userId) return res.status(401).json({ error: 'User token is required in headers.' });
 
+    // Sem isso a Vercel gera ETag e responde 304 em GETs repetidos com os mesmos
+    // headers, e como 304 não é "ok" pro fetch do navegador, o painel via o
+    // request como falho e mostrava a lista sempre vazia.
+    res.setHeader('Cache-Control', 'no-store');
+
     try {
         if (req.method === 'GET') return await handleUserGet(req, res, userId);
         if (req.method === 'PATCH') return await handleUserMarkRead(req, res, userId);
