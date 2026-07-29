@@ -2996,7 +2996,8 @@ document.addEventListener('DOMContentLoaded', () => {
     initFeasibilityModule();
     initHistoryModule();
     initReviewsModule();
-    initCatalogModule();
+    initCatalogStatusModule();
+    startNotificationPolling();
 });
 
 // ==========================================
@@ -3270,11 +3271,22 @@ async function markCatalogRead(payload) {
     await loadCatalogStatus();
 }
 
-function initCatalogModule() {
+function initCatalogStatusModule() {
     const btnMarkAll = document.getElementById('btn-mark-all-catalog-read');
     if (btnMarkAll) {
         btnMarkAll.addEventListener('click', () => markCatalogRead({ all: true }));
     }
+}
+
+// Mantém os badges de avaliações e catálogo atualizados enquanto a página fica
+// aberta, sem precisar recarregar — o checker no backend roda a cada 15 min,
+// aqui só confere a cada 5 min pra refletir rápido assim que houver mudança.
+function startNotificationPolling() {
+    setInterval(() => {
+        if (!state.currentUser) return;
+        loadReviews();
+        loadCatalogStatus();
+    }, 5 * 60 * 1000);
 }
 
 // Cabecalho passa a mostrar a view atual (icone + titulo + subtitulo) em vez
