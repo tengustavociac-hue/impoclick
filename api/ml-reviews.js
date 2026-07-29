@@ -10,18 +10,23 @@ function safeEqual(a, b) {
     return crypto.timingSafeEqual(bufA, bufB);
 }
 
-async function fetchItemTitles(userId, itemIds) {
-    const titles = {};
+// Também traz catalog_product_id: em anúncios de catálogo, as opiniões ficam
+// atreladas ao produto do catálogo, não à publicação — sem esse id na chamada
+// de /reviews/item, a API devolve a lista vazia mesmo quando o produto tem avaliações.
+async function fetchItemMeta(userId, itemIds) {
+    const meta = {};
     for (let i = 0; i < itemIds.length; i += 20) {
         const batch = itemIds.slice(i, i + 20);
-        const resp = await mlFetch(userId, `/items?ids=${batch.join(',')}`);
+        const resp = await mlFetch(userId, `/items?ids=${batch.join(',')}&attributes=id,title,catalog_product_id`);
         if (!resp.ok) continue;
         const data = await resp.json();
         for (const entry of data) {
-            if (entry.code === 200 && entry.body) titles[entry.body.id] = entry.body.title;
+            if (entry.code === 200 && entry.body) {
+                meta[entry.body.id] = { title: entry.body.title, catalogProductId: entry.body.catalog_product_id || null };
+            }
         }
     }
-    return titles;
+    return meta;
 }
 
 // Verifica as avaliações de um usuário conectado e grava as novas no Supabase.
@@ -35,11 +40,16 @@ async function checkUser(userId) {
     const itemIds = searchData.results || [];
     if (itemIds.length === 0) return { itemsChecked: 0, newReviews: 0 };
 
-    const titles = await fetchItemTitles(userId, itemIds);
+    const meta = await fetchItemMeta(userId, itemIds);
 
     const rows = [];
     for (const itemId of itemIds) {
-        const resp = await mlFetch(userId, `/reviews/item/${itemId}`);
+        const catalogProductId = meta[itemId] && meta[itemId].catalogProductId;
+        const reviewsPath = catalogProductId
+            ? `/reviews/item/${itemId}?catalog_product_id=${encodeURIComponent(catalogProductId)}`
+            : `/reviews/item/${itemId}`;
+
+        const resp = await mlFetch(userId, reviewsPath);
         if (!resp.ok) continue; // item sem reviews habilitadas ou erro pontual — segue para o próximo
 
         const data = await resp.json();
@@ -48,7 +58,7 @@ async function checkUser(userId) {
                 user_id: userId,
                 ml_item_id: itemId,
                 ml_review_id: String(r.id),
-                item_title: titles[itemId] || null,
+                item_title: (meta[itemId] && meta[itemId].title) || null,
                 rating: r.rate,
                 comment: r.content || null,
                 reviewed_at: r.date_created || null,
