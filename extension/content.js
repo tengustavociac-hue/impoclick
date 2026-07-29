@@ -1,7 +1,14 @@
 (function () {
-    function extractItemId() {
-        const match = window.location.href.match(/MLB-?(\d{6,})/i);
-        return match ? `MLB${match[1]}` : null;
+    // Páginas de catálogo (/p/MLB...) juntam ofertas de vários vendedores
+    // numa página só — não têm um preço/anúncio único, então não dá pra
+    // calcular viabilidade direto nelas (por enquanto). Só ativamos o painel
+    // em páginas de anúncio individual (MLB-123456789, com hífen).
+    function getPageType() {
+        const href = window.location.href;
+        if (/\/p\/MLB\d+/i.test(href)) return { type: 'catalog' };
+        const match = href.match(/MLB-(\d{6,})/i);
+        if (match) return { type: 'item', itemId: `MLB${match[1]}` };
+        return { type: 'none' };
     }
 
     function sendMessage(message) {
@@ -114,10 +121,17 @@
     }
 
     async function init() {
-        const itemId = extractItemId();
-        if (!itemId) return; // não é uma página de anúncio individual
+        const page = getPageType();
+        if (page.type === 'none') return;
 
         const container = buildPanel();
+
+        if (page.type === 'catalog') {
+            container.innerHTML = `
+                <p class="impoclick-text">Esta é uma página de catálogo (vários vendedores juntos). Abra a oferta específica de um vendedor (clique em "Ver outras opções de compra" ou no vendedor desejado) para calcular a viabilidade.</p>
+            `;
+            return;
+        }
 
         const session = await sendMessage({ type: 'GET_SESSION' });
         if (!session.session) {
@@ -125,7 +139,7 @@
             return;
         }
 
-        const itemResp = await sendMessage({ type: 'LOOKUP_ITEM', itemId });
+        const itemResp = await sendMessage({ type: 'LOOKUP_ITEM', itemId: page.itemId });
         if (itemResp.error) {
             const isNotConnected = /não conectada/i.test(itemResp.error);
             renderError(

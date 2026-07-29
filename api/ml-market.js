@@ -57,7 +57,14 @@ async function handleItem(req, res, userId) {
     if (!itemId) return res.status(400).json({ error: 'Parâmetro itemId é obrigatório.' });
 
     const resp = await mlFetch(userId, `/items/${encodeURIComponent(itemId)}`);
-    if (!resp.ok) return res.status(resp.status).json({ error: await resp.text() });
+    if (!resp.ok) {
+        let message = 'Não foi possível consultar este anúncio.';
+        try {
+            const errData = await resp.json();
+            if (errData.message) message = errData.message;
+        } catch (e) { /* corpo não era JSON, mantém a mensagem padrão */ }
+        return res.status(resp.status).json({ error: message });
+    }
 
     const data = await resp.json();
     res.json({
