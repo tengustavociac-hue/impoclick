@@ -2685,6 +2685,7 @@ tfoot th, tfoot td {
 }
 
 .nav-subitem {
+    width: 100%;
     background: none;
     border: none;
     padding: 0.5rem 0.75rem;
@@ -2693,8 +2694,18 @@ tfoot th, tfoot td {
     font-family: var(--font-secondary);
     font-weight: 600;
     font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
     text-align: left;
     cursor: pointer;
+    transition: var(--transition-smooth);
+}
+
+.nav-subitem svg {
+    color: var(--text-muted);
+    opacity: 0.75;
+    flex-shrink: 0;
     transition: var(--transition-smooth);
 }
 
@@ -2703,10 +2714,19 @@ tfoot th, tfoot td {
     background-color: var(--secondary);
 }
 
+.nav-subitem:hover svg {
+    opacity: 1;
+}
+
 .nav-subitem.active {
     color: var(--primary);
     font-weight: 700;
     background-color: var(--primary-glow);
+}
+
+.nav-subitem.active svg {
+    color: var(--primary);
+    opacity: 1;
 }
 
 /* Main Content Wrapper */
