@@ -42,6 +42,9 @@ async function checkUser(userId) {
 
     const meta = await fetchItemMeta(userId, itemIds);
 
+    // amostra de diagnóstico temporária (primeiros 3 itens) — remover depois de achar o problema
+    const sample = [];
+
     const rows = [];
     for (const itemId of itemIds) {
         const catalogProductId = meta[itemId] && meta[itemId].catalogProductId;
@@ -50,9 +53,21 @@ async function checkUser(userId) {
             : `/reviews/item/${itemId}`;
 
         const resp = await mlFetch(userId, reviewsPath);
-        if (!resp.ok) continue; // item sem reviews habilitadas ou erro pontual — segue para o próximo
+        if (!resp.ok) {
+            if (sample.length < 3) sample.push({ itemId, catalogProductId, status: resp.status, ok: false });
+            continue; // item sem reviews habilitadas ou erro pontual — segue para o próximo
+        }
 
         const data = await resp.json();
+        if (sample.length < 3) {
+            sample.push({
+                itemId,
+                catalogProductId,
+                status: resp.status,
+                ratingAverage: data.rating_average,
+                reviewCount: (data.reviews || []).length,
+            });
+        }
         for (const r of data.reviews || []) {
             rows.push({
                 user_id: userId,
@@ -76,7 +91,7 @@ async function checkUser(userId) {
         newReviews = inserted ? inserted.length : 0;
     }
 
-    return { itemsChecked: itemIds.length, newReviews };
+    return { itemsChecked: itemIds.length, newReviews, sample };
 }
 
 async function runCheck(res) {
