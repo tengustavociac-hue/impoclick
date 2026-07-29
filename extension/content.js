@@ -6,6 +6,16 @@
     // próprio conteúdo da página: se tem título e preço de produto visíveis,
     // é uma página de compra, não importa a URL.
     function looksLikeProductPage() {
+        // Páginas de RESULTADOS (busca, lista) também têm um <h1> genérico
+        // (breadcrumb, ex: "Mop x10") e várias ".andes-money-amount__fraction"
+        // (uma por card), então esses dois sozinhos davam falso positivo e
+        // confundiam página de busca com página de produto. O contêiner da
+        // grade de resultados só existe em página de busca — se ele existir,
+        // definitivamente NÃO é uma página de produto único, não importa
+        // o que mais tenha na página.
+        if (document.querySelector('.ui-search-results, ol.ui-search-layout, [class*="ui-search-layout"]')) {
+            return false;
+        }
         const hasTitle = !!(document.querySelector('h1.ui-pdp-title') || document.querySelector('h1'));
         const hasPrice = !!document.querySelector('.andes-money-amount__fraction');
         return hasTitle && hasPrice;
