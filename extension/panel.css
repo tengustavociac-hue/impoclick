@@ -214,3 +214,24 @@
     background: #fee2e2;
     color: #b91c1c;
 }
+
+/* Etiqueta "CATÁLOGO" injetada em links de produto catálogo (/p/MLB...)
+   nos resultados de busca e listas — all:initial pra não herdar estilo
+   nenhum da página do Mercado Livre. */
+.impoclick-catalog-badge {
+    all: initial;
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    z-index: 999999;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    color: #1a1305;
+    background: linear-gradient(135deg, #ffd873 0%, #b8860b 100%);
+    padding: 3px 7px;
+    border-radius: 999px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+    pointer-events: none;
+}

@@ -360,9 +360,28 @@
         if (existing) existing.remove();
     }
 
+    // Marca visualmente os produtos de CATÁLOGO (/p/MLB...) direto nos
+    // resultados de busca, listas, carrosséis etc — pra identificar sem
+    // precisar clicar em cada um. Catálogo = produto com vários vendedores
+    // concorrendo na mesma página (geralmente os mais procurados).
+    function markCatalogLinks() {
+        const links = document.querySelectorAll('a[href*="/p/MLB"]:not([data-impoclick-marked])');
+        links.forEach((link) => {
+            link.dataset.impoclickMarked = '1';
+            if (getComputedStyle(link).position === 'static') {
+                link.style.position = 'relative';
+            }
+            const badge = document.createElement('span');
+            badge.className = 'impoclick-catalog-badge';
+            badge.textContent = 'CATÁLOGO';
+            link.appendChild(badge);
+        });
+    }
+
     function start() {
         removePanel();
         init();
+        markCatalogLinks();
     }
 
     start();
@@ -381,4 +400,14 @@
             start();
         }
     }, 1000);
+
+    // Resultados de busca carregam aos poucos (scroll infinito, paginação
+    // via SPA) — observamos novos links aparecendo no DOM pra marcar os
+    // produtos de catálogo que ainda não tinham sido renderizados.
+    let markDebounce = null;
+    const observer = new MutationObserver(() => {
+        clearTimeout(markDebounce);
+        markDebounce = setTimeout(markCatalogLinks, 300);
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
 })();
