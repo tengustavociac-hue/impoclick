@@ -17,12 +17,16 @@ async function fetchItemMeta(userId, itemIds) {
     const meta = {};
     for (let i = 0; i < itemIds.length; i += 20) {
         const batch = itemIds.slice(i, i + 20);
-        const resp = await mlFetch(userId, `/items?ids=${batch.join(',')}&attributes=id,title,catalog_product_id`);
+        const resp = await mlFetch(userId, `/items?ids=${batch.join(',')}&attributes=id,title,catalog_product_id,user_product_id`);
         if (!resp.ok) continue;
         const data = await resp.json();
         for (const entry of data) {
             if (entry.code === 200 && entry.body) {
-                meta[entry.body.id] = { title: entry.body.title, catalogProductId: entry.body.catalog_product_id || null };
+                meta[entry.body.id] = {
+                    title: entry.body.title,
+                    catalogProductId: entry.body.catalog_product_id || null,
+                    userProductId: entry.body.user_product_id || null,
+                };
             }
         }
     }
@@ -74,6 +78,7 @@ async function checkCatalogCompetition(userId, itemIds, meta) {
             ml_item_id: itemId,
             item_title: meta[itemId].title || null,
             catalog_product_id: meta[itemId].catalogProductId,
+            user_product_id: meta[itemId].userProductId,
             status,
             current_price: data.current_price ?? null,
             price_to_win: data.price_to_win ?? null,
@@ -181,7 +186,7 @@ async function handleUserGet(req, res, userId) {
     if (req.query.resource === 'catalog') {
         const { data: items, error } = await supabaseAdmin
             .from('ml_catalog_status')
-            .select('id, ml_item_id, item_title, status, current_price, price_to_win, winner_item_id, winner_price, reason, is_read, updated_at')
+            .select('id, ml_item_id, user_product_id, item_title, status, current_price, price_to_win, winner_item_id, winner_price, reason, is_read, updated_at')
             .eq('user_id', userId)
             .order('updated_at', { ascending: false })
             .limit(100);

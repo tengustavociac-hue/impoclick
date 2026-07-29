@@ -3228,6 +3228,20 @@ function renderCatalogList(items) {
         dateP.textContent = item.updated_at ? `Verificado em ${new Date(item.updated_at).toLocaleString('pt-BR')}` : '';
         card.appendChild(dateP);
 
+        // Link direto pra tela de edição só faz sentido pra quem não está ganhando —
+        // precisa do user_product_id (padrão de URL confirmado com o usuário).
+        if (item.status !== 'winning' && item.user_product_id) {
+            const editLink = document.createElement('a');
+            editLink.className = 'btn btn-secondary btn-sm';
+            editLink.style.marginTop = '0.5rem';
+            editLink.style.display = 'inline-block';
+            editLink.href = `https://www.mercadolivre.com.br/anuncios/${encodeURIComponent(item.user_product_id)}/modificar/bomni/variation?item_id=${encodeURIComponent(item.ml_item_id)}`;
+            editLink.target = '_blank';
+            editLink.rel = 'noopener';
+            editLink.textContent = 'Editar anúncio no Mercado Livre';
+            card.appendChild(editLink);
+        }
+
         container.appendChild(card);
     });
 }

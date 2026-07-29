@@ -8,6 +8,7 @@ create table ml_catalog_status (
   ml_item_id text not null,
   item_title text,
   catalog_product_id text,
+  user_product_id text, -- usado pra montar o link direto de edição do anúncio no ML
   status text not null, -- winning | competing | sharing_first_place | listed
   current_price numeric,
   price_to_win numeric,
