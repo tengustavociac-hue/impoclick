@@ -242,11 +242,13 @@
         `;
     }
 
-    function computeAndRenderVerdict(resultEl, price, feePct, cost, freightCost, freightNote) {
+    function computeAndRenderVerdict(resultEl, price, feePct, cost, freightCost, freightNote, taxPct) {
         const effectiveFeePct = feePct !== null ? feePct : 13; // fallback: taxa clássica média
         const feeAmount = price * (effectiveFeePct / 100);
         const freight = freightCost || 0;
-        const netRevenue = price - feeAmount - freight;
+        const effectiveTaxPct = taxPct || 0;
+        const taxAmount = price * (effectiveTaxPct / 100);
+        const netRevenue = price - feeAmount - freight - taxAmount;
         const diff = netRevenue - cost;
         const marginPct = price > 0 ? (diff / price) * 100 : 0;
 
@@ -282,6 +284,12 @@
                     <span>(–) Frete da plataforma</span>
                     <strong>${formatBRL(freight)}</strong>
                 </div>
+                ${effectiveTaxPct > 0 ? `
+                <div class="impoclick-breakdown-row impoclick-breakdown-minus">
+                    <span>(–) Imposto sobre a venda (${effectiveTaxPct}%)</span>
+                    <strong>${formatBRL(taxAmount)}</strong>
+                </div>
+                ` : ''}
                 <div class="impoclick-breakdown-row impoclick-breakdown-subtotal">
                     <span>(=) Receita líquida da venda</span>
                     <strong>${formatBRL(netRevenue)}</strong>
@@ -324,6 +332,9 @@
             ${pageData.shipping && pageData.shipping.isFree ? `<p class="impoclick-note">"Grátis" é o que aparece pro comprador — normalmente o vendedor ainda paga o frete real pra Mercado Envios. Preencha peso/dimensões abaixo pra ver esse custo real.</p>` : ''}
             <label class="impoclick-label" for="impoclick-cost-input">Seu custo final de importação (R$/un.)</label>
             <input type="number" id="impoclick-cost-input" class="impoclick-input" step="0.01" min="0" placeholder="ex: 45.00">
+
+            <label class="impoclick-label" for="impoclick-tax-input">% de imposto pago na venda (opcional)</label>
+            <input type="number" id="impoclick-tax-input" class="impoclick-input" step="0.01" min="0" max="100" placeholder="ex: 6 (Simples Nacional)">
 
             <label class="impoclick-label">Peso e dimensões do produto (pra calcular o frete real da sua conta)</label>
             ${pageData.dims ? '<p class="impoclick-note">Lido automaticamente da ficha técnica do anúncio — confira antes de calcular.</p>' : ''}
@@ -391,6 +402,7 @@
             const priceInput = document.getElementById('impoclick-price-input');
             const price = pageData.price || parseFloat(priceInput ? priceInput.value : NaN);
             const cost = parseFloat(document.getElementById('impoclick-cost-input').value);
+            const taxPct = parseFloat(document.getElementById('impoclick-tax-input').value) || 0;
 
             if (!price || price <= 0) {
                 resultEl.innerHTML = '<p class="impoclick-text impoclick-error">Informe o preço do anúncio.</p>';
@@ -433,7 +445,7 @@
                 freightNote = 'Preencha peso e dimensões acima pra incluir o frete no cálculo.';
             }
 
-            computeAndRenderVerdict(resultEl, price, feePct, cost, freightCost, freightNote);
+            computeAndRenderVerdict(resultEl, price, feePct, cost, freightCost, freightNote, taxPct);
         });
 
         document.getElementById('impoclick-trademark-btn').addEventListener('click', async () => {
