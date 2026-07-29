@@ -30,8 +30,9 @@ async function fetchItemMeta(userId, itemIds) {
 }
 
 // Verifica as avaliações de um usuário conectado e grava as novas no Supabase.
-// A dedupe acontece via upsert com a constraint unique(ml_item_id, ml_review_id) —
-// não precisamos guardar "última avaliação vista" separadamente.
+// A dedupe acontece via upsert com a constraint unique(user_id, ml_item_id, ml_review_id)
+// — inclui user_id porque duas contas Impoclick podem estar ligadas à mesma conta
+// do Mercado Livre (mesmos itens). Não precisamos guardar "última avaliação vista".
 async function checkUser(userId) {
     const searchResp = await mlFetch(userId, mlUserId => `/users/${mlUserId}/items/search?status=active&limit=${ITEMS_PER_USER_CAP}`);
     if (!searchResp.ok) throw new Error(`items/search falhou (${searchResp.status})`);
@@ -42,9 +43,6 @@ async function checkUser(userId) {
 
     const meta = await fetchItemMeta(userId, itemIds);
 
-    // amostra de diagnóstico temporária (primeiros 3 itens) — remover depois de achar o problema
-    const sample = [];
-
     const rows = [];
     for (const itemId of itemIds) {
         const catalogProductId = meta[itemId] && meta[itemId].catalogProductId;
@@ -53,21 +51,9 @@ async function checkUser(userId) {
             : `/reviews/item/${itemId}`;
 
         const resp = await mlFetch(userId, reviewsPath);
-        if (!resp.ok) {
-            if (sample.length < 3) sample.push({ itemId, catalogProductId, status: resp.status, ok: false });
-            continue; // item sem reviews habilitadas ou erro pontual — segue para o próximo
-        }
+        if (!resp.ok) continue; // item sem reviews habilitadas ou erro pontual — segue para o próximo
 
         const data = await resp.json();
-        if (sample.length < 3) {
-            sample.push({
-                itemId,
-                catalogProductId,
-                status: resp.status,
-                ratingAverage: data.rating_average,
-                reviewCount: (data.reviews || []).length,
-            });
-        }
         for (const r of data.reviews || []) {
             rows.push({
                 user_id: userId,
@@ -91,7 +77,7 @@ async function checkUser(userId) {
         newReviews = inserted ? inserted.length : 0;
     }
 
-    return { itemsChecked: itemIds.length, newReviews, sample };
+    return { itemsChecked: itemIds.length, newReviews };
 }
 
 async function runCheck(res) {
@@ -105,20 +91,18 @@ async function runCheck(res) {
     let itemsChecked = 0;
     let newReviews = 0;
     const errors = [];
-    const perUser = [];
 
     for (const profile of profiles || []) {
         try {
             const result = await checkUser(profile.id);
             itemsChecked += result.itemsChecked;
             newReviews += result.newReviews;
-            perUser.push({ userId: profile.id, ...result });
         } catch (err) {
             errors.push({ userId: profile.id, error: err.message });
         }
     }
 
-    return res.json({ usersChecked: (profiles || []).length, itemsChecked, newReviews, errors, perUser });
+    return res.json({ usersChecked: (profiles || []).length, itemsChecked, newReviews, errors });
 }
 
 async function handleUserGet(req, res, userId) {
