@@ -2110,10 +2110,36 @@
                     <button type="button" id="btn-mark-all-promotions-read" class="btn btn-secondary btn-sm">Marcar todas como lidas</button>
                 </div>
                 <p class="small" style="color: var(--text-muted); margin-bottom: 1.25rem;">
-                    Promoções ativas nos seus anúncios que têm prazo de término (campanha tradicional, cofinanciada, desconto por quantidade, pré-acordado, campanha do vendedor e liquidação Full). Avisa quando faltam 3 dias ou menos, e quando o prazo termina. Modalidades sem prazo fixo (relâmpago, oferta do dia, cofinanciada automática e preços competitivos) não aparecem aqui.
+                    Promoções ativas nos seus anúncios que têm prazo de término (campanha tradicional, cofinanciada, desconto por quantidade, pré-acordado, campanha do vendedor e liquidação Full). Avisa quando faltam 3 dias ou menos, e quando o prazo termina. Modalidades sem prazo fixo (oferta do dia, cofinanciada automática e preços competitivos) não aparecem nas abas de prazo.
                 </p>
-                <div id="promotions-list"></div>
-                <p id="promotions-empty" class="small" style="color: var(--text-muted); text-align:center; padding: 1.5rem 0;">Nenhuma promoção com prazo verificada ainda.</p>
+
+                <div class="results-tab-bar">
+                    <button type="button" id="promo-tab-btn-active" class="results-tab-btn active">Ativas</button>
+                    <button type="button" id="promo-tab-btn-soon" class="results-tab-btn">Vencem em 10 dias</button>
+                    <button type="button" id="promo-tab-btn-ended" class="results-tab-btn">Inativas</button>
+                    <button type="button" id="promo-tab-btn-lightning" class="results-tab-btn">Podem ter Relâmpago</button>
+                </div>
+
+                <div id="promo-tab-active" class="tab-content-panel">
+                    <div id="promo-list-active"></div>
+                    <p id="promo-empty-active" class="small" style="color: var(--text-muted); text-align:center; padding: 1.5rem 0;">Nenhuma promoção ativa no momento.</p>
+                </div>
+
+                <div id="promo-tab-soon" class="tab-content-panel hidden">
+                    <div id="promo-list-soon"></div>
+                    <p id="promo-empty-soon" class="small" style="color: var(--text-muted); text-align:center; padding: 1.5rem 0;">Nenhuma promoção vencendo nos próximos 10 dias.</p>
+                </div>
+
+                <div id="promo-tab-ended" class="tab-content-panel hidden">
+                    <div id="promo-list-ended"></div>
+                    <p id="promo-empty-ended" class="small" style="color: var(--text-muted); text-align:center; padding: 1.5rem 0;">Nenhuma promoção inativa registrada ainda.</p>
+                </div>
+
+                <div id="promo-tab-lightning" class="tab-content-panel hidden">
+                    <p class="small" style="color: var(--text-muted); margin-bottom: 1rem;">Anúncios elegíveis para participar de uma Oferta Relâmpago agora — essa modalidade não tem prazo fixo, é uma oportunidade que aparece e pode ser aceita a qualquer momento.</p>
+                    <div id="promo-list-lightning"></div>
+                    <p id="promo-empty-lightning" class="small" style="color: var(--text-muted); text-align:center; padding: 1.5rem 0;">Nenhum anúncio elegível pra oferta relâmpago no momento.</p>
+                </div>
             </section>
         </div>
 

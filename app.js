@@ -3323,9 +3323,9 @@ function updatePromotionsBadge(count) {
     }
 }
 
-function renderPromotionsList(items) {
-    const container = document.getElementById('promotions-list');
-    const emptyMsg = document.getElementById('promotions-empty');
+function renderIntoList(containerId, emptyId, items, buildCardFn) {
+    const container = document.getElementById(containerId);
+    const emptyMsg = document.getElementById(emptyId);
     if (!container) return;
     container.innerHTML = '';
 
@@ -3334,60 +3334,95 @@ function renderPromotionsList(items) {
         return;
     }
     if (emptyMsg) emptyMsg.classList.add('hidden');
+    items.forEach(item => container.appendChild(buildCardFn(item)));
+}
 
-    items.forEach(item => {
-        const card = document.createElement('section');
-        card.className = 'card';
-        card.style.marginBottom = '0.75rem';
-        card.style.opacity = item.is_read ? '0.7' : '1';
+function buildPromotionCard(item) {
+    const card = document.createElement('section');
+    card.className = 'card';
+    card.style.marginBottom = '0.75rem';
+    card.style.opacity = item.is_read ? '0.7' : '1';
 
-        const header = document.createElement('div');
-        header.style.display = 'flex';
-        header.style.justifyContent = 'space-between';
-        header.style.alignItems = 'center';
-        header.style.marginBottom = '0.35rem';
-        header.style.gap = '0.75rem';
+    const header = document.createElement('div');
+    header.style.display = 'flex';
+    header.style.justifyContent = 'space-between';
+    header.style.alignItems = 'center';
+    header.style.marginBottom = '0.35rem';
+    header.style.gap = '0.75rem';
 
-        const title = document.createElement('strong');
-        title.textContent = item.item_title || item.ml_item_id;
+    const title = document.createElement('strong');
+    title.textContent = item.item_title || item.ml_item_id;
 
-        const daysLeft = item.finish_date ? Math.ceil((new Date(item.finish_date).getTime() - Date.now()) / 86400000) : null;
-        const statusSpan = document.createElement('span');
-        statusSpan.style.fontWeight = '700';
-        statusSpan.style.whiteSpace = 'nowrap';
-        if (item.status === 'ended') {
-            statusSpan.style.color = 'var(--text-muted)';
-            statusSpan.textContent = 'Terminou';
-        } else if (daysLeft != null && daysLeft <= 3) {
-            statusSpan.style.color = 'var(--danger, #ef4444)';
-            statusSpan.textContent = daysLeft <= 0 ? 'Termina hoje' : `Termina em ${daysLeft} dia${daysLeft > 1 ? 's' : ''}`;
-        } else {
-            statusSpan.style.color = 'var(--success)';
-            statusSpan.textContent = 'Ativa';
-        }
+    const daysLeft = item.finish_date ? Math.ceil((new Date(item.finish_date).getTime() - Date.now()) / 86400000) : null;
+    const statusSpan = document.createElement('span');
+    statusSpan.style.fontWeight = '700';
+    statusSpan.style.whiteSpace = 'nowrap';
+    if (item.status === 'ended') {
+        statusSpan.style.color = 'var(--text-muted)';
+        statusSpan.textContent = 'Terminou';
+    } else if (daysLeft != null && daysLeft <= 3) {
+        statusSpan.style.color = 'var(--danger, #ef4444)';
+        statusSpan.textContent = daysLeft <= 0 ? 'Termina hoje' : `Termina em ${daysLeft} dia${daysLeft > 1 ? 's' : ''}`;
+    } else {
+        statusSpan.style.color = 'var(--success)';
+        statusSpan.textContent = 'Ativa';
+    }
 
-        header.appendChild(title);
-        header.appendChild(statusSpan);
-        card.appendChild(header);
+    header.appendChild(title);
+    header.appendChild(statusSpan);
+    card.appendChild(header);
 
-        const detailP = document.createElement('p');
-        detailP.className = 'small';
-        detailP.style.color = 'var(--text-muted)';
-        detailP.style.marginBottom = '0.35rem';
-        const typeLabel = PROMOTION_TYPE_LABELS[item.promotion_type] || item.promotion_type || 'Promoção';
-        detailP.textContent = item.promotion_name ? `${typeLabel} — ${item.promotion_name}` : typeLabel;
-        card.appendChild(detailP);
+    const detailP = document.createElement('p');
+    detailP.className = 'small';
+    detailP.style.color = 'var(--text-muted)';
+    detailP.style.marginBottom = '0.35rem';
+    const typeLabel = PROMOTION_TYPE_LABELS[item.promotion_type] || item.promotion_type || 'Promoção';
+    detailP.textContent = item.promotion_name ? `${typeLabel} — ${item.promotion_name}` : typeLabel;
+    card.appendChild(detailP);
 
-        if (item.finish_date) {
-            const dateP = document.createElement('p');
-            dateP.className = 'small';
-            dateP.style.color = 'var(--text-muted)';
-            dateP.textContent = `${item.status === 'ended' ? 'Terminou em' : 'Termina em'} ${new Date(item.finish_date).toLocaleString('pt-BR')}`;
-            card.appendChild(dateP);
-        }
+    if (item.finish_date) {
+        const dateP = document.createElement('p');
+        dateP.className = 'small';
+        dateP.style.color = 'var(--text-muted)';
+        dateP.textContent = `${item.status === 'ended' ? 'Terminou em' : 'Termina em'} ${new Date(item.finish_date).toLocaleString('pt-BR')}`;
+        card.appendChild(dateP);
+    }
 
-        container.appendChild(card);
-    });
+    return card;
+}
+
+function buildLightningCandidateCard(item) {
+    const card = document.createElement('section');
+    card.className = 'card';
+    card.style.marginBottom = '0.75rem';
+
+    const title = document.createElement('strong');
+    title.textContent = item.item_title || item.ml_item_id;
+    card.appendChild(title);
+
+    const detailP = document.createElement('p');
+    detailP.className = 'small';
+    detailP.style.color = 'var(--text-muted)';
+    detailP.style.marginTop = '0.35rem';
+    detailP.textContent = 'Elegível para participar de uma Oferta Relâmpago agora';
+    card.appendChild(detailP);
+
+    return card;
+}
+
+const TEN_DAYS_MS = 10 * 86400000;
+
+function renderPromotionsTabs(items) {
+    const all = items || [];
+    const active = all.filter(i => i.status === 'active');
+    const soon = active.filter(i => i.finish_date && (new Date(i.finish_date).getTime() - Date.now()) <= TEN_DAYS_MS);
+    const ended = all.filter(i => i.status === 'ended');
+    const lightning = all.filter(i => i.status === 'candidate' && i.promotion_type === 'LIGHTNING');
+
+    renderIntoList('promo-list-active', 'promo-empty-active', active, buildPromotionCard);
+    renderIntoList('promo-list-soon', 'promo-empty-soon', soon, buildPromotionCard);
+    renderIntoList('promo-list-ended', 'promo-empty-ended', ended, buildPromotionCard);
+    renderIntoList('promo-list-lightning', 'promo-empty-lightning', lightning, buildLightningCandidateCard);
 }
 
 async function loadPromotionsStatus() {
@@ -3397,7 +3432,7 @@ async function loadPromotionsStatus() {
     }
     const data = await mlApiFetch('/api/ml-reviews?resource=promotions');
     updatePromotionsBadge(data ? data.unreadCount : 0);
-    renderPromotionsList(data ? data.items : []);
+    renderPromotionsTabs(data ? data.items : []);
 }
 
 async function markPromotionsRead(payload) {
@@ -3419,6 +3454,31 @@ function initPromotionsModule() {
     if (btnMarkAll) {
         btnMarkAll.addEventListener('click', () => markPromotionsRead({ all: true }));
     }
+
+    const tabButtons = {
+        active: document.getElementById('promo-tab-btn-active'),
+        soon: document.getElementById('promo-tab-btn-soon'),
+        ended: document.getElementById('promo-tab-btn-ended'),
+        lightning: document.getElementById('promo-tab-btn-lightning'),
+    };
+    const tabPanels = {
+        active: document.getElementById('promo-tab-active'),
+        soon: document.getElementById('promo-tab-soon'),
+        ended: document.getElementById('promo-tab-ended'),
+        lightning: document.getElementById('promo-tab-lightning'),
+    };
+    Object.keys(tabButtons).forEach(key => {
+        const btn = tabButtons[key];
+        if (!btn) return;
+        btn.addEventListener('click', () => {
+            Object.keys(tabButtons).forEach(k => {
+                if (!tabButtons[k] || !tabPanels[k]) return;
+                const isActive = k === key;
+                tabButtons[k].classList.toggle('active', isActive);
+                tabPanels[k].classList.toggle('hidden', !isActive);
+            });
+        });
+    });
 }
 
 // Cabecalho passa a mostrar a view atual (icone + titulo + subtitulo) em vez

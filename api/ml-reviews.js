@@ -107,18 +107,22 @@ async function checkCatalogCompetition(userId, itemIds, meta) {
 // a cada checagem depois que o usuário já viu:
 //   1) faltam <= 3 dias pro fim (soon_alerted vira true na primeira vez que cruza o limite)
 //   2) a promoção estava ativa e sumiu da lista da API = terminou
+const LIGHTNING_CANDIDATE_ID = 'LIGHTNING_CANDIDATE';
+
 async function checkPromotions(userId, itemIds, meta) {
-    const { data: existingRows, error: existingError } = await supabaseAdmin
-        .from('ml_promotions')
-        .select('ml_item_id, promotion_id, soon_alerted, is_read')
-        .eq('user_id', userId)
-        .eq('status', 'active');
-    if (existingError) throw new Error(existingError.message);
+    const [activeRes, candidateRes] = await Promise.all([
+        supabaseAdmin.from('ml_promotions').select('ml_item_id, promotion_id, soon_alerted, is_read').eq('user_id', userId).eq('status', 'active'),
+        supabaseAdmin.from('ml_promotions').select('ml_item_id, promotion_id').eq('user_id', userId).eq('status', 'candidate'),
+    ]);
+    if (activeRes.error) throw new Error(activeRes.error.message);
+    if (candidateRes.error) throw new Error(candidateRes.error.message);
 
     const oldByKey = {};
-    for (const row of existingRows || []) oldByKey[`${row.ml_item_id}|${row.promotion_id}`] = row;
+    for (const row of activeRes.data || []) oldByKey[`${row.ml_item_id}|${row.promotion_id}`] = row;
+    const oldCandidateKeys = new Set((candidateRes.data || []).map(r => `${r.ml_item_id}|${r.promotion_id}`));
 
     const seenKeys = new Set();
+    const seenCandidateKeys = new Set();
     const rows = [];
     let endingSoon = 0;
 
@@ -128,6 +132,28 @@ async function checkPromotions(userId, itemIds, meta) {
 
         const promos = await resp.json();
         for (const p of (Array.isArray(promos) ? promos : [])) {
+            // Candidato a Oferta Relâmpago: o anúncio é elegível mas ainda não está
+            // inscrito. Não tem finish_date/id — é só uma oportunidade informativa,
+            // sem alerta de prazo (LIGHTNING não tem prazo fixo).
+            if (p.type === 'LIGHTNING' && p.status === 'candidate') {
+                const key = `${itemId}|${LIGHTNING_CANDIDATE_ID}`;
+                seenCandidateKeys.add(key);
+                rows.push({
+                    user_id: userId,
+                    ml_item_id: itemId,
+                    item_title: (meta[itemId] && meta[itemId].title) || null,
+                    promotion_id: LIGHTNING_CANDIDATE_ID,
+                    promotion_type: 'LIGHTNING',
+                    promotion_name: null,
+                    finish_date: null,
+                    status: 'candidate',
+                    soon_alerted: false,
+                    is_read: true,
+                    updated_at: new Date().toISOString(),
+                });
+                continue;
+            }
+
             if (p.status !== 'started' || !p.finish_date || !p.id) continue;
 
             const key = `${itemId}|${p.id}`;
@@ -184,7 +210,22 @@ async function checkPromotions(userId, itemIds, meta) {
         if (error) throw new Error(error.message);
     }
 
-    return { promotionsChecked: seenKeys.size, endingSoon, justEnded };
+    // Itens que eram candidatos a Relâmpago e não são mais (já foram inscritos,
+    // deixaram de ser elegíveis, etc.) — remove pra não mostrar oportunidade que já passou.
+    const staleCandidateItemIds = [...oldCandidateKeys]
+        .filter(key => !seenCandidateKeys.has(key))
+        .map(key => key.split('|')[0]);
+    if (staleCandidateItemIds.length > 0) {
+        const { error } = await supabaseAdmin
+            .from('ml_promotions')
+            .delete()
+            .eq('user_id', userId)
+            .eq('promotion_id', LIGHTNING_CANDIDATE_ID)
+            .in('ml_item_id', staleCandidateItemIds);
+        if (error) throw new Error(error.message);
+    }
+
+    return { promotionsChecked: seenKeys.size, endingSoon, justEnded, lightningCandidates: seenCandidateKeys.size };
 }
 
 // Verifica as avaliações e o status de catálogo de um usuário conectado, gravando
@@ -197,7 +238,7 @@ async function checkUser(userId) {
 
     const searchData = await searchResp.json();
     const itemIds = searchData.results || [];
-    if (itemIds.length === 0) return { itemsChecked: 0, newReviews: 0, catalogChecked: 0, catalogLost: 0, promotionsChecked: 0, endingSoon: 0, justEnded: 0 };
+    if (itemIds.length === 0) return { itemsChecked: 0, newReviews: 0, catalogChecked: 0, catalogLost: 0, promotionsChecked: 0, endingSoon: 0, justEnded: 0, lightningCandidates: 0 };
 
     const meta = await fetchItemMeta(userId, itemIds);
 
@@ -256,6 +297,7 @@ async function runCheck(res) {
     let promotionsChecked = 0;
     let endingSoon = 0;
     let justEnded = 0;
+    let lightningCandidates = 0;
     const errors = [];
 
     for (const profile of profiles || []) {
@@ -268,6 +310,7 @@ async function runCheck(res) {
             promotionsChecked += result.promotionsChecked;
             endingSoon += result.endingSoon;
             justEnded += result.justEnded;
+            lightningCandidates += result.lightningCandidates;
         } catch (err) {
             errors.push({ userId: profile.id, error: err.message });
         }
@@ -277,7 +320,7 @@ async function runCheck(res) {
         usersChecked: (profiles || []).length,
         itemsChecked, newReviews,
         catalogChecked, catalogLost,
-        promotionsChecked, endingSoon, justEnded,
+        promotionsChecked, endingSoon, justEnded, lightningCandidates,
         errors,
     });
 }
@@ -310,7 +353,7 @@ async function handleUserGet(req, res, userId) {
             .select('id, ml_item_id, item_title, promotion_id, promotion_type, promotion_name, finish_date, status, is_read, updated_at')
             .eq('user_id', userId)
             .order('finish_date', { ascending: true })
-            .limit(100);
+            .limit(300);
 
         if (error) return res.status(500).json({ error: error.message });
 
