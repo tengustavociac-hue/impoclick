@@ -372,26 +372,32 @@
     // o crachá aparecer no meio do card em vez do canto.
     const catalogBadges = new Map(); // link -> elemento do crachá
 
+    // Canto superior DIREITO do link (não esquerdo) — usa a borda direita
+    // como referência e desloca o próprio crachá pra trás com transform,
+    // assim não precisa saber a largura do crachá de antemão.
     function positionBadge(link, badge) {
         const rect = link.getBoundingClientRect();
         badge.style.top = `${rect.top + window.scrollY + 6}px`;
-        badge.style.left = `${rect.left + window.scrollX + 6}px`;
+        badge.style.left = `${rect.right + window.scrollX - 6}px`;
+        badge.style.transform = 'translateX(-100%)';
     }
 
-    // Cards do ML costumam ter DOIS links pro mesmo produto (um envolvendo a
-    // imagem, outro envolvendo o título/texto) — sem agrupar por produto,
-    // isso cria dois crachás pro mesmo card. Agrupamos por ID do produto e
-    // marcamos só o link que contém uma imagem (o "principal" do card).
+    // Cards do ML costumam ter mais de um link pro mesmo produto (imagem,
+    // título, carrossel de miniaturas...) — sem agrupar por produto, isso
+    // cria um crachá por link. Agrupamos por ID do produto e ficamos com o
+    // link de MAIOR ÁREA visível — na prática, é sempre o que envolve a
+    // foto principal do card, não importa a estrutura exata do HTML.
     function markCatalogLinks() {
         const links = Array.from(document.querySelectorAll('a[href*="/p/MLB"]:not([data-impoclick-marked])'));
         const byProductId = new Map();
         links.forEach((link) => {
             const idMatch = link.href.match(/\/p\/(MLB\d+)/i);
             const productId = idMatch ? idMatch[1] : link.href;
+            const rect = link.getBoundingClientRect();
+            const area = rect.width * rect.height;
             const existing = byProductId.get(productId);
-            const hasImage = !!link.querySelector('img');
-            if (!existing || (hasImage && !existing.hasImage)) {
-                byProductId.set(productId, { link, hasImage });
+            if (!existing || area > existing.area) {
+                byProductId.set(productId, { link, area });
             }
         });
 
