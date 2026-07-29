@@ -191,6 +191,59 @@
     color: #b91c1c;
 }
 
+.impoclick-trademark-search {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 4px;
+}
+
+.impoclick-trademark-search .impoclick-input {
+    margin-bottom: 0;
+    flex: 1;
+}
+
+.impoclick-btn-sm {
+    width: auto;
+    padding: 7px 12px;
+    font-size: 12px;
+    flex-shrink: 0;
+}
+
+.impoclick-trademark-item {
+    border: 1px solid #f0e0b0;
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin: 8px 0;
+    background: #fffdf7;
+}
+
+.impoclick-trademark-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    font-size: 12.5px;
+    margin-bottom: 4px;
+}
+
+.impoclick-tm-status {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+
+.impoclick-tm-active {
+    background: #dcfce7;
+    color: #15803d;
+}
+
+.impoclick-tm-inactive {
+    background: #f3f4f6;
+    color: #6b7280;
+}
+
 .impoclick-verdict {
     text-align: center;
     font-size: 15px;

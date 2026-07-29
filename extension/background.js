@@ -72,6 +72,22 @@ async function getFee(price, categoryId) {
     return { fee: data };
 }
 
+// Consulta pública de marcas no INPI — usada de forma OPCIONAL (só quando o
+// usuário clica), pra checar se um nome de marca visto num anúncio de
+// catálogo tem registro no INPI e em qual classe de Nice.
+async function checkTrademark(query, page) {
+    const session = await getSession();
+    if (!session) return { error: 'not_logged_in' };
+
+    const qs = new URLSearchParams({ q: query, page: page || 1 });
+    const resp = await fetch(`${IMPOCLICK_API}/inpi-marca?${qs.toString()}`, {
+        headers: { 'user-token': session.userId },
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) return { error: data.error || 'Não foi possível consultar a marca no INPI.' };
+    return { trademark: data };
+}
+
 async function getFreight(price, weight, length, width, height, freeShipping) {
     const session = await getSession();
     if (!session) return { error: 'not_logged_in' };
@@ -105,6 +121,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 break;
             case 'GET_FREIGHT':
                 sendResponse(await getFreight(message.price, message.weight, message.length, message.width, message.height, message.freeShipping));
+                break;
+            case 'CHECK_TRADEMARK':
+                sendResponse(await checkTrademark(message.query, message.page));
                 break;
             default:
                 sendResponse({ error: 'unknown_message_type' });

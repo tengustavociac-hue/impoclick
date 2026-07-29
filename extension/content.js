@@ -159,6 +159,55 @@
         return `R$ ${(Number(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     }
 
+    // Os dados de marca vêm da base pública do INPI (texto livre digitado
+    // por terceiros nos processos de registro) — escapamos antes de jogar
+    // em innerHTML pra não abrir brecha de XSS com nome/titular malformado.
+    function escapeHtml(str) {
+        return String(str).replace(/[&<>"']/g, (c) => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+        }[c]));
+    }
+
+    function renderTrademarkResults(container, trademark) {
+        if (!trademark || !trademark.results || trademark.results.length === 0) {
+            container.innerHTML = '<p class="impoclick-text">Nenhum registro encontrado para esse termo no INPI.</p>';
+            return;
+        }
+
+        const items = trademark.results.slice(0, 5).map((r) => {
+            const isActive = /em vigor/i.test(r.status || '');
+            const statusClass = isActive ? 'impoclick-tm-active' : 'impoclick-tm-inactive';
+            const classesHtml = (r.niceClasses && r.niceClasses.length)
+                ? r.niceClasses.map((c) => {
+                    const desc = c.description ? c.description.slice(0, 70) + (c.description.length > 70 ? '…' : '') : '';
+                    return `Classe ${escapeHtml(c.code)}${desc ? ` — ${escapeHtml(desc)}` : ''}`;
+                }).join('<br>')
+                : 'Classe não identificada';
+            const holders = (r.holders && r.holders.length) ? escapeHtml(r.holders.join(', ')) : '—';
+
+            return `
+                <div class="impoclick-trademark-item">
+                    <div class="impoclick-trademark-item-header">
+                        <strong>${escapeHtml(r.markName || '(sem nome)')}</strong>
+                        <span class="impoclick-tm-status ${statusClass}">${escapeHtml(r.status || '—')}</span>
+                    </div>
+                    <p class="impoclick-note">Titular: ${holders}</p>
+                    <p class="impoclick-note">${classesHtml}</p>
+                </div>
+            `;
+        }).join('');
+
+        const moreNote = trademark.totalResults > 5
+            ? `<p class="impoclick-note">Mostrando 5 de ${trademark.totalResults} resultados.</p>`
+            : '';
+
+        container.innerHTML = `
+            ${items}
+            ${moreNote}
+            <p class="impoclick-note">Consulta informativa via base pública do INPI (ambiente beta) — confirme oficialmente no site do INPI antes de qualquer decisão.</p>
+        `;
+    }
+
     function buildPanel() {
         const panel = document.createElement('div');
         panel.id = 'impoclick-panel';
@@ -261,6 +310,13 @@
 
             <button id="impoclick-calc-btn" class="impoclick-btn">Calcular viabilidade</button>
             <div id="impoclick-result"></div>
+
+            <label class="impoclick-label" for="impoclick-trademark-input">Verificar marca no INPI (opcional)</label>
+            <div class="impoclick-trademark-search">
+                <input type="text" id="impoclick-trademark-input" class="impoclick-input impoclick-input-sm" placeholder="ex: JBL">
+                <button id="impoclick-trademark-btn" class="impoclick-btn impoclick-btn-sm">Consultar</button>
+            </div>
+            <div id="impoclick-trademark-result"></div>
         `;
 
         let feePct = null;
@@ -347,6 +403,26 @@
             }
 
             computeAndRenderVerdict(resultEl, price, feePct, cost, freightCost, freightNote);
+        });
+
+        document.getElementById('impoclick-trademark-btn').addEventListener('click', async () => {
+            const input = document.getElementById('impoclick-trademark-input');
+            const trademarkResultEl = document.getElementById('impoclick-trademark-result');
+            const query = input.value.trim();
+            if (query.length < 2) {
+                trademarkResultEl.innerHTML = '<p class="impoclick-text impoclick-error">Digite pelo menos 2 caracteres.</p>';
+                return;
+            }
+            trademarkResultEl.innerHTML = '<p class="impoclick-text">Consultando INPI...</p>';
+            const resp = await sendMessage({ type: 'CHECK_TRADEMARK', query });
+            if (resp.error) {
+                const isNotConnected = resp.error === 'not_logged_in' || /não conectada/i.test(resp.error);
+                trademarkResultEl.innerHTML = `<p class="impoclick-text impoclick-error">${
+                    isNotConnected ? 'Faça login na extensão para consultar.' : escapeHtml(resp.error)
+                }</p>`;
+                return;
+            }
+            renderTrademarkResults(trademarkResultEl, resp.trademark);
         });
     }
 
