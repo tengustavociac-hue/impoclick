@@ -249,26 +249,52 @@
         const netRevenue = price - feeAmount - freight;
         const diff = netRevenue - cost;
         const marginPct = price > 0 ? (diff / price) * 100 : 0;
-        const freightSuffix = freightCost ? ` (já com ${formatBRL(freight)} de frete)` : ', sem contar o frete da plataforma';
 
-        let verdict, verdictClass, detail;
+        let verdict, verdictClass;
         if (diff <= 0) {
             verdict = 'NÃO COMPENSA';
             verdictClass = 'impoclick-bad';
-            detail = `Faltariam ${formatBRL(Math.abs(diff))} para cobrir seu custo, considerando taxa de venda${freightSuffix}.`;
         } else if (marginPct < 15) {
             verdict = 'MARGEM APERTADA';
             verdictClass = 'impoclick-warn';
-            detail = `Sobraria ${formatBRL(diff)} líquidos por unidade (${marginPct.toFixed(1)}%)${freightSuffix}.`;
         } else {
             verdict = 'COMPENSA';
             verdictClass = 'impoclick-good';
-            detail = `Sobraria ${formatBRL(diff)} líquidos por unidade (${marginPct.toFixed(1)}%)${freightSuffix}.`;
         }
+        const resultClass = diff <= 0 ? 'impoclick-breakdown-negative' : 'impoclick-breakdown-positive';
 
+        // Detalhamento linha a linha (estilo "cascata"): parte do preço do
+        // anúncio, desconta comissão e frete pra chegar na receita líquida,
+        // e dessa subtrai o custo — deixando claro de onde vem cada centavo
+        // do resultado, em vez de só a frase-resumo.
         resultEl.innerHTML = `
             <div class="impoclick-verdict ${verdictClass}">${verdict}</div>
-            <p class="impoclick-text">${detail}</p>
+            <div class="impoclick-breakdown">
+                <div class="impoclick-breakdown-row">
+                    <span>Valor do produto</span>
+                    <strong>${formatBRL(price)}</strong>
+                </div>
+                <div class="impoclick-breakdown-row impoclick-breakdown-minus">
+                    <span>(–) Comissão do Mercado Livre (${effectiveFeePct}%)</span>
+                    <strong>${formatBRL(feeAmount)}</strong>
+                </div>
+                <div class="impoclick-breakdown-row impoclick-breakdown-minus">
+                    <span>(–) Frete da plataforma</span>
+                    <strong>${formatBRL(freight)}</strong>
+                </div>
+                <div class="impoclick-breakdown-row impoclick-breakdown-subtotal">
+                    <span>(=) Receita líquida da venda</span>
+                    <strong>${formatBRL(netRevenue)}</strong>
+                </div>
+                <div class="impoclick-breakdown-row impoclick-breakdown-minus">
+                    <span>(–) Seu custo de importação</span>
+                    <strong>${formatBRL(cost)}</strong>
+                </div>
+                <div class="impoclick-breakdown-row impoclick-breakdown-total ${resultClass}">
+                    <span>(=) Resultado líquido por unidade</span>
+                    <strong>${formatBRL(diff)} (${marginPct.toFixed(1)}%)</strong>
+                </div>
+            </div>
             <p class="impoclick-note">${freightNote || 'Estimativa rápida. Para o cálculo completo, abra o Impoclick.'}</p>
         `;
     }

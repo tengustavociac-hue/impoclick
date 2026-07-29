@@ -277,6 +277,59 @@
     color: #b91c1c;
 }
 
+.impoclick-breakdown {
+    border: 1px solid #f0e0b0;
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin: 4px 0 8px;
+    background: #fffdf7;
+}
+
+.impoclick-breakdown-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+    font-size: 12px;
+    color: #4b5563;
+    padding: 4px 0;
+}
+
+.impoclick-breakdown-row:not(:last-child) {
+    border-bottom: 1px dashed #eee0c0;
+}
+
+.impoclick-breakdown-row strong {
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.impoclick-breakdown-minus strong {
+    color: #b91c1c;
+}
+
+.impoclick-breakdown-subtotal {
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.impoclick-breakdown-total {
+    font-weight: 800;
+    font-size: 13px;
+    border-top: 2px solid #eab308 !important;
+    border-bottom: none !important;
+    margin-top: 2px;
+    padding-top: 6px;
+}
+
+.impoclick-breakdown-total.impoclick-breakdown-positive strong {
+    color: #15803d;
+}
+
+.impoclick-breakdown-total.impoclick-breakdown-negative strong {
+    color: #b91c1c;
+}
+
 /* Etiqueta "CATÁLOGO" injetada em links de produto catálogo (/p/MLB...)
    nos resultados de busca e listas — all:initial pra não herdar estilo
    nenhum da página do Mercado Livre. */
