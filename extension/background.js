@@ -40,20 +40,23 @@ async function logout() {
     return { ok: true };
 }
 
-// A API pública de itens do Mercado Livre passou a bloquear acesso anônimo
-// (403 PolicyAgent), então a consulta é feita pelo backend do Impoclick,
-// usando o token OAuth da conta ML já conectada pelo usuário — o mesmo
-// mecanismo que a Comparação de Mercado do site já usa.
-async function lookupItem(itemId) {
+// A API do Mercado Livre bloqueia (403) consultar /items/{id} de anúncios
+// que não pertencem ao token OAuth usado — tanto anônimo quanto autenticado
+// só enxerga os PRÓPRIOS itens do vendedor logado. Não dá pra usar isso para
+// ver o anúncio de outra pessoa. Por isso o título/preço são extraídos da
+// própria página pelo content script (que já está renderizada no navegador
+// do usuário) e mandados aqui só pra resolver a categoria — reaproveitando
+// a mesma busca por nome que a Comparação de Mercado do site já usa.
+async function resolveCategory(query) {
     const session = await getSession();
     if (!session) return { error: 'not_logged_in' };
 
-    const resp = await fetch(`${IMPOCLICK_API}/ml-market?action=item&itemId=${encodeURIComponent(itemId)}`, {
+    const resp = await fetch(`${IMPOCLICK_API}/ml-market?action=category&q=${encodeURIComponent(query)}`, {
         headers: { 'user-token': session.userId },
     });
     const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) return { error: data.error || 'Não foi possível consultar este anúncio.' };
-    return { item: data };
+    if (!resp.ok) return { error: data.error || 'Não foi possível identificar a categoria deste produto.' };
+    return { category: data };
 }
 
 async function getFee(price, categoryId) {
@@ -81,8 +84,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             case 'LOGOUT':
                 sendResponse(await logout());
                 break;
-            case 'LOOKUP_ITEM':
-                sendResponse(await lookupItem(message.itemId));
+            case 'RESOLVE_CATEGORY':
+                sendResponse(await resolveCategory(message.query));
                 break;
             case 'GET_FEE':
                 sendResponse(await getFee(message.price, message.categoryId));
