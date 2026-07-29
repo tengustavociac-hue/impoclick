@@ -2670,6 +2670,19 @@ tfoot th, tfoot td {
     transition: transform 0.25s ease;
 }
 
+.nav-badge {
+    margin-left: auto;
+    background-color: var(--danger, #ef4444);
+    color: #fff;
+    font-size: 0.7rem;
+    font-weight: 700;
+    line-height: 1;
+    padding: 0.2rem 0.45rem;
+    border-radius: 999px;
+    min-width: 1.1rem;
+    text-align: center;
+}
+
 .nav-dropdown-group.open .chevron {
     transform: rotate(180deg);
 }

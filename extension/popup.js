@@ -7,11 +7,26 @@ function showView(id) {
     document.getElementById(id).classList.remove('hidden');
 }
 
+async function refreshReviewsSummary() {
+    const countEl = document.getElementById('reviews-count');
+    if (!countEl) return;
+    const result = await sendMessage({ type: 'GET_REVIEWS' });
+    if (result.error || !result.reviews) {
+        countEl.textContent = 'Não foi possível verificar as avaliações agora.';
+        return;
+    }
+    const unread = result.reviews.unreadCount || 0;
+    countEl.textContent = unread > 0
+        ? `${unread} avaliação${unread > 1 ? 'ões' : ''} nova${unread > 1 ? 's' : ''}`
+        : 'Nenhuma avaliação nova.';
+}
+
 async function refresh() {
     const { session } = await sendMessage({ type: 'GET_SESSION' });
     if (session) {
         document.getElementById('user-name').textContent = session.name;
         showView('view-session');
+        refreshReviewsSummary();
     } else {
         showView('view-login');
     }

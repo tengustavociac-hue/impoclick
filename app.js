@@ -351,6 +351,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (btnSettings) btnSettings.click();
         }, 500);
     }
+    if (window.location.hash === '#view-reviews') {
+        setTimeout(() => {
+            const btnReviews = document.querySelector('[data-view="view-reviews"]');
+            if (btnReviews) btnReviews.click();
+        }, 500);
+    }
     initAuthArt();
     await checkAuthSession();
 
@@ -2401,6 +2407,7 @@ async function checkAuthSession() {
         
         // Atualiza a tabela de histórico assim que confirmar o status de login
         if (typeof renderHistoryTable === 'function') renderHistoryTable();
+        if (state.currentUser && typeof loadReviews === 'function') loadReviews();
     } catch (e) {
         console.error('Erro ao verificar sessão de login no Supabase:', e);
         state.currentUser = null;
@@ -2981,7 +2988,107 @@ document.addEventListener('DOMContentLoaded', () => {
     initDocumentsModule();
     initFeasibilityModule();
     initHistoryModule();
+    initReviewsModule();
 });
+
+// ==========================================
+// AVALIAÇÕES DO MERCADO LIVRE (checadas por api/ml-reviews.js via cron externo)
+// ==========================================
+
+function updateReviewsBadge(count) {
+    const badge = document.getElementById('nav-badge-reviews');
+    if (!badge) return;
+    if (count > 0) {
+        badge.textContent = count > 99 ? '99+' : String(count);
+        badge.classList.remove('hidden');
+    } else {
+        badge.classList.add('hidden');
+    }
+}
+
+// As avaliações vêm de compradores (texto livre) — nunca usar innerHTML com esses
+// campos, sempre textContent, para não abrir XSS armazenado no painel.
+function renderReviewsList(reviews) {
+    const container = document.getElementById('reviews-list');
+    const emptyMsg = document.getElementById('reviews-empty');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (!reviews || reviews.length === 0) {
+        if (emptyMsg) emptyMsg.classList.remove('hidden');
+        return;
+    }
+    if (emptyMsg) emptyMsg.classList.add('hidden');
+
+    reviews.forEach(r => {
+        const card = document.createElement('section');
+        card.className = 'card';
+        card.style.marginBottom = '0.75rem';
+        card.style.opacity = r.is_read ? '0.7' : '1';
+
+        const header = document.createElement('div');
+        header.style.display = 'flex';
+        header.style.justifyContent = 'space-between';
+        header.style.alignItems = 'center';
+        header.style.marginBottom = '0.35rem';
+
+        const title = document.createElement('strong');
+        title.textContent = r.item_title || r.ml_item_id;
+
+        const stars = document.createElement('span');
+        stars.style.color = 'var(--primary)';
+        const rating = r.rating || 0;
+        stars.textContent = '★'.repeat(rating) + '☆'.repeat(Math.max(0, 5 - rating));
+
+        header.appendChild(title);
+        header.appendChild(stars);
+
+        const dateP = document.createElement('p');
+        dateP.className = 'small';
+        dateP.style.color = 'var(--text-muted)';
+        dateP.style.marginBottom = '0.35rem';
+        dateP.textContent = r.reviewed_at ? new Date(r.reviewed_at).toLocaleDateString('pt-BR') : '';
+
+        const commentP = document.createElement('p');
+        commentP.textContent = r.comment || 'Sem comentário.';
+
+        card.appendChild(header);
+        card.appendChild(dateP);
+        card.appendChild(commentP);
+        container.appendChild(card);
+    });
+}
+
+async function loadReviews() {
+    if (!state.currentUser) {
+        updateReviewsBadge(0);
+        return;
+    }
+    const data = await mlApiFetch('/api/ml-reviews');
+    updateReviewsBadge(data ? data.unreadCount : 0);
+    renderReviewsList(data ? data.reviews : []);
+}
+
+async function markReviewsRead(payload) {
+    if (!state.currentUser) return;
+    try {
+        await fetch('/api/ml-reviews', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'user-token': state.currentUser.id },
+            body: JSON.stringify(payload),
+        });
+    } catch (err) {
+        console.error('Erro ao marcar avaliações como lidas:', err);
+    }
+    await loadReviews();
+}
+
+function initReviewsModule() {
+    const btnMarkAll = document.getElementById('btn-mark-all-reviews-read');
+    if (btnMarkAll) {
+        btnMarkAll.addEventListener('click', () => markReviewsRead({ all: true }));
+    }
+}
 
 // Cabecalho passa a mostrar a view atual (icone + titulo + subtitulo) em vez
 // de repetir sempre "Impoclick" (que ja aparece fixo na barra lateral).
@@ -3161,6 +3268,9 @@ function initDashboardNavigation() {
             }
             if (viewId === 'view-home') {
                 renderHomeDashboard();
+            }
+            if (viewId === 'view-reviews') {
+                loadReviews();
             }
         });
     });

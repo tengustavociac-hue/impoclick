@@ -32,11 +32,13 @@ async function login(email, password) {
         accessToken: data.access_token,
     };
     await chrome.storage.local.set({ session });
+    refreshReviewsBadge();
     return { session };
 }
 
 async function logout() {
     await chrome.storage.local.remove('session');
+    chrome.action.setBadgeText({ text: '' });
     return { ok: true };
 }
 
@@ -88,6 +90,43 @@ async function checkTrademark(query, page) {
     return { trademark: data };
 }
 
+// Avaliações novas nos anúncios — a checagem de verdade roda no backend (cron via
+// GitHub Actions); aqui só lemos o resultado pra acender o badge no ícone.
+async function getReviews() {
+    const session = await getSession();
+    if (!session) return { error: 'not_logged_in' };
+
+    const resp = await fetch(`${IMPOCLICK_API}/ml-reviews`, {
+        headers: { 'user-token': session.userId },
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) return { error: data.error || 'Não foi possível consultar as avaliações.' };
+    return { reviews: data };
+}
+
+async function refreshReviewsBadge() {
+    const session = await getSession();
+    if (!session) {
+        chrome.action.setBadgeText({ text: '' });
+        return;
+    }
+
+    const result = await getReviews();
+    const unreadCount = (result.reviews && result.reviews.unreadCount) || 0;
+    if (unreadCount > 0) {
+        chrome.action.setBadgeBackgroundColor({ color: '#ef4444' });
+        chrome.action.setBadgeText({ text: unreadCount > 99 ? '99+' : String(unreadCount) });
+    } else {
+        chrome.action.setBadgeText({ text: '' });
+    }
+}
+
+chrome.alarms.create('checkReviews', { periodInMinutes: 15 });
+chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === 'checkReviews') refreshReviewsBadge();
+});
+refreshReviewsBadge();
+
 async function getFreight(price, weight, length, width, height, freeShipping) {
     const session = await getSession();
     if (!session) return { error: 'not_logged_in' };
@@ -124,6 +163,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 break;
             case 'CHECK_TRADEMARK':
                 sendResponse(await checkTrademark(message.query, message.page));
+                break;
+            case 'GET_REVIEWS':
+                sendResponse(await getReviews());
                 break;
             default:
                 sendResponse({ error: 'unknown_message_type' });
