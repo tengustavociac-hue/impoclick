@@ -42,6 +42,36 @@ function buildSearchPayload(term, page) {
     };
 }
 
+// A API beta do INPI falha de forma intermitente (~1 em cada 4-5 chamadas
+// nos testes reais, com 502/timeout esporádicos) — típico de ambiente de
+// homologação, não um problema no nosso lado. Uma segunda tentativa quase
+// sempre resolve, então tentamos de novo antes de desistir. O orçamento de
+// tempo fica bem abaixo do limite de execução da função serverless (10s no
+// plano Hobby) pra não sermos nós mesmos a travar a resposta.
+async function fetchInpiWithRetry(payload, attempts = 2) {
+    let lastError = null;
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 4000);
+        try {
+            const resp = await fetch(INPI_SEARCH_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+                signal: controller.signal,
+            });
+            clearTimeout(timeout);
+            if (resp.ok) return resp;
+            lastError = new Error(`INPI respondeu ${resp.status}`);
+        } catch (err) {
+            clearTimeout(timeout);
+            lastError = err;
+        }
+        if (attempt < attempts) await new Promise((r) => setTimeout(r, 400));
+    }
+    throw lastError;
+}
+
 module.exports = async (req, res) => {
     const userId = req.headers['user-token'];
     if (!userId) return res.status(401).json({ error: 'User token is required.' });
@@ -52,14 +82,11 @@ module.exports = async (req, res) => {
     }
 
     try {
-        const resp = await fetch(INPI_SEARCH_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(buildSearchPayload(q.trim(), Number(page) || 1)),
-        });
-
-        if (!resp.ok) {
-            return res.status(502).json({ error: 'A base do INPI não respondeu — tente novamente em instantes.' });
+        let resp;
+        try {
+            resp = await fetchInpiWithRetry(buildSearchPayload(q.trim(), Number(page) || 1));
+        } catch (err) {
+            return res.status(502).json({ error: 'A base do INPI não respondeu depois de 2 tentativas — tente novamente em instantes.' });
         }
 
         const data = await resp.json();
