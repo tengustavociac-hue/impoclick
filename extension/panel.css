@@ -221,8 +221,6 @@
 .impoclick-catalog-badge {
     all: initial;
     position: absolute;
-    top: 6px;
-    left: 6px;
     z-index: 999999;
     font-family: 'Segoe UI', Arial, sans-serif;
     font-size: 10px;

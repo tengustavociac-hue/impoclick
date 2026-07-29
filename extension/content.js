@@ -364,19 +364,45 @@
     // resultados de busca, listas, carrosséis etc — pra identificar sem
     // precisar clicar em cada um. Catálogo = produto com vários vendedores
     // concorrendo na mesma página (geralmente os mais procurados).
+    //
+    // O crachá é posicionado com coordenadas absolutas da PÁGINA (não do
+    // link) e anexado direto no <body> — colocar como filho do link corria
+    // o risco de "grudar" num elemento interno do card do ML que também
+    // tem position relative/absolute (ex: o container da imagem), fazendo
+    // o crachá aparecer no meio do card em vez do canto.
+    const catalogBadges = new Map(); // link -> elemento do crachá
+
+    function positionBadge(link, badge) {
+        const rect = link.getBoundingClientRect();
+        badge.style.top = `${rect.top + window.scrollY + 6}px`;
+        badge.style.left = `${rect.left + window.scrollX + 6}px`;
+    }
+
     function markCatalogLinks() {
         const links = document.querySelectorAll('a[href*="/p/MLB"]:not([data-impoclick-marked])');
         links.forEach((link) => {
             link.dataset.impoclickMarked = '1';
-            if (getComputedStyle(link).position === 'static') {
-                link.style.position = 'relative';
-            }
             const badge = document.createElement('span');
             badge.className = 'impoclick-catalog-badge';
             badge.textContent = 'CATÁLOGO';
-            link.appendChild(badge);
+            document.body.appendChild(badge);
+            positionBadge(link, badge);
+            catalogBadges.set(link, badge);
         });
     }
+
+    function repositionCatalogBadges() {
+        catalogBadges.forEach((badge, link) => {
+            if (!link.isConnected) {
+                badge.remove();
+                catalogBadges.delete(link);
+                return;
+            }
+            positionBadge(link, badge);
+        });
+    }
+
+    window.addEventListener('resize', repositionCatalogBadges);
 
     function start() {
         removePanel();
@@ -407,7 +433,10 @@
     let markDebounce = null;
     const observer = new MutationObserver(() => {
         clearTimeout(markDebounce);
-        markDebounce = setTimeout(markCatalogLinks, 300);
+        markDebounce = setTimeout(() => {
+            markCatalogLinks();
+            repositionCatalogBadges();
+        }, 300);
     });
     observer.observe(document.body, { childList: true, subtree: true });
 })();
