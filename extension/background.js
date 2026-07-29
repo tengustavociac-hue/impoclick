@@ -72,11 +72,11 @@ async function getFee(price, categoryId) {
     return { fee: data };
 }
 
-async function getFreight(price, weight, length, width, height) {
+async function getFreight(price, weight, length, width, height, freeShipping) {
     const session = await getSession();
     if (!session) return { error: 'not_logged_in' };
 
-    const qs = new URLSearchParams({ price, weight, length, width, height });
+    const qs = new URLSearchParams({ price, weight, length, width, height, freeShipping: freeShipping ? 'true' : 'false' });
     const resp = await fetch(`${IMPOCLICK_API}/ml-freight?${qs.toString()}`, {
         headers: { 'user-token': session.userId },
     });
@@ -104,7 +104,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 sendResponse(await getFee(message.price, message.categoryId));
                 break;
             case 'GET_FREIGHT':
-                sendResponse(await getFreight(message.price, message.weight, message.length, message.width, message.height));
+                sendResponse(await getFreight(message.price, message.weight, message.length, message.width, message.height, message.freeShipping));
                 break;
             default:
                 sendResponse({ error: 'unknown_message_type' });

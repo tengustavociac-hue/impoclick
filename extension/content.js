@@ -43,7 +43,25 @@
             if (match) price = parseFloat(match[1].replace(/\./g, '') + '.' + match[2]);
         }
 
-        return { title, price };
+        return { title, price, shipping: extractShippingInfo() };
+    }
+
+    // Lê o frete mostrado no próprio anúncio (o que o COMPRADOR vê), como
+    // atalho pra não precisar digitar peso/dimensões. Isso não é
+    // necessariamente igual ao custo real de frete pra você como vendedor —
+    // "frete grátis" no anúncio normalmente significa que o vendedor está
+    // banca a Mercado Envios, não que ela custe zero. Por isso mostramos
+    // isso separado do cálculo com peso/dimensões reais.
+    function extractShippingInfo() {
+        const bodyText = document.body.innerText;
+        if (/frete\s*gr[aá]tis|chegar[aá]\s*gr[aá]tis|envio\s*gr[aá]tis/i.test(bodyText)) {
+            return { cost: 0, isFree: true };
+        }
+        const match = bodyText.match(/(?:frete|envio|chegar[aá][^.\n]{0,25}?)\D{0,10}R\$\s*([\d.]+),(\d{2})/i);
+        if (match) {
+            return { cost: parseFloat(match[1].replace(/\./g, '') + '.' + match[2]), isFree: false };
+        }
+        return null;
     }
 
     function sendMessage(message) {
@@ -131,15 +149,26 @@
                 <input type="number" id="impoclick-price-input" class="impoclick-input" step="0.01" min="0" placeholder="ex: 149.90">
             `}
             <div class="impoclick-row" id="impoclick-fee-row"><span>Taxa de venda (sua conta)</span><strong id="impoclick-fee-value">calculando...</strong></div>
+            <div class="impoclick-row" id="impoclick-shipping-row"><span>Frete mostrado no anúncio</span><strong id="impoclick-shipping-value">${
+                pageData.shipping
+                    ? (pageData.shipping.isFree ? 'Grátis' : formatBRL(pageData.shipping.cost))
+                    : 'não identificado'
+            }</strong></div>
+            ${pageData.shipping && pageData.shipping.isFree ? `<p class="impoclick-note">"Grátis" é o que aparece pro comprador — normalmente o vendedor ainda paga o frete real pra Mercado Envios. Preencha peso/dimensões abaixo pra ver esse custo real.</p>` : ''}
             <label class="impoclick-label" for="impoclick-cost-input">Seu custo final de importação (R$/un.)</label>
             <input type="number" id="impoclick-cost-input" class="impoclick-input" step="0.01" min="0" placeholder="ex: 45.00">
 
-            <label class="impoclick-label">Peso e dimensões do seu produto (opcional, pra incluir o frete real)</label>
+            <label class="impoclick-label">Peso e dimensões do seu produto (opcional, pra usar o frete real da sua conta em vez do mostrado acima)</label>
             <div class="impoclick-dim-grid">
                 <input type="number" id="impoclick-weight-input" class="impoclick-input impoclick-input-sm" step="1" min="0" placeholder="Peso (g)">
                 <input type="number" id="impoclick-length-input" class="impoclick-input impoclick-input-sm" step="0.1" min="0" placeholder="Compr. (cm)">
                 <input type="number" id="impoclick-width-input" class="impoclick-input impoclick-input-sm" step="0.1" min="0" placeholder="Larg. (cm)">
                 <input type="number" id="impoclick-height-input" class="impoclick-input impoclick-input-sm" step="0.1" min="0" placeholder="Alt. (cm)">
+            </div>
+            <div class="impoclick-toggle-group" id="impoclick-freeshipping-toggle">
+                <span class="impoclick-toggle-label">Você oferece frete grátis?</span>
+                <label><input type="radio" name="impoclick-free-shipping" value="false" checked> Não</label>
+                <label><input type="radio" name="impoclick-free-shipping" value="true"> Sim</label>
             </div>
 
             <button id="impoclick-calc-btn" class="impoclick-btn">Calcular viabilidade</button>
@@ -202,19 +231,31 @@
             const width = parseFloat(document.getElementById('impoclick-width-input').value);
             const height = parseFloat(document.getElementById('impoclick-height-input').value);
             const hasAllDims = weight > 0 && length > 0 && width > 0 && height > 0;
+            const freeShippingChecked = document.querySelector('input[name="impoclick-free-shipping"]:checked');
+            const freeShipping = freeShippingChecked ? freeShippingChecked.value === 'true' : false;
 
             let freightCost = 0;
             let freightNote = null;
+
             if (hasAllDims) {
+                // Peso/dimensões preenchidos: usa o cálculo real da sua conta
+                // (mais preciso, respeita a modalidade escolhida acima).
                 resultEl.innerHTML = '<p class="impoclick-text">Calculando frete real...</p>';
-                const freightResp = await sendMessage({ type: 'GET_FREIGHT', price, weight, length, width, height });
+                const freightResp = await sendMessage({ type: 'GET_FREIGHT', price, weight, length, width, height, freeShipping });
                 if (freightResp.freight && typeof freightResp.freight.cost === 'number') {
                     freightCost = freightResp.freight.cost;
                 } else {
                     freightNote = 'Não foi possível calcular o frete real agora — resultado abaixo sem frete.';
                 }
+            } else if (pageData.shipping && !pageData.shipping.isFree) {
+                // Sem peso/dimensões, mas o anúncio mostra um frete com valor
+                // — usa esse valor lido da página como aproximação.
+                freightCost = pageData.shipping.cost;
+                freightNote = 'Usando o frete mostrado no anúncio como aproximação. Preencha peso/dimensões acima pra um valor mais preciso.';
+            } else if (pageData.shipping && pageData.shipping.isFree) {
+                freightNote = 'O anúncio mostra "frete grátis" pro comprador, mas isso não é o custo real pro vendedor — preencha peso/dimensões acima pra ver o valor real.';
             } else {
-                freightNote = 'Preencha peso e dimensões pra incluir o frete real no cálculo.';
+                freightNote = 'Preencha peso e dimensões acima pra incluir o frete no cálculo.';
             }
 
             computeAndRenderVerdict(resultEl, price, feePct, cost, freightCost, freightNote);
