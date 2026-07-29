@@ -3138,6 +3138,7 @@ const CATALOG_STATUS_LABELS = {
     sharing_first_place: { label: 'Empatado em 1º', color: 'var(--primary)' },
     competing: { label: 'Perdendo', color: 'var(--danger, #ef4444)' },
     listed: { label: 'Fora da disputa', color: 'var(--text-muted)' },
+    not_listed: { label: 'Fora do catálogo', color: 'var(--text-muted)' },
 };
 
 const CATALOG_REASON_LABELS = {
