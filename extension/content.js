@@ -1,14 +1,14 @@
 (function () {
-    // Páginas de catálogo (/p/MLB...) juntam ofertas de vários vendedores
-    // numa página só — não têm um preço/anúncio único, então não dá pra
-    // calcular viabilidade direto nelas (por enquanto). Só ativamos o painel
-    // em páginas de anúncio individual (MLB-123456789, com hífen).
-    function getPageType() {
-        const href = window.location.href;
-        if (/\/p\/MLB\d+/i.test(href)) return { type: 'catalog' };
-        const match = href.match(/MLB-(\d{6,})/i);
-        if (match) return { type: 'item', itemId: `MLB${match[1]}` };
-        return { type: 'none' };
+    // O Mercado Livre usa vários formatos de URL pra página de produto (o
+    // permalink clássico "MLB-123456789", páginas de catálogo "/p/MLB...",
+    // e páginas "unificadas" mais novas "/up/MLBU..." — e isso muda com o
+    // tempo). Em vez de tentar prever todo formato de URL, detectamos pelo
+    // próprio conteúdo da página: se tem título e preço de produto visíveis,
+    // é uma página de compra, não importa a URL.
+    function looksLikeProductPage() {
+        const hasTitle = !!(document.querySelector('h1.ui-pdp-title') || document.querySelector('h1'));
+        const hasPrice = !!document.querySelector('.andes-money-amount__fraction');
+        return hasTitle && hasPrice;
     }
 
     // A API do Mercado Livre não permite consultar anúncios de outros
@@ -190,17 +190,9 @@
     }
 
     async function init() {
-        const page = getPageType();
-        if (page.type === 'none') return;
+        if (!looksLikeProductPage()) return;
 
         const container = buildPanel();
-
-        if (page.type === 'catalog') {
-            container.innerHTML = `
-                <p class="impoclick-text">Esta é uma página de catálogo (vários vendedores juntos). Abra a oferta específica de um vendedor (clique em "Ver outras opções de compra" ou no vendedor desejado) para calcular a viabilidade.</p>
-            `;
-            return;
-        }
 
         const session = await sendMessage({ type: 'GET_SESSION' });
         if (!session.session) {
