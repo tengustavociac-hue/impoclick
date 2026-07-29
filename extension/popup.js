@@ -35,6 +35,20 @@ async function refreshCatalogSummary() {
         : 'Nenhuma mudança de status em catálogo.';
 }
 
+async function refreshPromotionsSummary() {
+    const countEl = document.getElementById('promotions-count');
+    if (!countEl) return;
+    const result = await sendMessage({ type: 'GET_PROMOTIONS_STATUS' });
+    if (result.error || !result.promotions) {
+        countEl.textContent = 'Não foi possível verificar as promoções agora.';
+        return;
+    }
+    const unread = result.promotions.unreadCount || 0;
+    countEl.textContent = unread > 0
+        ? `${unread} promoção${unread > 1 ? 'ões' : ''} terminando ou terminada${unread > 1 ? 's' : ''}`
+        : 'Nenhuma promoção terminando.';
+}
+
 async function refresh() {
     const { session } = await sendMessage({ type: 'GET_SESSION' });
     if (session) {
@@ -42,6 +56,7 @@ async function refresh() {
         showView('view-session');
         refreshReviewsSummary();
         refreshCatalogSummary();
+        refreshPromotionsSummary();
     } else {
         showView('view-login');
     }

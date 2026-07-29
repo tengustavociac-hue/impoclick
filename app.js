@@ -363,6 +363,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (btnCatalog) btnCatalog.click();
         }, 500);
     }
+    if (window.location.hash === '#view-promotions') {
+        setTimeout(() => {
+            const btnPromotions = document.querySelector('[data-view="view-promotions"]');
+            if (btnPromotions) btnPromotions.click();
+        }, 500);
+    }
     initAuthArt();
     await checkAuthSession();
 
@@ -2415,6 +2421,7 @@ async function checkAuthSession() {
         if (typeof renderHistoryTable === 'function') renderHistoryTable();
         if (state.currentUser && typeof loadReviews === 'function') loadReviews();
         if (state.currentUser && typeof loadCatalogStatus === 'function') loadCatalogStatus();
+        if (state.currentUser && typeof loadPromotionsStatus === 'function') loadPromotionsStatus();
     } catch (e) {
         console.error('Erro ao verificar sessão de login no Supabase:', e);
         state.currentUser = null;
@@ -2997,6 +3004,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initHistoryModule();
     initReviewsModule();
     initCatalogStatusModule();
+    initPromotionsModule();
     startNotificationPolling();
 });
 
@@ -3286,7 +3294,131 @@ function startNotificationPolling() {
         if (!state.currentUser) return;
         loadReviews();
         loadCatalogStatus();
+        loadPromotionsStatus();
     }, 5 * 60 * 1000);
+}
+
+// ==========================================
+// PROMOÇÕES COM PRAZO (alerta 3 dias antes de terminar, ou quando termina)
+// ==========================================
+
+const PROMOTION_TYPE_LABELS = {
+    DEAL: 'Campanha Tradicional',
+    MARKETPLACE_CAMPAIGN: 'Campanha Cofinanciada',
+    VOLUME: 'Desconto por Quantidade',
+    PRE_NEGOTIATED: 'Desconto Pré-Acordado',
+    SELLER_CAMPAIGN: 'Campanha do Vendedor',
+    UNHEALTHY_STOCK: 'Liquidação de Estoque Full',
+    PRICE_DISCOUNT: 'Desconto Individual',
+};
+
+function updatePromotionsBadge(count) {
+    const badge = document.getElementById('nav-badge-promotions');
+    if (!badge) return;
+    if (count > 0) {
+        badge.textContent = count > 99 ? '99+' : String(count);
+        badge.classList.remove('hidden');
+    } else {
+        badge.classList.add('hidden');
+    }
+}
+
+function renderPromotionsList(items) {
+    const container = document.getElementById('promotions-list');
+    const emptyMsg = document.getElementById('promotions-empty');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (!items || items.length === 0) {
+        if (emptyMsg) emptyMsg.classList.remove('hidden');
+        return;
+    }
+    if (emptyMsg) emptyMsg.classList.add('hidden');
+
+    items.forEach(item => {
+        const card = document.createElement('section');
+        card.className = 'card';
+        card.style.marginBottom = '0.75rem';
+        card.style.opacity = item.is_read ? '0.7' : '1';
+
+        const header = document.createElement('div');
+        header.style.display = 'flex';
+        header.style.justifyContent = 'space-between';
+        header.style.alignItems = 'center';
+        header.style.marginBottom = '0.35rem';
+        header.style.gap = '0.75rem';
+
+        const title = document.createElement('strong');
+        title.textContent = item.item_title || item.ml_item_id;
+
+        const daysLeft = item.finish_date ? Math.ceil((new Date(item.finish_date).getTime() - Date.now()) / 86400000) : null;
+        const statusSpan = document.createElement('span');
+        statusSpan.style.fontWeight = '700';
+        statusSpan.style.whiteSpace = 'nowrap';
+        if (item.status === 'ended') {
+            statusSpan.style.color = 'var(--text-muted)';
+            statusSpan.textContent = 'Terminou';
+        } else if (daysLeft != null && daysLeft <= 3) {
+            statusSpan.style.color = 'var(--danger, #ef4444)';
+            statusSpan.textContent = daysLeft <= 0 ? 'Termina hoje' : `Termina em ${daysLeft} dia${daysLeft > 1 ? 's' : ''}`;
+        } else {
+            statusSpan.style.color = 'var(--success)';
+            statusSpan.textContent = 'Ativa';
+        }
+
+        header.appendChild(title);
+        header.appendChild(statusSpan);
+        card.appendChild(header);
+
+        const detailP = document.createElement('p');
+        detailP.className = 'small';
+        detailP.style.color = 'var(--text-muted)';
+        detailP.style.marginBottom = '0.35rem';
+        const typeLabel = PROMOTION_TYPE_LABELS[item.promotion_type] || item.promotion_type || 'Promoção';
+        detailP.textContent = item.promotion_name ? `${typeLabel} — ${item.promotion_name}` : typeLabel;
+        card.appendChild(detailP);
+
+        if (item.finish_date) {
+            const dateP = document.createElement('p');
+            dateP.className = 'small';
+            dateP.style.color = 'var(--text-muted)';
+            dateP.textContent = `${item.status === 'ended' ? 'Terminou em' : 'Termina em'} ${new Date(item.finish_date).toLocaleString('pt-BR')}`;
+            card.appendChild(dateP);
+        }
+
+        container.appendChild(card);
+    });
+}
+
+async function loadPromotionsStatus() {
+    if (!state.currentUser) {
+        updatePromotionsBadge(0);
+        return;
+    }
+    const data = await mlApiFetch('/api/ml-reviews?resource=promotions');
+    updatePromotionsBadge(data ? data.unreadCount : 0);
+    renderPromotionsList(data ? data.items : []);
+}
+
+async function markPromotionsRead(payload) {
+    if (!state.currentUser) return;
+    try {
+        await fetch('/api/ml-reviews?resource=promotions', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'user-token': state.currentUser.id },
+            body: JSON.stringify(payload),
+        });
+    } catch (err) {
+        console.error('Erro ao marcar promoções como lidas:', err);
+    }
+    await loadPromotionsStatus();
+}
+
+function initPromotionsModule() {
+    const btnMarkAll = document.getElementById('btn-mark-all-promotions-read');
+    if (btnMarkAll) {
+        btnMarkAll.addEventListener('click', () => markPromotionsRead({ all: true }));
+    }
 }
 
 // Cabecalho passa a mostrar a view atual (icone + titulo + subtitulo) em vez
@@ -3473,6 +3605,9 @@ function initDashboardNavigation() {
             }
             if (viewId === 'view-catalog') {
                 loadCatalogStatus();
+            }
+            if (viewId === 'view-promotions') {
+                loadPromotionsStatus();
             }
         });
     });

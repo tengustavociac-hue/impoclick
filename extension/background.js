@@ -118,8 +118,23 @@ async function getCatalogStatus() {
     return { catalog: data };
 }
 
+// Promoções com prazo terminando (ou já terminadas) — mesmo endpoint,
+// resource=promotions.
+async function getPromotionsStatus() {
+    const session = await getSession();
+    if (!session) return { error: 'not_logged_in' };
+
+    const resp = await fetch(`${IMPOCLICK_API}/ml-reviews?resource=promotions`, {
+        headers: { 'user-token': session.userId },
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) return { error: data.error || 'Não foi possível consultar as promoções.' };
+    return { promotions: data };
+}
+
 // O badge do ícone soma avaliações não lidas + itens de catálogo que acabaram
-// de perder a competição — o popup detalha os dois separadamente.
+// de perder a competição + promoções terminando/terminadas — o popup detalha
+// cada um separadamente.
 async function refreshReviewsBadge() {
     const session = await getSession();
     if (!session) {
@@ -127,10 +142,11 @@ async function refreshReviewsBadge() {
         return;
     }
 
-    const [reviewsResult, catalogResult] = await Promise.all([getReviews(), getCatalogStatus()]);
+    const [reviewsResult, catalogResult, promotionsResult] = await Promise.all([getReviews(), getCatalogStatus(), getPromotionsStatus()]);
     const reviewsUnread = (reviewsResult.reviews && reviewsResult.reviews.unreadCount) || 0;
     const catalogUnread = (catalogResult.catalog && catalogResult.catalog.unreadCount) || 0;
-    const totalUnread = reviewsUnread + catalogUnread;
+    const promotionsUnread = (promotionsResult.promotions && promotionsResult.promotions.unreadCount) || 0;
+    const totalUnread = reviewsUnread + catalogUnread + promotionsUnread;
 
     if (totalUnread > 0) {
         chrome.action.setBadgeBackgroundColor({ color: '#ef4444' });
@@ -188,6 +204,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 break;
             case 'GET_CATALOG_STATUS':
                 sendResponse(await getCatalogStatus());
+                break;
+            case 'GET_PROMOTIONS_STATUS':
+                sendResponse(await getPromotionsStatus());
                 break;
             default:
                 sendResponse({ error: 'unknown_message_type' });

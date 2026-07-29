@@ -100,6 +100,93 @@ async function checkCatalogCompetition(userId, itemIds, meta) {
     return { catalogChecked: catalogItemIds.length, catalogLost };
 }
 
+// Promoções com prazo de término (GET /seller-promotions/items/{id}?app_version=v2).
+// Nem toda modalidade tem prazo (LIGHTNING, DOD, SMART e PRICE_MATCHING rodam sem data
+// fixa) — essas simplesmente não aparecem aqui porque não vêm com finish_date.
+// Dois gatilhos de alerta, independentes do soon_alerted salvo pra não re-notificar
+// a cada checagem depois que o usuário já viu:
+//   1) faltam <= 3 dias pro fim (soon_alerted vira true na primeira vez que cruza o limite)
+//   2) a promoção estava ativa e sumiu da lista da API = terminou
+async function checkPromotions(userId, itemIds, meta) {
+    const { data: existingRows, error: existingError } = await supabaseAdmin
+        .from('ml_promotions')
+        .select('ml_item_id, promotion_id, soon_alerted, is_read')
+        .eq('user_id', userId)
+        .eq('status', 'active');
+    if (existingError) throw new Error(existingError.message);
+
+    const oldByKey = {};
+    for (const row of existingRows || []) oldByKey[`${row.ml_item_id}|${row.promotion_id}`] = row;
+
+    const seenKeys = new Set();
+    const rows = [];
+    let endingSoon = 0;
+
+    for (const itemId of itemIds) {
+        const resp = await mlFetch(userId, `/seller-promotions/items/${itemId}?app_version=v2`);
+        if (!resp.ok) continue;
+
+        const promos = await resp.json();
+        for (const p of (Array.isArray(promos) ? promos : [])) {
+            if (p.status !== 'started' || !p.finish_date || !p.id) continue;
+
+            const key = `${itemId}|${p.id}`;
+            seenKeys.add(key);
+            const old = oldByKey[key];
+            const daysLeft = (new Date(p.finish_date).getTime() - Date.now()) / 86400000;
+            const withinWindow = daysLeft <= 3;
+
+            let soonAlerted = old ? old.soon_alerted : false;
+            let isRead = old ? old.is_read : true;
+            if (withinWindow && !soonAlerted) {
+                isRead = false;
+                soonAlerted = true;
+                endingSoon++;
+            } else if (!withinWindow) {
+                soonAlerted = false; // data foi estendida pra frente — reseta pra poder alertar de novo depois
+            }
+
+            rows.push({
+                user_id: userId,
+                ml_item_id: itemId,
+                item_title: (meta[itemId] && meta[itemId].title) || null,
+                promotion_id: p.id,
+                promotion_type: p.type || null,
+                promotion_name: p.name || null,
+                finish_date: p.finish_date,
+                status: 'active',
+                soon_alerted: soonAlerted,
+                is_read: isRead,
+                updated_at: new Date().toISOString(),
+            });
+        }
+    }
+
+    let justEnded = 0;
+    for (const key of Object.keys(oldByKey)) {
+        if (seenKeys.has(key)) continue;
+        const [itemId, promotionId] = key.split('|');
+        rows.push({
+            user_id: userId,
+            ml_item_id: itemId,
+            promotion_id: promotionId,
+            status: 'ended',
+            is_read: false,
+            updated_at: new Date().toISOString(),
+        });
+        justEnded++;
+    }
+
+    if (rows.length > 0) {
+        const { error } = await supabaseAdmin
+            .from('ml_promotions')
+            .upsert(rows, { onConflict: 'user_id,ml_item_id,promotion_id' });
+        if (error) throw new Error(error.message);
+    }
+
+    return { promotionsChecked: seenKeys.size, endingSoon, justEnded };
+}
+
 // Verifica as avaliações e o status de catálogo de um usuário conectado, gravando
 // tudo que for novo/mudou no Supabase. A dedupe de avaliações acontece via upsert
 // com a constraint unique(user_id, ml_item_id, ml_review_id) — inclui user_id porque
@@ -110,7 +197,7 @@ async function checkUser(userId) {
 
     const searchData = await searchResp.json();
     const itemIds = searchData.results || [];
-    if (itemIds.length === 0) return { itemsChecked: 0, newReviews: 0, catalogChecked: 0, catalogLost: 0 };
+    if (itemIds.length === 0) return { itemsChecked: 0, newReviews: 0, catalogChecked: 0, catalogLost: 0, promotionsChecked: 0, endingSoon: 0, justEnded: 0 };
 
     const meta = await fetchItemMeta(userId, itemIds);
 
@@ -149,8 +236,9 @@ async function checkUser(userId) {
     }
 
     const catalogResult = await checkCatalogCompetition(userId, itemIds, meta);
+    const promotionsResult = await checkPromotions(userId, itemIds, meta);
 
-    return { itemsChecked: itemIds.length, newReviews, ...catalogResult };
+    return { itemsChecked: itemIds.length, newReviews, ...catalogResult, ...promotionsResult };
 }
 
 async function runCheck(res) {
@@ -165,6 +253,9 @@ async function runCheck(res) {
     let newReviews = 0;
     let catalogChecked = 0;
     let catalogLost = 0;
+    let promotionsChecked = 0;
+    let endingSoon = 0;
+    let justEnded = 0;
     const errors = [];
 
     for (const profile of profiles || []) {
@@ -174,12 +265,21 @@ async function runCheck(res) {
             newReviews += result.newReviews;
             catalogChecked += result.catalogChecked;
             catalogLost += result.catalogLost;
+            promotionsChecked += result.promotionsChecked;
+            endingSoon += result.endingSoon;
+            justEnded += result.justEnded;
         } catch (err) {
             errors.push({ userId: profile.id, error: err.message });
         }
     }
 
-    return res.json({ usersChecked: (profiles || []).length, itemsChecked, newReviews, catalogChecked, catalogLost, errors });
+    return res.json({
+        usersChecked: (profiles || []).length,
+        itemsChecked, newReviews,
+        catalogChecked, catalogLost,
+        promotionsChecked, endingSoon, justEnded,
+        errors,
+    });
 }
 
 async function handleUserGet(req, res, userId) {
@@ -195,6 +295,27 @@ async function handleUserGet(req, res, userId) {
 
         const { count, error: countError } = await supabaseAdmin
             .from('ml_catalog_status')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', userId)
+            .eq('is_read', false);
+
+        if (countError) return res.status(500).json({ error: countError.message });
+
+        return res.json({ items: items || [], unreadCount: count || 0 });
+    }
+
+    if (req.query.resource === 'promotions') {
+        const { data: items, error } = await supabaseAdmin
+            .from('ml_promotions')
+            .select('id, ml_item_id, item_title, promotion_id, promotion_type, promotion_name, finish_date, status, is_read, updated_at')
+            .eq('user_id', userId)
+            .order('finish_date', { ascending: true })
+            .limit(100);
+
+        if (error) return res.status(500).json({ error: error.message });
+
+        const { count, error: countError } = await supabaseAdmin
+            .from('ml_promotions')
             .select('id', { count: 'exact', head: true })
             .eq('user_id', userId)
             .eq('is_read', false);
@@ -231,7 +352,8 @@ async function handleUserMarkRead(req, res, userId) {
     }
     body = body || {};
 
-    const table = req.query.resource === 'catalog' ? 'ml_catalog_status' : 'ml_reviews';
+    const tableByResource = { catalog: 'ml_catalog_status', promotions: 'ml_promotions' };
+    const table = tableByResource[req.query.resource] || 'ml_reviews';
     let query = supabaseAdmin.from(table).update({ is_read: true }).eq('user_id', userId);
     if (!body.all) {
         const ids = Array.isArray(body.ids) ? body.ids : [];

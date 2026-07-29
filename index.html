@@ -238,6 +238,11 @@
                     <span>Catálogos</span>
                     <span id="nav-badge-catalog" class="nav-badge hidden">0</span>
                 </button>
+                <button class="nav-item" data-view="view-promotions">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+                    <span>Promoções</span>
+                    <span id="nav-badge-promotions" class="nav-badge hidden">0</span>
+                </button>
 
                 <span class="nav-eyebrow">Documentos</span>
                 <div class="nav-dropdown-group open">
@@ -2091,6 +2096,24 @@
                 </p>
                 <div id="catalog-list"></div>
                 <p id="catalog-empty" class="small" style="color: var(--text-muted); text-align:center; padding: 1.5rem 0;">Nenhum anúncio de catálogo verificado ainda.</p>
+            </section>
+        </div>
+
+        <!-- VIEW: Promoções (fim de prazo) -->
+        <div id="view-promotions" class="view-panel hidden">
+            <section class="card">
+                <div class="card-header-with-badge" style="display:flex; align-items:center; justify-content:space-between;">
+                    <h2 class="card-title">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+                        Promoções — Prazo de Término
+                    </h2>
+                    <button type="button" id="btn-mark-all-promotions-read" class="btn btn-secondary btn-sm">Marcar todas como lidas</button>
+                </div>
+                <p class="small" style="color: var(--text-muted); margin-bottom: 1.25rem;">
+                    Promoções ativas nos seus anúncios que têm prazo de término (campanha tradicional, cofinanciada, desconto por quantidade, pré-acordado, campanha do vendedor e liquidação Full). Avisa quando faltam 3 dias ou menos, e quando o prazo termina. Modalidades sem prazo fixo (relâmpago, oferta do dia, cofinanciada automática e preços competitivos) não aparecem aqui.
+                </p>
+                <div id="promotions-list"></div>
+                <p id="promotions-empty" class="small" style="color: var(--text-muted); text-align:center; padding: 1.5rem 0;">Nenhuma promoção com prazo verificada ainda.</p>
             </section>
         </div>
 
