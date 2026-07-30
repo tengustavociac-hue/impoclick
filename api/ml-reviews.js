@@ -156,17 +156,26 @@ async function checkPromotions(userId, itemIds, meta) {
         if (!resp.ok) return;
 
         const promos = await resp.json();
-        for (const p of (Array.isArray(promos) ? promos : [])) {
-            if (p.type === 'LIGHTNING' && p.status === 'candidate') {
-                seenCandidateItemIds.add(itemId);
-                candidateRows.push({
-                    user_id: userId,
-                    ml_item_id: itemId,
-                    item_title: (meta[itemId] && meta[itemId].title) || null,
-                    updated_at: new Date().toISOString(),
-                });
-                continue;
-            }
+        const list = Array.isArray(promos) ? promos : [];
+
+        // Relâmpago é tratado uma vez por item, olhando TODAS as entradas LIGHTNING
+        // juntas: a API pode devolver "candidate" (nova oportunidade) e "pending"/
+        // "started" (já agendada/rodando) ao mesmo tempo pro mesmo anúncio. Só entra
+        // como candidato de verdade quem não tem nada agendado nem ativo ainda.
+        const hasLightningCandidate = list.some(p => p.type === 'LIGHTNING' && p.status === 'candidate');
+        const hasLightningScheduledOrActive = list.some(p => p.type === 'LIGHTNING' && (p.status === 'pending' || p.status === 'started'));
+        if (hasLightningCandidate && !hasLightningScheduledOrActive) {
+            seenCandidateItemIds.add(itemId);
+            candidateRows.push({
+                user_id: userId,
+                ml_item_id: itemId,
+                item_title: (meta[itemId] && meta[itemId].title) || null,
+                updated_at: new Date().toISOString(),
+            });
+        }
+
+        for (const p of list) {
+            if (p.type === 'LIGHTNING') continue; // já resolvido acima — Relâmpago não entra como promoção "com prazo"
 
             if (p.status !== 'started' || !p.finish_date || !p.id) continue;
 
