@@ -1,14 +1,18 @@
 const { MercadoPagoConfig, PreApproval } = require('mercadopago');
+const { getVerifiedUserId } = require('./_ml-helper');
 
 module.exports = async (req, res) => {
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method Not Allowed' });
     }
 
-    const { userId } = req.body;
+    // Mesma correção do mp-checkout.js: userId vinha cru do corpo da
+    // requisição, sem provar que quem chamou é dono dele. Agora exige o
+    // Authorization: Bearer verificado contra o Supabase Auth.
+    const userId = await getVerifiedUserId(req);
 
     if (!userId) {
-        return res.status(400).json({ error: 'Faltando userId.' });
+        return res.status(401).json({ error: 'Sessão inválida ou expirada. Faça login novamente.' });
     }
 
     const client = new MercadoPagoConfig({ accessToken: process.env.MP_ACCESS_TOKEN });

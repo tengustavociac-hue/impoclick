@@ -1,4 +1,5 @@
 const { MercadoPagoConfig, Preference } = require('mercadopago');
+const { getVerifiedUserId } = require('./_ml-helper');
 
 module.exports = async (req, res) => {
     // Apenas requisições POST são aceitas
@@ -6,10 +7,14 @@ module.exports = async (req, res) => {
         return res.status(405).json({ error: 'Method Not Allowed' });
     }
 
-    const { userId } = req.body;
+    // O userId vinha cru do corpo da requisição — qualquer um podia gerar um
+    // link de pagamento com o external_reference de outra pessoa. Agora exige
+    // o mesmo Authorization: Bearer verificado contra o Supabase Auth usado no
+    // resto da API (ver getVerifiedUserId em _ml-helper.js).
+    const userId = await getVerifiedUserId(req);
 
     if (!userId) {
-        return res.status(400).json({ error: 'Faltando userId no corpo da requisição.' });
+        return res.status(401).json({ error: 'Sessão inválida ou expirada. Faça login novamente.' });
     }
 
     // Inicializa o Mercado Pago
