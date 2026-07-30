@@ -357,10 +357,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (btnReviews) btnReviews.click();
         }, 500);
     }
-    if (window.location.hash === '#view-catalog') {
+    // Aceita link direto pra uma sub-aba específica: #view-catalog/winning ou
+    // #view-catalog/losing (senão abre em "winning").
+    if (window.location.hash.indexOf('#view-catalog') === 0) {
+        const catalogSubTab = window.location.hash.split('/')[1];
         setTimeout(() => {
             const btnCatalog = document.querySelector('[data-view="view-catalog"]');
             if (btnCatalog) btnCatalog.click();
+            if (catalogSubTab) {
+                const btnSubTab = document.getElementById(`catalog-tab-btn-${catalogSubTab}`);
+                if (btnSubTab) btnSubTab.click();
+            }
         }, 500);
     }
     // Aceita link direto pra uma sub-aba específica: #view-promotions/soon,
@@ -2429,6 +2436,7 @@ async function checkAuthSession() {
         if (state.currentUser && typeof loadReviews === 'function') loadReviews();
         if (state.currentUser && typeof loadCatalogStatus === 'function') loadCatalogStatus();
         if (state.currentUser && typeof loadPromotionsStatus === 'function') loadPromotionsStatus();
+        if (state.currentUser && typeof loadCheckStatus === 'function') loadCheckStatus();
     } catch (e) {
         console.error('Erro ao verificar sessão de login no Supabase:', e);
         state.currentUser = null;
@@ -3050,12 +3058,27 @@ function starsText(rating) {
 
 // Foto pequena do produto, reaproveitada nos cards de Avaliações, Catálogo e
 // Promoções — os três já recebem o mesmo item_thumbnail do backend.
-function buildThumbnailImg(src) {
+function buildThumbnailImg(src, size) {
+    const px = `${size || 48}px`;
+    if (!src) {
+        const placeholder = document.createElement('div');
+        placeholder.style.width = px;
+        placeholder.style.height = px;
+        placeholder.style.borderRadius = 'var(--border-radius-md, 8px)';
+        placeholder.style.flexShrink = '0';
+        placeholder.style.background = 'var(--secondary)';
+        placeholder.style.display = 'flex';
+        placeholder.style.alignItems = 'center';
+        placeholder.style.justifyContent = 'center';
+        placeholder.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-muted)"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>';
+        return placeholder;
+    }
+
     const img = document.createElement('img');
     img.src = src;
     img.alt = '';
-    img.style.width = '48px';
-    img.style.height = '48px';
+    img.style.width = px;
+    img.style.height = px;
     img.style.objectFit = 'cover';
     img.style.borderRadius = 'var(--border-radius-md, 8px)';
     img.style.flexShrink = '0';
@@ -3096,17 +3119,7 @@ function buildReviewCard(r) {
     header.style.gap = '0.75rem';
     header.style.alignItems = 'flex-start';
 
-    if (r.item_thumbnail) {
-        const img = document.createElement('img');
-        img.src = r.item_thumbnail;
-        img.alt = '';
-        img.style.width = '56px';
-        img.style.height = '56px';
-        img.style.objectFit = 'cover';
-        img.style.borderRadius = 'var(--border-radius-md, 8px)';
-        img.style.flexShrink = '0';
-        header.appendChild(img);
-    }
+    header.appendChild(buildThumbnailImg(r.item_thumbnail, 56));
 
     const infoDiv = document.createElement('div');
     infoDiv.style.flex = '1';
@@ -3235,6 +3248,10 @@ const CATALOG_REASON_LABELS = {
     reputation_below_threshold: 'Reputação abaixo do mínimo exigido',
     winner_has_better_reputation: 'O ganhador tem reputação melhor',
     manufacturing_time: 'Anúncio com prazo de fabricação (ganhador tem estoque imediato)',
+    temporarily_winning_manufacturing_time: 'Ganhando temporariamente (prazo de fabricação, sem concorrente melhor no momento)',
+    temporarily_competing_manufacturing_time: 'Competindo (prazo de fabricação, o ganhador também tem prazo)',
+    temporarily_winning_best_reputation_available: 'Ganhando temporariamente (melhor oferta disponível no momento)',
+    temporarily_competing_best_reputation_available: 'Competindo (mesma reputação do ganhador, sem estar à frente)',
     item_paused: 'Anúncio pausado',
     item_not_opted_in: 'Anúncio não participa do catálogo',
     shipping_mode: 'Modalidade de envio inferior à do ganhador',
@@ -3252,88 +3269,84 @@ function updateCatalogBadge(count) {
     }
 }
 
-function renderCatalogList(items) {
-    const container = document.getElementById('catalog-list');
-    const emptyMsg = document.getElementById('catalog-empty');
-    if (!container) return;
-    container.innerHTML = '';
+function buildCatalogCard(item) {
+    const card = document.createElement('section');
+    card.className = 'card';
+    card.style.marginBottom = '0.75rem';
+    card.style.opacity = item.is_read ? '0.7' : '1';
 
-    if (!items || items.length === 0) {
-        if (emptyMsg) emptyMsg.classList.remove('hidden');
-        return;
+    const header = document.createElement('div');
+    header.className = 'item-card-header';
+
+    const titleGroup = document.createElement('div');
+    titleGroup.className = 'item-card-title-group';
+
+    titleGroup.appendChild(buildThumbnailImg(item.item_thumbnail));
+
+    const title = document.createElement('strong');
+    title.textContent = item.item_title || item.ml_item_id;
+    titleGroup.appendChild(title);
+
+    const statusInfo = CATALOG_STATUS_LABELS[item.status] || { label: item.status, color: 'var(--text-muted)' };
+    const statusSpan = document.createElement('span');
+    statusSpan.className = 'item-card-status';
+    statusSpan.style.color = statusInfo.color;
+    statusSpan.textContent = statusInfo.label;
+
+    header.appendChild(titleGroup);
+    header.appendChild(statusSpan);
+
+    const detailP = document.createElement('p');
+    detailP.className = 'small';
+    detailP.style.color = 'var(--text-muted)';
+    detailP.style.marginBottom = '0.35rem';
+    const priceParts = [];
+    if (item.current_price != null) priceParts.push(`Seu preço: R$ ${Number(item.current_price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`);
+    if (item.status !== 'winning' && item.price_to_win != null) priceParts.push(`Preço pra ganhar: R$ ${Number(item.price_to_win).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`);
+    detailP.textContent = priceParts.join(' · ');
+
+    card.appendChild(header);
+    card.appendChild(detailP);
+
+    if (item.reason) {
+        const reasonP = document.createElement('p');
+        reasonP.className = 'small';
+        reasonP.style.color = 'var(--text-muted)';
+        reasonP.style.marginBottom = '0.35rem';
+        reasonP.textContent = item.reason.split(', ').map(r => CATALOG_REASON_LABELS[r] || r).join(' · ');
+        card.appendChild(reasonP);
     }
-    if (emptyMsg) emptyMsg.classList.add('hidden');
 
-    items.forEach(item => {
-        const card = document.createElement('section');
-        card.className = 'card';
-        card.style.marginBottom = '0.75rem';
-        card.style.opacity = item.is_read ? '0.7' : '1';
+    const dateP = document.createElement('p');
+    dateP.className = 'small';
+    dateP.style.color = 'var(--text-muted)';
+    dateP.textContent = item.updated_at ? `Verificado em ${new Date(item.updated_at).toLocaleString('pt-BR')}` : '';
+    card.appendChild(dateP);
 
-        const header = document.createElement('div');
-        header.className = 'item-card-header';
+    // Link direto pra tela de edição só faz sentido pra quem não está ganhando —
+    // precisa do user_product_id (padrão de URL confirmado com o usuário).
+    if (item.status !== 'winning' && item.user_product_id) {
+        const editLink = document.createElement('a');
+        editLink.className = 'btn btn-secondary btn-sm';
+        editLink.style.marginTop = '0.5rem';
+        editLink.style.display = 'inline-block';
+        editLink.href = `https://www.mercadolivre.com.br/anuncios/${encodeURIComponent(item.user_product_id)}/modificar/bomni/variation?item_id=${encodeURIComponent(item.ml_item_id)}`;
+        editLink.target = '_blank';
+        editLink.rel = 'noopener';
+        editLink.textContent = 'Editar anúncio no Mercado Livre';
+        card.appendChild(editLink);
+    }
 
-        const titleGroup = document.createElement('div');
-        titleGroup.className = 'item-card-title-group';
+    return card;
+}
 
-        if (item.item_thumbnail) titleGroup.appendChild(buildThumbnailImg(item.item_thumbnail));
+function renderCatalogList(items) {
+    const all = items || [];
+    const winning = all.filter(i => i.status === 'winning');
+    const losing = all.filter(i => i.status !== 'winning');
 
-        const title = document.createElement('strong');
-        title.textContent = item.item_title || item.ml_item_id;
-        titleGroup.appendChild(title);
-
-        const statusInfo = CATALOG_STATUS_LABELS[item.status] || { label: item.status, color: 'var(--text-muted)' };
-        const statusSpan = document.createElement('span');
-        statusSpan.className = 'item-card-status';
-        statusSpan.style.color = statusInfo.color;
-        statusSpan.textContent = statusInfo.label;
-
-        header.appendChild(titleGroup);
-        header.appendChild(statusSpan);
-
-        const detailP = document.createElement('p');
-        detailP.className = 'small';
-        detailP.style.color = 'var(--text-muted)';
-        detailP.style.marginBottom = '0.35rem';
-        const priceParts = [];
-        if (item.current_price != null) priceParts.push(`Seu preço: R$ ${Number(item.current_price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`);
-        if (item.status !== 'winning' && item.price_to_win != null) priceParts.push(`Preço pra ganhar: R$ ${Number(item.price_to_win).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`);
-        detailP.textContent = priceParts.join(' · ');
-
-        card.appendChild(header);
-        card.appendChild(detailP);
-
-        if (item.reason) {
-            const reasonP = document.createElement('p');
-            reasonP.className = 'small';
-            reasonP.style.color = 'var(--text-muted)';
-            reasonP.style.marginBottom = '0.35rem';
-            reasonP.textContent = item.reason.split(', ').map(r => CATALOG_REASON_LABELS[r] || r).join(' · ');
-            card.appendChild(reasonP);
-        }
-
-        const dateP = document.createElement('p');
-        dateP.className = 'small';
-        dateP.style.color = 'var(--text-muted)';
-        dateP.textContent = item.updated_at ? `Verificado em ${new Date(item.updated_at).toLocaleString('pt-BR')}` : '';
-        card.appendChild(dateP);
-
-        // Link direto pra tela de edição só faz sentido pra quem não está ganhando —
-        // precisa do user_product_id (padrão de URL confirmado com o usuário).
-        if (item.status !== 'winning' && item.user_product_id) {
-            const editLink = document.createElement('a');
-            editLink.className = 'btn btn-secondary btn-sm';
-            editLink.style.marginTop = '0.5rem';
-            editLink.style.display = 'inline-block';
-            editLink.href = `https://www.mercadolivre.com.br/anuncios/${encodeURIComponent(item.user_product_id)}/modificar/bomni/variation?item_id=${encodeURIComponent(item.ml_item_id)}`;
-            editLink.target = '_blank';
-            editLink.rel = 'noopener';
-            editLink.textContent = 'Editar anúncio no Mercado Livre';
-            card.appendChild(editLink);
-        }
-
-        container.appendChild(card);
-    });
+    renderIntoList('catalog-list-winning', 'catalog-empty-winning', winning, buildCatalogCard);
+    renderIntoList('catalog-list-losing', 'catalog-empty-losing', losing, buildCatalogCard);
 }
 
 async function loadCatalogStatus() {
@@ -3365,6 +3378,27 @@ function initCatalogStatusModule() {
     if (btnMarkAll) {
         btnMarkAll.addEventListener('click', () => markCatalogRead({ all: true }));
     }
+
+    const tabButtons = {
+        winning: document.getElementById('catalog-tab-btn-winning'),
+        losing: document.getElementById('catalog-tab-btn-losing'),
+    };
+    const tabPanels = {
+        winning: document.getElementById('catalog-tab-winning'),
+        losing: document.getElementById('catalog-tab-losing'),
+    };
+    Object.keys(tabButtons).forEach(key => {
+        const btn = tabButtons[key];
+        if (!btn) return;
+        btn.addEventListener('click', () => {
+            Object.keys(tabButtons).forEach(k => {
+                if (!tabButtons[k] || !tabPanels[k]) return;
+                const isActive = k === key;
+                tabButtons[k].classList.toggle('active', isActive);
+                tabPanels[k].classList.toggle('hidden', !isActive);
+            });
+        });
+    });
 }
 
 // Mantém os badges de avaliações e catálogo atualizados enquanto a página fica
@@ -3376,7 +3410,33 @@ function startNotificationPolling() {
         loadReviews();
         loadCatalogStatus();
         loadPromotionsStatus();
+        loadCheckStatus();
     }, 5 * 60 * 1000);
+}
+
+// "Última verificação" — sem isso não tem como saber, olhando o site, se o
+// cron (GitHub Actions) parou de rodar. Mesma chamada alimenta as 3 abas.
+async function loadCheckStatus() {
+    const elIds = ['reviews-check-status', 'catalog-check-status', 'promotions-check-status'];
+    if (!state.currentUser) {
+        elIds.forEach(id => { const el = document.getElementById(id); if (el) el.textContent = ''; });
+        return;
+    }
+
+    const data = await mlApiFetch('/api/ml-reviews?resource=status');
+    let text = '';
+    if (data && data.last_checked_at) {
+        text = `Última verificação: ${timeAgo(data.last_checked_at)}`;
+        if (data.total_active_items && data.total_active_items > 100) {
+            text += ` · você tem ${data.total_active_items} anúncios ativos, mas só os 100 primeiros são verificados por rodada`;
+        }
+        if (data.last_error) {
+            text += ' · a última rodada teve um erro (tentando de novo na próxima checagem)';
+        }
+    } else {
+        text = 'Ainda sem checagem registrada — aguarde a próxima rodada (a cada 15 min).';
+    }
+    elIds.forEach(id => { const el = document.getElementById(id); if (el) el.textContent = text; });
 }
 
 // ==========================================
@@ -3430,7 +3490,7 @@ function buildPromotionCard(item) {
     const titleGroup = document.createElement('div');
     titleGroup.className = 'item-card-title-group';
 
-    if (item.item_thumbnail) titleGroup.appendChild(buildThumbnailImg(item.item_thumbnail));
+    titleGroup.appendChild(buildThumbnailImg(item.item_thumbnail));
 
     const title = document.createElement('strong');
     title.textContent = item.item_title || item.ml_item_id;
@@ -3501,7 +3561,7 @@ function buildLightningCandidateCard(item) {
     const titleGroup = document.createElement('div');
     titleGroup.className = 'item-card-title-group';
 
-    if (item.item_thumbnail) titleGroup.appendChild(buildThumbnailImg(item.item_thumbnail));
+    titleGroup.appendChild(buildThumbnailImg(item.item_thumbnail));
 
     const title = document.createElement('strong');
     title.textContent = item.item_title || item.ml_item_id;
@@ -3536,6 +3596,14 @@ function renderPromotionsTabs(items) {
     const soonIds = new Set(soon.map(i => i.id));
     const active = promotions.filter(i => i.status === 'active' && !soonIds.has(i.id));
     const ended = promotions.filter(i => i.status === 'ended');
+
+    // Ativas/Vencem em 10 dias: mais urgente (menos dias restantes) primeiro.
+    // Inativas: a que terminou por último primeiro (mais relevante que uma de meses atrás).
+    const byFinishDateAsc = (a, b) => new Date(a.finish_date || 0) - new Date(b.finish_date || 0);
+    const byUpdatedAtDesc = (a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0);
+    active.sort(byFinishDateAsc);
+    soon.sort(byFinishDateAsc);
+    ended.sort(byUpdatedAtDesc);
 
     renderIntoList('promo-list-active', 'promo-empty-active', active, buildPromotionCard);
     renderIntoList('promo-list-soon', 'promo-empty-soon', soon, buildPromotionCard);
@@ -3795,12 +3863,15 @@ function initDashboardNavigation() {
             }
             if (viewId === 'view-reviews') {
                 loadReviews();
+                loadCheckStatus();
             }
             if (viewId === 'view-catalog') {
                 loadCatalogStatus();
+                loadCheckStatus();
             }
             if (viewId === 'view-promotions') {
                 loadPromotionsStatus();
+                loadCheckStatus();
             }
         });
     });

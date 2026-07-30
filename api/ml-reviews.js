@@ -280,7 +280,8 @@ async function checkUser(userId) {
 
     const searchData = await searchResp.json();
     const itemIds = searchData.results || [];
-    if (itemIds.length === 0) return { itemsChecked: 0, newReviews: 0, catalogChecked: 0, catalogLost: 0, promotionsChecked: 0, endingSoon: 0, justEnded: 0, lightningCandidates: 0 };
+    const totalActiveItems = (searchData.paging && searchData.paging.total) || itemIds.length;
+    if (itemIds.length === 0) return { itemsChecked: 0, newReviews: 0, catalogChecked: 0, catalogLost: 0, promotionsChecked: 0, endingSoon: 0, justEnded: 0, lightningCandidates: 0, totalActiveItems };
 
     const meta = await fetchItemMeta(userId, itemIds);
 
@@ -334,10 +335,28 @@ async function checkUser(userId) {
     const catalogResult = await checkCatalogCompetition(userId, itemIds, meta);
     const promotionsResult = await checkPromotions(userId, itemIds, meta);
 
-    return { itemsChecked: itemIds.length, newReviews, ...catalogResult, ...promotionsResult };
+    return { itemsChecked: itemIds.length, newReviews, ...catalogResult, ...promotionsResult, totalActiveItems };
+}
+
+const PROMOTION_RETENTION_DAYS = 180;
+
+// ml_reviews e ml_catalog_status não crescem sem limite (reviews têm valor
+// histórico, catálogo é upsert por item) — só ml_promotions acumula uma linha
+// por promoção encerrada pra sempre. Uma limpeza leve, 1x por rodada (não por
+// usuário), evita a tabela crescer indefinidamente com campanhas antigas.
+async function cleanupOldPromotions() {
+    const cutoff = new Date(Date.now() - PROMOTION_RETENTION_DAYS * 86400000).toISOString();
+    const { error } = await supabaseAdmin
+        .from('ml_promotions')
+        .delete()
+        .eq('status', 'ended')
+        .lt('updated_at', cutoff);
+    if (error) console.error('Erro na limpeza de promoções antigas:', error.message);
 }
 
 async function runCheck(res) {
+    await cleanupOldPromotions();
+
     const { data: profiles, error } = await supabaseAdmin
         .from('profiles')
         .select('id')
@@ -366,8 +385,23 @@ async function runCheck(res) {
             endingSoon += result.endingSoon;
             justEnded += result.justEnded;
             lightningCandidates += result.lightningCandidates;
+
+            await supabaseAdmin.from('ml_check_status').upsert({
+                user_id: profile.id,
+                last_checked_at: new Date().toISOString(),
+                last_items_checked: result.itemsChecked,
+                total_active_items: result.totalActiveItems,
+                last_error: null,
+            });
         } catch (err) {
             errors.push({ userId: profile.id, error: err.message });
+            try {
+                await supabaseAdmin.from('ml_check_status').upsert({
+                    user_id: profile.id,
+                    last_checked_at: new Date().toISOString(),
+                    last_error: err.message,
+                });
+            } catch (e2) { /* não deixa um erro ao registrar o status derrubar o lote inteiro */ }
         }
     }
 
@@ -381,6 +415,17 @@ async function runCheck(res) {
 }
 
 async function handleUserGet(req, res, userId) {
+    if (req.query.resource === 'status') {
+        const { data, error } = await supabaseAdmin
+            .from('ml_check_status')
+            .select('last_checked_at, last_items_checked, total_active_items, last_error')
+            .eq('user_id', userId)
+            .maybeSingle();
+
+        if (error) return res.status(500).json({ error: error.message });
+        return res.json(data || { last_checked_at: null, last_items_checked: null, total_active_items: null, last_error: null });
+    }
+
     if (req.query.resource === 'catalog') {
         const { data: items, error } = await supabaseAdmin
             .from('ml_catalog_status')
