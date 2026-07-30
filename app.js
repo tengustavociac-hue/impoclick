@@ -118,8 +118,13 @@ async function loadState() {
     if (savedState) {
         try {
             const parsed = savedState;
+            // O estado salvo (localStorage ou active_simulation) pode ter seu próprio
+            // currentUser antigo (sem access_token, por exemplo) — nunca deixa essa
+            // mesclagem sobrescrever a sessão recém-autenticada por checkAuthSession().
+            const currentAuthUser = state.currentUser;
             state = { ...state, ...parsed };
-            
+            state.currentUser = currentAuthUser;
+
             // Populate form elements with saved state
             document.getElementById('select-currency').value = state.currency;
             document.getElementById('input-exchange-rate').value = state.exchangeRate;
@@ -190,9 +195,13 @@ async function loadState() {
 
 // SAVE STATE
 async function saveState() {
-    localStorage.setItem('import_rateio_state', JSON.stringify(state));
+    // currentUser nunca deveria ir pro estado persistido (localStorage/Supabase) —
+    // vira uma cópia desatualizada do access_token que depois sobrescreve a sessão
+    // de verdade quando o estado é recarregado. A sessão sempre vem de checkAuthSession().
+    const { currentUser, ...stateToPersist } = state;
+    localStorage.setItem('import_rateio_state', JSON.stringify(stateToPersist));
     if (state.currentUser) {
-        try { await window.db.saveActiveSimulation(state); } catch(e){}
+        try { await window.db.saveActiveSimulation(stateToPersist); } catch(e){}
     }
 }
 
