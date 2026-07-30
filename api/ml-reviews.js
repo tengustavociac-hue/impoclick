@@ -32,13 +32,14 @@ async function fetchItemMeta(userId, itemIds) {
     const meta = {};
     for (let i = 0; i < itemIds.length; i += 20) {
         const batch = itemIds.slice(i, i + 20);
-        const resp = await mlFetch(userId, `/items?ids=${batch.join(',')}&attributes=id,title,catalog_product_id,user_product_id`);
+        const resp = await mlFetch(userId, `/items?ids=${batch.join(',')}&attributes=id,title,thumbnail,catalog_product_id,user_product_id`);
         if (!resp.ok) continue;
         const data = await resp.json();
         for (const entry of data) {
             if (entry.code === 200 && entry.body) {
                 meta[entry.body.id] = {
                     title: entry.body.title,
+                    thumbnail: entry.body.thumbnail || null,
                     catalogProductId: entry.body.catalog_product_id || null,
                     userProductId: entry.body.user_product_id || null,
                 };
@@ -290,12 +291,19 @@ async function checkUser(userId) {
         if (!resp.ok) return; // item sem reviews habilitadas ou erro pontual — segue para o próximo
 
         const data = await resp.json();
+        const levels = data.rating_levels || {};
+        const itemRatingCount = ['one_star', 'two_star', 'three_star', 'four_star', 'five_star']
+            .reduce((sum, key) => sum + (levels[key] || 0), 0);
+
         for (const r of data.reviews || []) {
             rows.push({
                 user_id: userId,
                 ml_item_id: itemId,
                 ml_review_id: String(r.id),
                 item_title: (meta[itemId] && meta[itemId].title) || null,
+                item_thumbnail: (meta[itemId] && meta[itemId].thumbnail) || null,
+                item_rating_average: data.rating_average ?? null,
+                item_rating_count: itemRatingCount,
                 rating: r.rate,
                 comment: r.content || null,
                 reviewed_at: r.date_created || null,
@@ -414,24 +422,36 @@ async function handleUserGet(req, res, userId) {
         return res.json({ items: [...promotions, ...candidates], unreadCount: countRes.count || 0 });
     }
 
-    const { data: reviews, error } = await supabaseAdmin
-        .from('ml_reviews')
-        .select('id, ml_item_id, ml_review_id, item_title, rating, comment, reviewed_at, is_read')
-        .eq('user_id', userId)
-        .order('reviewed_at', { ascending: false })
-        .limit(50);
+    const [reviewsRes, countRes] = await Promise.all([
+        supabaseAdmin
+            .from('ml_reviews')
+            .select('id, ml_item_id, ml_review_id, item_title, item_thumbnail, item_rating_average, item_rating_count, rating, comment, reviewed_at, is_read')
+            .eq('user_id', userId)
+            .order('reviewed_at', { ascending: false })
+            .limit(60),
+        supabaseAdmin
+            .from('ml_reviews')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', userId)
+            .eq('is_read', false),
+    ]);
 
-    if (error) return res.status(500).json({ error: error.message });
+    if (reviewsRes.error) return res.status(500).json({ error: reviewsRes.error.message });
+    if (countRes.error) return res.status(500).json({ error: countRes.error.message });
 
-    const { count, error: countError } = await supabaseAdmin
-        .from('ml_reviews')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .eq('is_read', false);
+    // Painel mostra só o último produto avaliado, um card por produto (não por
+    // review), pra não pesar com muita foto/lista — o unreadCount acima continua
+    // contando TODAS as avaliações não lidas, não só as 10 mostradas.
+    const latestPerItem = [];
+    const seenItemIds = new Set();
+    for (const r of reviewsRes.data || []) {
+        if (seenItemIds.has(r.ml_item_id)) continue;
+        seenItemIds.add(r.ml_item_id);
+        latestPerItem.push(r);
+        if (latestPerItem.length >= 10) break;
+    }
 
-    if (countError) return res.status(500).json({ error: countError.message });
-
-    res.json({ reviews: reviews || [], unreadCount: count || 0 });
+    res.json({ reviews: latestPerItem, unreadCount: countRes.count || 0 });
 }
 
 async function handleUserMarkRead(req, res, userId) {

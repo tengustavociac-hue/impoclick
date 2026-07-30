@@ -3030,88 +3030,118 @@ function updateReviewsBadge(count) {
     }
 }
 
+function timeAgo(dateStr) {
+    if (!dateStr) return '';
+    const diffDays = Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
+    if (diffDays <= 0) return 'hoje';
+    if (diffDays === 1) return 'há 1 dia';
+    if (diffDays < 30) return `há ${diffDays} dias`;
+    const diffMonths = Math.floor(diffDays / 30);
+    if (diffMonths === 1) return 'há 1 mês';
+    if (diffMonths < 12) return `há ${diffMonths} meses`;
+    const diffYears = Math.floor(diffMonths / 12);
+    return diffYears === 1 ? 'há 1 ano' : `há ${diffYears} anos`;
+}
+
+function starsText(rating) {
+    const r = Math.max(0, Math.min(5, Math.round(rating || 0)));
+    return '★'.repeat(r) + '☆'.repeat(5 - r);
+}
+
 // As avaliações vêm de compradores (texto livre) — nunca usar innerHTML com esses
-// campos, sempre textContent, para não abrir XSS armazenado no painel.
-// O Mercado Livre replica a mesma avaliação em todas as publicações vinculadas
-// como variação de cor/tamanho (não dá pra saber pela API qual variação foi
-// realmente comprada) — agrupamos aqui pra não mostrar o mesmo comentário 3x.
-function groupReviews(reviews) {
-    const groups = [];
-    const byKey = new Map();
-    reviews.forEach(r => {
-        const key = `${r.rating}|${r.reviewed_at}|${r.comment}`;
-        const existing = byKey.get(key);
-        if (existing) {
-            existing.itemTitles.push(r.item_title || r.ml_item_id);
-            existing.allRead = existing.allRead && r.is_read;
-        } else {
-            const group = { ...r, itemTitles: [r.item_title || r.ml_item_id], allRead: r.is_read };
-            byKey.set(key, group);
-            groups.push(group);
-        }
-    });
-    return groups;
+// campos, sempre textContent, para não abrir XSS armazenado no painel. O backend já
+// devolve só o produto avaliado mais recentemente, 1 card por produto (até 10).
+function buildReviewCard(r) {
+    const card = document.createElement('section');
+    card.className = 'card';
+    card.style.marginBottom = '0.75rem';
+    card.style.opacity = r.is_read ? '0.7' : '1';
+
+    const header = document.createElement('div');
+    header.style.display = 'flex';
+    header.style.gap = '0.75rem';
+    header.style.alignItems = 'flex-start';
+
+    if (r.item_thumbnail) {
+        const img = document.createElement('img');
+        img.src = r.item_thumbnail;
+        img.alt = '';
+        img.style.width = '56px';
+        img.style.height = '56px';
+        img.style.objectFit = 'cover';
+        img.style.borderRadius = 'var(--border-radius-md, 8px)';
+        img.style.flexShrink = '0';
+        header.appendChild(img);
+    }
+
+    const infoDiv = document.createElement('div');
+    infoDiv.style.flex = '1';
+    infoDiv.style.minWidth = '0';
+
+    const title = document.createElement('strong');
+    title.textContent = r.item_title || r.ml_item_id;
+    title.style.display = 'block';
+    title.style.marginBottom = '0.2rem';
+    infoDiv.appendChild(title);
+
+    const statsP = document.createElement('p');
+    statsP.className = 'small';
+    statsP.style.color = 'var(--text-muted)';
+    statsP.style.margin = '0';
+
+    const avgStarsSpan = document.createElement('span');
+    avgStarsSpan.style.color = 'var(--primary)';
+    avgStarsSpan.textContent = starsText(r.item_rating_average) + ' ';
+    statsP.appendChild(avgStarsSpan);
+
+    const avgLabel = r.item_rating_average != null
+        ? Number(r.item_rating_average).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+        : '—';
+    const totalCount = r.item_rating_count || 0;
+    statsP.appendChild(document.createTextNode(`${avgLabel} · ${totalCount} avaliaç${totalCount === 1 ? 'ão' : 'ões'}`));
+    infoDiv.appendChild(statsP);
+
+    header.appendChild(infoDiv);
+    card.appendChild(header);
+
+    const highlight = document.createElement('div');
+    highlight.style.background = 'var(--secondary)';
+    highlight.style.borderLeft = '3px solid var(--primary)';
+    highlight.style.borderRadius = '6px';
+    highlight.style.padding = '0.6rem 0.75rem';
+    highlight.style.marginTop = '0.6rem';
+
+    const reviewHeader = document.createElement('div');
+    reviewHeader.style.display = 'flex';
+    reviewHeader.style.justifyContent = 'space-between';
+    reviewHeader.style.alignItems = 'center';
+    reviewHeader.style.gap = '0.5rem';
+
+    const reviewStars = document.createElement('span');
+    reviewStars.style.color = 'var(--primary)';
+    reviewStars.style.fontWeight = '700';
+    reviewStars.textContent = starsText(r.rating);
+
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'small';
+    timeSpan.style.color = 'var(--text-muted)';
+    timeSpan.textContent = timeAgo(r.reviewed_at);
+
+    reviewHeader.appendChild(reviewStars);
+    reviewHeader.appendChild(timeSpan);
+    highlight.appendChild(reviewHeader);
+
+    const commentP = document.createElement('p');
+    commentP.style.margin = '0.35rem 0 0';
+    commentP.textContent = r.comment || 'Sem comentário.';
+    highlight.appendChild(commentP);
+
+    card.appendChild(highlight);
+    return card;
 }
 
 function renderReviewsList(reviews) {
-    const container = document.getElementById('reviews-list');
-    const emptyMsg = document.getElementById('reviews-empty');
-    if (!container) return;
-    container.innerHTML = '';
-
-    if (!reviews || reviews.length === 0) {
-        if (emptyMsg) emptyMsg.classList.remove('hidden');
-        return;
-    }
-    if (emptyMsg) emptyMsg.classList.add('hidden');
-
-    groupReviews(reviews).forEach(r => {
-        const card = document.createElement('section');
-        card.className = 'card';
-        card.style.marginBottom = '0.75rem';
-        card.style.opacity = r.allRead ? '0.7' : '1';
-
-        const header = document.createElement('div');
-        header.style.display = 'flex';
-        header.style.justifyContent = 'space-between';
-        header.style.alignItems = 'center';
-        header.style.marginBottom = '0.35rem';
-
-        const title = document.createElement('strong');
-        title.textContent = r.itemTitles[0];
-
-        const stars = document.createElement('span');
-        stars.style.color = 'var(--primary)';
-        const rating = r.rating || 0;
-        stars.textContent = '★'.repeat(rating) + '☆'.repeat(Math.max(0, 5 - rating));
-
-        header.appendChild(title);
-        header.appendChild(stars);
-
-        const dateP = document.createElement('p');
-        dateP.className = 'small';
-        dateP.style.color = 'var(--text-muted)';
-        dateP.style.marginBottom = '0.35rem';
-        dateP.textContent = r.reviewed_at ? new Date(r.reviewed_at).toLocaleDateString('pt-BR') : '';
-
-        const commentP = document.createElement('p');
-        commentP.textContent = r.comment || 'Sem comentário.';
-
-        card.appendChild(header);
-
-        if (r.itemTitles.length > 1) {
-            const alsoP = document.createElement('p');
-            alsoP.className = 'small';
-            alsoP.style.color = 'var(--text-muted)';
-            alsoP.style.marginBottom = '0.35rem';
-            alsoP.textContent = `O Mercado Livre também mostra esta avaliação em: ${r.itemTitles.slice(1).join(', ')}`;
-            card.appendChild(alsoP);
-        }
-
-        card.appendChild(dateP);
-        card.appendChild(commentP);
-        container.appendChild(card);
-    });
+    renderIntoList('reviews-list', 'reviews-empty', reviews, buildReviewCard);
 }
 
 async function loadReviews() {
