@@ -3395,7 +3395,27 @@ function buildPromotionCard(item) {
         card.appendChild(dateP);
     }
 
+    card.appendChild(buildPromotionPageLink(item.ml_item_id));
+
     return card;
+}
+
+// A Central de Promoções do Mercado Livre busca por anúncio usando só a parte
+// numérica do item_id (sem o prefixo "MLB"), ex.: /anuncios/lista/promos?search=4966146745
+function mlItemNumericId(itemId) {
+    return (itemId || '').replace(/^[A-Za-z]+/, '');
+}
+
+function buildPromotionPageLink(itemId) {
+    const link = document.createElement('a');
+    link.className = 'btn btn-secondary btn-sm';
+    link.style.marginTop = '0.5rem';
+    link.style.display = 'inline-block';
+    link.href = `https://www.mercadolivre.com.br/anuncios/lista/promos?search=${encodeURIComponent(mlItemNumericId(itemId))}`;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    link.textContent = 'Ver anúncio nas promoções';
+    return link;
 }
 
 function buildLightningCandidateCard(item) {
@@ -3413,6 +3433,8 @@ function buildLightningCandidateCard(item) {
     detailP.style.marginTop = '0.35rem';
     detailP.textContent = 'Elegível para participar de uma Oferta Relâmpago agora';
     card.appendChild(detailP);
+
+    card.appendChild(buildPromotionPageLink(item.ml_item_id));
 
     return card;
 }
