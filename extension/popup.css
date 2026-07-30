@@ -106,3 +106,20 @@ input:focus {
     color: #6b7280;
     line-height: 1.5;
 }
+
+.promo-quick-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    margin-top: 6px;
+}
+
+.promo-quick-links a {
+    font-size: 11.5px;
+    color: #b8860b;
+    text-decoration: none;
+}
+
+.promo-quick-links a:hover {
+    text-decoration: underline;
+}

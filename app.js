@@ -363,10 +363,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (btnCatalog) btnCatalog.click();
         }, 500);
     }
-    if (window.location.hash === '#view-promotions') {
+    // Aceita link direto pra uma sub-aba específica: #view-promotions/soon,
+    // #view-promotions/ended ou #view-promotions/lightning (senão abre em "active").
+    if (window.location.hash.indexOf('#view-promotions') === 0) {
+        const subTab = window.location.hash.split('/')[1];
         setTimeout(() => {
             const btnPromotions = document.querySelector('[data-view="view-promotions"]');
             if (btnPromotions) btnPromotions.click();
+            if (subTab) {
+                const btnSubTab = document.getElementById(`promo-tab-btn-${subTab}`);
+                if (btnSubTab) btnSubTab.click();
+            }
         }, 500);
     }
     initAuthArt();
