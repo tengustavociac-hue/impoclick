@@ -1,10 +1,55 @@
+const crypto = require('crypto');
 const { MercadoPagoConfig, Payment } = require('mercadopago');
 const { createClient } = require('@supabase/supabase-js');
+
+// Verificação de assinatura oficial do MP (x-signature: "ts=...,v1=..."), manifest
+// "id:{data.id};request-id:{x-request-id};ts:{ts};" assinado com HMAC-SHA256 usando
+// o secret do painel de Webhooks do MP. Fica com skipped=true (não bloqueia) enquanto
+// MP_WEBHOOK_SECRET não estiver configurado, pra não quebrar o que já funciona hoje —
+// assim que configurar o secret, a verificação passa a valer sozinha.
+function verifyMpSignature(req) {
+    const secret = process.env.MP_WEBHOOK_SECRET;
+    if (!secret) return { verified: false, skipped: true };
+
+    const xSignature = req.headers['x-signature'];
+    const xRequestId = req.headers['x-request-id'];
+    if (!xSignature) return { verified: false, skipped: false };
+
+    const parts = {};
+    xSignature.split(',').forEach((p) => {
+        const [k, v] = p.split('=');
+        if (k) parts[k.trim()] = (v || '').trim();
+    });
+    const ts = parts.ts;
+    const v1 = parts.v1;
+    if (!ts || !v1) return { verified: false, skipped: false };
+
+    const dataId = String((req.query && (req.query['data.id'] || req.query.id)) || '').toLowerCase();
+
+    let manifest = '';
+    if (dataId) manifest += `id:${dataId};`;
+    if (xRequestId) manifest += `request-id:${xRequestId};`;
+    manifest += `ts:${ts};`;
+
+    const computed = crypto.createHmac('sha256', secret).update(manifest).digest('hex');
+    const a = Buffer.from(computed, 'utf8');
+    const b = Buffer.from(v1, 'utf8');
+    const matches = a.length === b.length && crypto.timingSafeEqual(a, b);
+    return { verified: matches, skipped: false };
+}
 
 module.exports = async (req, res) => {
     // Mercado Pago pode mandar notificações GET para testes, mas pagamentos são POST
     if (req.method !== 'POST') {
         return res.status(200).send('OK');
+    }
+
+    const sigCheck = verifyMpSignature(req);
+    if (sigCheck.skipped) {
+        console.warn('MP_WEBHOOK_SECRET não configurado — verificação de assinatura do webhook MP está desativada. Configure o secret no painel de Webhooks do Mercado Pago pra ativar.');
+    } else if (!sigCheck.verified) {
+        console.error('Assinatura do webhook MP inválida — rejeitando notificação.');
+        return res.status(401).json({ error: 'invalid signature' });
     }
 
     try {
