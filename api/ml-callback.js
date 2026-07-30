@@ -1,4 +1,31 @@
+const crypto = require('crypto');
 const { ML_BASE, supabaseAdmin } = require('./_ml-helper');
+
+const STATE_MAX_AGE_MS = 10 * 60 * 1000; // janela pra completar o consentimento no ML
+
+// Verifica o state assinado por ml-auth.js (HMAC com ML_CLIENT_SECRET) — sem
+// isso, "state" seria só o userId cru e qualquer um poderia forjar o callback
+// pra vincular o Mercado Livre de outra pessoa à própria conta (CSRF).
+function verifyState(state, secret) {
+    if (!state || typeof state !== 'string' || !state.includes('.')) return null;
+    const idx = state.lastIndexOf('.');
+    const payload = state.slice(0, idx);
+    const sig = state.slice(idx + 1);
+
+    const expectedSig = crypto.createHmac('sha256', secret).update(payload).digest('base64url');
+    const a = Buffer.from(sig);
+    const b = Buffer.from(expectedSig);
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
+
+    let parsed;
+    try {
+        parsed = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    } catch (e) {
+        return null;
+    }
+    if (!parsed.userId || !parsed.iat || Date.now() - parsed.iat > STATE_MAX_AGE_MS) return null;
+    return parsed.userId;
+}
 
 module.exports = async (req, res) => {
     const { code, state, error } = req.query;
@@ -8,12 +35,17 @@ module.exports = async (req, res) => {
     }
 
     if (!code || !state) {
-        return res.status(400).send('Parâmetros "code" e "state" (userId) são obrigatórios.');
+        return res.status(400).send('Parâmetros "code" e "state" são obrigatórios.');
     }
 
-    const userId = state;
     const clientId = process.env.ML_CLIENT_ID;
     const clientSecret = process.env.ML_CLIENT_SECRET;
+
+    const userId = verifyState(state, clientSecret);
+    if (!userId) {
+        return res.status(400).send('State inválido ou expirado. Inicie a conexão com o Mercado Livre novamente a partir do Impoclick.');
+    }
+
     const redirectUri = process.env.ML_REDIRECT_URI || `https://${req.headers.host}/api/ml-callback`;
 
     try {
