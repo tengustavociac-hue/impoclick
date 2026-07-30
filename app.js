@@ -4510,7 +4510,7 @@ function initDocumentsModule() {
             const impSelect = document.getElementById('pack-importer-select').value;
             const impEl = document.getElementById('preview-pack-importer-text');
             if (impSelect === 'default' && state.company) {
-                impEl.innerHTML = '<strong>' + state.company.name + '</strong><br>CNPJ: ' + state.company.cnpj + '<br>' + state.company.address + '<br>CEP: ' + state.company.zip + '<br>Contato: ' + state.company.email;
+                impEl.innerHTML = '<strong>' + escapeHtml(state.company.name) + '</strong><br>CNPJ: ' + escapeHtml(state.company.cnpj) + '<br>' + escapeHtml(state.company.address) + '<br>CEP: ' + escapeHtml(state.company.zip) + '<br>Contato: ' + escapeHtml(state.company.email);
             } else {
                 impEl.textContent = '[Selecione o Importador nos Cadastros]';
             }
