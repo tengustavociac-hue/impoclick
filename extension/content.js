@@ -312,7 +312,7 @@
         const needsManualTitle = !pageData.title;
 
         container.innerHTML = `
-            ${pageData.title ? `<p class="impoclick-item-title">${pageData.title}</p>` : ''}
+            ${pageData.title ? `<p class="impoclick-item-title">${escapeHtml(pageData.title)}</p>` : ''}
             ${needsManualTitle ? `
                 <label class="impoclick-label" for="impoclick-title-input">Não consegui ler o nome do produto — digite (usado só pra achar a categoria)</label>
                 <input type="text" id="impoclick-title-input" class="impoclick-input" placeholder="ex: fone de ouvido bluetooth">
