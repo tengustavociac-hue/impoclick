@@ -3,7 +3,6 @@ const { mlFetch, supabaseAdmin } = require('./_ml-helper');
 
 const ITEMS_PER_USER_CAP = 100; // 1 página de /items/search (máx permitido pela API); evita estourar o tempo de execução da function
 const ITEM_CHECK_CONCURRENCY = 8; // chamadas simultâneas à API do ML por item, pra caber no limite de 60s da function
-const DEBUG_SAMPLE = {}; // temporário — diagnóstico de thumbnail/rating_average, remover depois
 
 function safeEqual(a, b) {
     const bufA = Buffer.from(String(a || ''), 'utf8');
@@ -280,10 +279,6 @@ async function checkUser(userId) {
     if (itemIds.length === 0) return { itemsChecked: 0, newReviews: 0, catalogChecked: 0, catalogLost: 0, promotionsChecked: 0, endingSoon: 0, justEnded: 0, lightningCandidates: 0 };
 
     const meta = await fetchItemMeta(userId, itemIds);
-    if (DEBUG_SAMPLE.metaSample === undefined) {
-        const firstId = itemIds[0];
-        DEBUG_SAMPLE.metaSample = { itemId: firstId, meta: meta[firstId] };
-    }
 
     const rows = [];
     await mapWithConcurrency(itemIds, ITEM_CHECK_CONCURRENCY, async (itemId) => {
@@ -296,9 +291,6 @@ async function checkUser(userId) {
         if (!resp.ok) return; // item sem reviews habilitadas ou erro pontual — segue para o próximo
 
         const data = await resp.json();
-        if (DEBUG_SAMPLE.reviewsSample === undefined && (data.reviews || []).length > 0) {
-            DEBUG_SAMPLE.reviewsSample = { itemId, rating_average: data.rating_average, rating_levels: data.rating_levels, keys: Object.keys(data) };
-        }
         const levels = data.rating_levels || {};
         const itemRatingCount = ['one_star', 'two_star', 'three_star', 'four_star', 'five_star']
             .reduce((sum, key) => sum + (levels[key] || 0), 0);
@@ -381,7 +373,6 @@ async function runCheck(res) {
         catalogChecked, catalogLost,
         promotionsChecked, endingSoon, justEnded, lightningCandidates,
         errors,
-        debug: DEBUG_SAMPLE,
     });
 }
 
