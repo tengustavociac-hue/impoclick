@@ -3116,6 +3116,41 @@ tfoot th, tfoot td {
     }
 }
 
+/* Cards de item (Avaliações/Catálogo/Promoções/Relâmpago, montados via JS em
+   app.js): título+foto de um lado, status de largura fixa (nowrap) do outro.
+   Sem isso, um título longo + rótulo de status ("Fora do catálogo", "Termina
+   em 10 dias") não cabem lado a lado numa tela de 320-375px. */
+.item-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.35rem;
+}
+
+.item-card-title-group {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    min-width: 0;
+}
+
+.item-card-status {
+    font-weight: 700;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+@media (max-width: 480px) {
+    .item-card-header {
+        flex-wrap: wrap;
+    }
+    .item-card-status {
+        white-space: normal;
+        text-align: right;
+    }
+}
+
 /* RESULTS TABS AND NCM PREVIEW FOR FORMAL IMPORT */
 .results-tab-bar {
     display: flex;
