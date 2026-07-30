@@ -122,23 +122,15 @@ async function mlFetch(userId, pathAndQuery, opts = {}, returnMlUserId = false) 
 // exigimos o access_token real da sessão Supabase (Authorization: Bearer) e
 // validamos contra o Supabase Auth antes de confiar em qualquer user_id.
 async function getVerifiedUserId(req) {
-    const result = await getVerifiedUserIdDebug(req);
-    return result.userId;
-}
-
-// Versão com detalhe do motivo — temporário, pra diagnosticar por que a
-// validação de sessão está falhando no navegador real.
-async function getVerifiedUserIdDebug(req) {
-    if (!supabaseAdmin) return { userId: null, reason: 'supabaseAdmin não inicializado' };
+    if (!supabaseAdmin) return null;
 
     const authHeader = req.headers['authorization'] || '';
     const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-    if (!token) return { userId: null, reason: 'sem header Authorization Bearer' };
+    if (!token) return null;
 
     const { data, error } = await supabaseAdmin.auth.getUser(token);
-    if (error) return { userId: null, reason: `getUser error: ${error.message}` };
-    if (!data || !data.user) return { userId: null, reason: 'getUser sem usuário' };
-    return { userId: data.user.id, reason: null };
+    if (error || !data || !data.user) return null;
+    return data.user.id;
 }
 
 module.exports = {
@@ -146,5 +138,4 @@ module.exports = {
     mlFetch,
     supabaseAdmin,
     getVerifiedUserId,
-    getVerifiedUserIdDebug,
 };
