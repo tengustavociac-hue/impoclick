@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /index.backup.html
+Disallow: /design-modelo-v4.html
+
+Sitemap: https://www.impoclick.com.br/sitemap.xml
