@@ -156,6 +156,24 @@ async function refreshReviewsBadge() {
     }
 }
 
+// O popup só mostra a contagem (o conteúdo detalhado fica no site), então abrir
+// o popup já vale como "vi o aviso" — marca tudo como lido e zera o badge na hora,
+// em vez de esperar os até 15 min do próximo alarme pra refletir o que já foi visto.
+async function markAllAsRead() {
+    const session = await getSession();
+    if (!session) return { error: 'not_logged_in' };
+
+    const headers = { 'Content-Type': 'application/json', 'user-token': session.userId };
+    const body = JSON.stringify({ all: true });
+    await Promise.all([
+        fetch(`${IMPOCLICK_API}/ml-reviews`, { method: 'PATCH', headers, body }).catch(() => {}),
+        fetch(`${IMPOCLICK_API}/ml-reviews?resource=catalog`, { method: 'PATCH', headers, body }).catch(() => {}),
+        fetch(`${IMPOCLICK_API}/ml-reviews?resource=promotions`, { method: 'PATCH', headers, body }).catch(() => {}),
+    ]);
+    chrome.action.setBadgeText({ text: '' });
+    return { ok: true };
+}
+
 chrome.alarms.create('checkReviews', { periodInMinutes: 15 });
 chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === 'checkReviews') refreshReviewsBadge();
@@ -207,6 +225,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 break;
             case 'GET_PROMOTIONS_STATUS':
                 sendResponse(await getPromotionsStatus());
+                break;
+            case 'MARK_ALL_READ':
+                sendResponse(await markAllAsRead());
                 break;
             default:
                 sendResponse({ error: 'unknown_message_type' });

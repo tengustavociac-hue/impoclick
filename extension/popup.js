@@ -54,9 +54,11 @@ async function refresh() {
     if (session) {
         document.getElementById('user-name').textContent = session.name;
         showView('view-session');
-        refreshReviewsSummary();
-        refreshCatalogSummary();
-        refreshPromotionsSummary();
+        // Mostra o que estava pendente primeiro, e só depois marca como lido —
+        // assim o popup continua avisando "1 avaliação nova" desta vez, mas o
+        // badge do ícone já zera pra não continuar "pendente" depois de aberto.
+        await Promise.all([refreshReviewsSummary(), refreshCatalogSummary(), refreshPromotionsSummary()]);
+        await sendMessage({ type: 'MARK_ALL_READ' });
     } else {
         showView('view-login');
     }
