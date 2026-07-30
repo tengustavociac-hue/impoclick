@@ -36,8 +36,67 @@
         }
     }
     </script>
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+            {
+                "@type": "Question",
+                "name": "Qual a diferença entre Importação Simplificada e Formal?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "A Simplificada vale para remessas internacionais (courier ou Correios): Imposto de Importação de 20% até US$ 50, ou 60% com dedução de US$ 20 acima desse valor, mais o ICMS do estado de destino. Não exige CNPJ nem Radar. A Formal é a importação via despachante com CNPJ e Radar SISCOMEX habilitado: apura II, IPI, PIS, COFINS e ICMS individualmente por NCM, com o Valor Aduaneiro formado por FOB mais frete e seguro internacional."
+                }
+            },
+            {
+                "@type": "Question",
+                "name": "O que é NCM e por que preciso informar?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "NCM (Nomenclatura Comum do Mercosul) é o código de 8 dígitos que classifica o produto e define as alíquotas de II, IPI, PIS e COFINS na Importação Formal. O Impoclick busca a descrição oficial automaticamente e, quando o código não está na base curada, usa uma estimativa do IBPT como aproximação, o que não substitui a classificação fiscal oficial da TEC/TIPI."
+                }
+            },
+            {
+                "@type": "Question",
+                "name": "Como funciona o rateio entre os produtos do lote?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "Você escolhe o critério de rateio (por peso, por valor FOB ou por quantidade) separadamente para frete, seguro e taxas. O sistema divide cada custo proporcionalmente entre os produtos conforme o critério escolhido, chegando ao custo unitário real de cada item."
+                }
+            },
+            {
+                "@type": "Question",
+                "name": "Os cálculos substituem o desembaraço aduaneiro oficial?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "Não. O Impoclick é uma ferramenta de simulação para planejamento. Os valores finais de impostos são sempre apurados oficialmente pela Receita Federal na importação e pela Secretaria da Fazenda estadual no caso do ICMS, no momento do desembaraço."
+                }
+            },
+            {
+                "@type": "Question",
+                "name": "Preciso ter CNPJ para usar?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "Não para simular. A Importação Simplificada não exige CNPJ nem Radar, e você pode usar a calculadora normalmente como pessoa física. O CNPJ e o Radar SISCOMEX só são necessários para operar de fato no regime de Importação Formal."
+                }
+            }
+        ]
+    }
+    </script>
     <script>
         document.documentElement.setAttribute('data-theme', localStorage.getItem('theme') || 'light');
+        // Se já existe sessão salva, esconde a landing antes da primeira pintura
+        // pra quem já é usuário não ver a página de apresentação piscando antes
+        // do app carregar. Se a sessão estiver expirada, o updateUI() corrige.
+        try {
+            for (var i = 0; i < localStorage.length; i++) {
+                if (/^sb-.*-auth-token$/.test(localStorage.key(i))) {
+                    document.documentElement.classList.add('has-session');
+                    break;
+                }
+            }
+        } catch (e) { /* localStorage bloqueado: mostra a landing normalmente */ }
     </script>
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -49,8 +108,241 @@
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
+    <!-- LANDING PÚBLICA
+         Fica visível para quem não está logado — é a única parte do site que
+         os buscadores conseguem ler, já que o resto do sistema exige conta.
+         Os botões daqui revelam a tela de login/cadastro (#auth-container). -->
+    <div id="landing-container" class="lp">
+        <header class="lp-nav">
+            <a class="lp-brand" href="/">
+                <img src="impoclick_logo.png" alt="" width="36" height="36">
+                <span>Impoclick</span>
+            </a>
+            <nav class="lp-nav-links">
+                <a href="#recursos">Recursos</a>
+                <a href="#regimes">Regimes</a>
+                <a href="#planos">Planos</a>
+                <a href="#duvidas">Dúvidas</a>
+            </nav>
+            <div class="lp-nav-actions">
+                <button type="button" class="lp-btn lp-btn-ghost" data-lp-action="login">Entrar</button>
+                <button type="button" class="lp-btn lp-btn-primary" data-lp-action="register">Testar grátis</button>
+            </div>
+        </header>
+
+        <main>
+            <section class="lp-hero">
+                <div class="lp-hero-text">
+                    <p class="lp-eyebrow">Simulador de custos de importação</p>
+                    <h1>Saiba o custo real da sua importação antes de fechar o pedido</h1>
+                    <p class="lp-lead">
+                        O Impoclick calcula impostos, frete, câmbio e rateio por produto para você
+                        descobrir o custo unitário verdadeiro de cada item — e se ainda sobra margem
+                        para revender.
+                    </p>
+                    <div class="lp-hero-actions">
+                        <button type="button" class="lp-btn lp-btn-primary lp-btn-lg" data-lp-action="register">Testar grátis por 7 dias</button>
+                        <button type="button" class="lp-btn lp-btn-ghost lp-btn-lg" data-lp-action="login">Já tenho conta</button>
+                    </div>
+                    <p class="lp-hero-note">Sem cartão de crédito para testar · Depois R$ 29,90/mês</p>
+                </div>
+                <div class="lp-hero-panel" aria-hidden="true">
+                    <div class="lp-panel-head">
+                        <span>Custo unitário — lote importado</span>
+                    </div>
+                    <div class="lp-panel-rows">
+                        <div class="lp-panel-row"><span>Produto (FOB)</span><strong>R$ 42,10</strong></div>
+                        <div class="lp-panel-row"><span>Frete rateado por peso</span><strong>R$ 8,35</strong></div>
+                        <div class="lp-panel-row"><span>Imposto de Importação</span><strong>R$ 25,26</strong></div>
+                        <div class="lp-panel-row"><span>ICMS</span><strong>R$ 13,80</strong></div>
+                        <div class="lp-panel-row lp-panel-total"><span>Custo final por unidade</span><strong>R$ 89,51</strong></div>
+                    </div>
+                    <p class="lp-panel-foot">Exemplo ilustrativo de rateio</p>
+                </div>
+            </section>
+
+            <section class="lp-section" id="recursos">
+                <h2>Tudo que entra no custo, em um lugar só</h2>
+                <p class="lp-section-lead">
+                    Planilha de importação vira retrabalho a cada lote novo. O Impoclick já vem com as
+                    regras tributárias, o câmbio e o rateio prontos.
+                </p>
+                <div class="lp-grid">
+                    <article class="lp-card">
+                        <h3>Rateio inteligente de custos</h3>
+                        <p>
+                            Distribua frete, seguro e taxas entre os produtos do lote por peso, valor FOB
+                            ou quantidade — cada critério escolhido separadamente — e chegue ao custo
+                            unitário real de cada item.
+                        </p>
+                    </article>
+                    <article class="lp-card">
+                        <h3>Impostos apurados por NCM</h3>
+                        <p>
+                            Na Importação Formal, II, IPI, PIS, COFINS e ICMS são calculados por NCM sobre
+                            o Valor Aduaneiro (FOB + frete + seguro internacional), com busca automática da
+                            descrição oficial do código.
+                        </p>
+                    </article>
+                    <article class="lp-card">
+                        <h3>Câmbio efetivo automático</h3>
+                        <p>
+                            Cotação do dólar comercial em tempo real, com a opção de aplicar o spread do
+                            cartão ou da operadora e o IOF para chegar na taxa que você realmente vai pagar.
+                        </p>
+                    </article>
+                    <article class="lp-card">
+                        <h3>Viabilidade no Mercado Livre</h3>
+                        <p>
+                            Conecte sua conta e veja taxa de venda, frete do Mercado Envios por peso e
+                            dimensões, e o que os concorrentes cobram — para saber se o preço fecha antes
+                            de anunciar.
+                        </p>
+                    </article>
+                    <article class="lp-card">
+                        <h3>Documentos de importação</h3>
+                        <p>
+                            Gere Proforma Invoice, Commercial Invoice e Packing List já preenchidos com os
+                            dados da sua empresa e do lote, prontos para imprimir em A4 ou enviar ao
+                            fornecedor.
+                        </p>
+                    </article>
+                    <article class="lp-card">
+                        <h3>Histórico e catálogo</h3>
+                        <p>
+                            Salve cada lote para reabrir depois e cadastre os produtos que você importa com
+                            frequência, preenchendo nome, preço, peso e NCM com um clique.
+                        </p>
+                    </article>
+                </div>
+            </section>
+
+            <section class="lp-section lp-section-alt" id="regimes">
+                <h2>Importação Simplificada ou Formal?</h2>
+                <p class="lp-section-lead">
+                    Os dois regimes têm regras de imposto completamente diferentes. O Impoclick simula os
+                    dois lado a lado, com a memória de cálculo aberta, para você comparar antes de decidir.
+                </p>
+                <div class="lp-compare">
+                    <article class="lp-compare-card">
+                        <h3>Simplificada</h3>
+                        <p class="lp-compare-sub">Remessa internacional (courier / Correios)</p>
+                        <ul>
+                            <li>Imposto de Importação de 20% até US$ 50</li>
+                            <li>60% acima disso, com dedução de US$ 20</li>
+                            <li>Mais o ICMS do estado de destino</li>
+                            <li>Não exige CNPJ nem Radar SISCOMEX</li>
+                        </ul>
+                    </article>
+                    <article class="lp-compare-card">
+                        <h3>Formal</h3>
+                        <p class="lp-compare-sub">Via despachante, com CNPJ e Radar habilitado</p>
+                        <ul>
+                            <li>II, IPI, PIS e COFINS apurados por NCM</li>
+                            <li>ICMS conforme o estado de destino</li>
+                            <li>Base no Valor Aduaneiro (FOB + frete + seguro)</li>
+                            <li>Exige Radar SISCOMEX habilitado</li>
+                        </ul>
+                    </article>
+                </div>
+            </section>
+
+            <section class="lp-section" id="planos">
+                <h2>Planos</h2>
+                <p class="lp-section-lead">
+                    Comece testando. Se não fizer sentido para a sua operação, é só não assinar.
+                </p>
+                <div class="lp-pricing">
+                    <div class="lp-price-card">
+                        <span class="lp-price-badge">7 dias grátis</span>
+                        <h3>Plano Mensal</h3>
+                        <p class="lp-price">
+                            <span class="lp-price-currency">R$</span>
+                            <span class="lp-price-amount">29,90</span>
+                            <span class="lp-price-period">/mês</span>
+                        </p>
+                        <ul class="lp-price-features">
+                            <li>Rateio de frete, seguro e taxas por lote</li>
+                            <li>Impostos por NCM e comparação de regimes</li>
+                            <li>Câmbio efetivo com spread e IOF</li>
+                            <li>Integração com o Mercado Livre</li>
+                            <li>Proforma, Commercial Invoice e Packing List</li>
+                            <li>Exportação para Excel e histórico na nuvem</li>
+                        </ul>
+                        <button type="button" class="lp-btn lp-btn-primary lp-btn-block" data-lp-action="register">Criar conta e testar</button>
+                        <p class="lp-price-note">O teste começa no cadastro e não pede cartão.</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="lp-section lp-section-alt" id="duvidas">
+                <h2>Dúvidas frequentes</h2>
+                <div class="lp-faq">
+                    <details class="lp-faq-item" open>
+                        <summary>Qual a diferença entre Importação Simplificada e Formal?</summary>
+                        <div>
+                            <p>A <strong>Simplificada</strong> vale para remessas internacionais (courier ou Correios): Imposto de Importação de 20% até US$ 50, ou 60% com dedução de US$ 20 acima desse valor, mais o ICMS do estado de destino. Não exige CNPJ nem Radar.</p>
+                            <p>A <strong>Formal</strong> é a importação via despachante com CNPJ e Radar SISCOMEX habilitado: apura II, IPI, PIS, COFINS e ICMS individualmente por NCM, com o Valor Aduaneiro formado por FOB mais frete e seguro internacional.</p>
+                        </div>
+                    </details>
+                    <details class="lp-faq-item">
+                        <summary>O que é NCM e por que preciso informar?</summary>
+                        <div>
+                            <p>NCM (Nomenclatura Comum do Mercosul) é o código de 8 dígitos que classifica o produto e define as alíquotas de II, IPI, PIS e COFINS na Importação Formal. O Impoclick busca a descrição oficial automaticamente e, quando o código não está na base curada, usa uma estimativa do IBPT como aproximação — o que não substitui a classificação fiscal oficial da TEC/TIPI.</p>
+                        </div>
+                    </details>
+                    <details class="lp-faq-item">
+                        <summary>Como funciona o rateio entre os produtos do lote?</summary>
+                        <div>
+                            <p>Você escolhe o critério de rateio — por peso, por valor FOB ou por quantidade — separadamente para frete, seguro e taxas. O sistema divide cada custo proporcionalmente entre os produtos conforme o critério escolhido, chegando ao custo unitário real de cada item.</p>
+                        </div>
+                    </details>
+                    <details class="lp-faq-item">
+                        <summary>Os cálculos substituem o desembaraço aduaneiro oficial?</summary>
+                        <div>
+                            <p>Não. O Impoclick é uma ferramenta de simulação para planejamento. Os valores finais de impostos são sempre apurados oficialmente pela Receita Federal na importação e pela Secretaria da Fazenda estadual no caso do ICMS, no momento do desembaraço.</p>
+                        </div>
+                    </details>
+                    <details class="lp-faq-item">
+                        <summary>Preciso ter CNPJ para usar?</summary>
+                        <div>
+                            <p>Não para simular. A Importação Simplificada não exige CNPJ nem Radar, e você pode usar a calculadora normalmente como pessoa física. O CNPJ e o Radar SISCOMEX só são necessários para operar de fato no regime de Importação Formal.</p>
+                        </div>
+                    </details>
+                    <details class="lp-faq-item">
+                        <summary>Onde ficam salvos meus dados?</summary>
+                        <div>
+                            <p>Com a conta conectada, seus lotes, catálogo e dados da empresa ficam salvos na nuvem e acessíveis de qualquer dispositivo. Sem login, tudo fica apenas no seu navegador — limpar os dados do navegador apaga essas informações.</p>
+                        </div>
+                    </details>
+                </div>
+            </section>
+
+            <section class="lp-cta">
+                <h2>Simule seu próximo lote hoje</h2>
+                <p>Sete dias para testar com os seus próprios números, sem cartão de crédito.</p>
+                <button type="button" class="lp-btn lp-btn-primary lp-btn-lg" data-lp-action="register">Criar conta grátis</button>
+            </section>
+        </main>
+
+        <footer class="lp-footer">
+            <div class="lp-footer-inner">
+                <div class="lp-footer-brand">
+                    <img src="impoclick_logo.png" alt="" width="28" height="28">
+                    <span>Impoclick</span>
+                </div>
+                <p class="lp-footer-disclaimer">
+                    Ferramenta de simulação para planejamento de importação. Os valores finais de tributos
+                    são apurados oficialmente pela Receita Federal e pela Secretaria da Fazenda estadual no
+                    desembaraço aduaneiro.
+                </p>
+                <p class="lp-footer-copy">© 2026 Impoclick</p>
+            </div>
+        </footer>
+    </div>
+
     <!-- AUTHENTICATION SCREEN -->
-    <div id="auth-container" class="auth-screen">
+    <div id="auth-container" class="auth-screen hidden">
         <canvas id="auth-art-canvas" class="auth-art-canvas" aria-hidden="true"></canvas>
         <div class="auth-split">
             <div class="auth-art-half">
@@ -65,6 +357,7 @@
             </div>
             <div class="auth-form-half">
                 <div class="auth-card">
+                    <button type="button" id="btn-back-to-landing" class="auth-back-link">← Voltar para a página inicial</button>
                     <div class="auth-header">
                         <h2>Impoclick</h2>
                         <p>Simulador inteligente de rateio e viabilidade</p>

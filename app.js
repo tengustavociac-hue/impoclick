@@ -402,6 +402,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         window.history.replaceState({}, document.title, window.location.pathname);
     }
 
+    // Quem chega por link de confirmação/recuperação (ou com #login) espera
+    // a tela de login, não a página de apresentação. Se a confirmação deu
+    // certo o app abre direto; isso cobre o caso em que ela falhou.
+    if (/access_token|type=|error/.test(window.__authRedirectHash || '') || window.location.hash === '#login') {
+        showAuthScreen = true;
+    }
+
     syncViabMlStatus();
     await loadState();
     registerEventListeners();
@@ -1371,22 +1378,50 @@ async function handleNcmPreview(ncmValue) {
     `;
 }
 
+// Visitante deslogado vê a landing por padrão; a tela de login só aparece
+// quando ele clica em "Entrar"/"Testar grátis" (ou quando chega por um link
+// de confirmação de e-mail). Esse flag guarda essa escolha.
+let showAuthScreen = false;
+
+function goToAuthScreen(tab) {
+    showAuthScreen = true;
+    updateUI();
+    // Abre já na aba certa (entrar x cadastrar)
+    const tabBtn = document.getElementById(tab === 'register' ? 'tab-register' : 'tab-login');
+    if (tabBtn) tabBtn.click();
+    window.scrollTo({ top: 0 });
+}
+
+function goToLanding() {
+    showAuthScreen = false;
+    updateUI();
+    window.scrollTo({ top: 0 });
+}
+
 // MAIN CALCULATION & UI RE-RENDER
 function updateUI() {
+    const landingContainer = document.getElementById('landing-container');
     const authContainer = document.getElementById('auth-container');
     const paywallScreen = document.getElementById('paywall-screen');
     const appContainer = document.querySelector('.app-container');
     const userDisplayName = document.getElementById('user-display-name');
     const trialBanner = document.getElementById('trial-banner');
     const trialDaysText = document.getElementById('trial-days-text');
-    
+
+    // A partir daqui o JS assume o controle da landing, então a regra de CSS
+    // que a escondia durante o carregamento (html.has-session) sai do caminho.
+    document.documentElement.classList.remove('has-session');
+
     if (!state.currentUser) {
-        if (authContainer) authContainer.classList.remove('hidden');
         if (paywallScreen) paywallScreen.classList.add('hidden');
         if (appContainer) appContainer.classList.add('hidden');
-        return; 
+        if (landingContainer) landingContainer.classList.toggle('hidden', showAuthScreen);
+        if (authContainer) authContainer.classList.toggle('hidden', !showAuthScreen);
+        return;
     }
-    
+
+    if (landingContainer) landingContainer.classList.add('hidden');
+
     // Check subscription / trial status
     const subStatus = checkSubscriptionStatus(state.currentUser);
     
@@ -2460,6 +2495,14 @@ function registerAuthEventListeners() {
     const formRegister = document.getElementById('form-register');
     const btnLogout = document.getElementById('btn-logout');
 
+    // Botões da landing pública que levam pra tela de login/cadastro.
+    document.querySelectorAll('[data-lp-action]').forEach((btn) => {
+        btn.addEventListener('click', () => goToAuthScreen(btn.dataset.lpAction));
+    });
+
+    const btnBackToLanding = document.getElementById('btn-back-to-landing');
+    if (btnBackToLanding) btnBackToLanding.addEventListener('click', goToLanding);
+
     // Tab Switching
     if (tabLogin && tabRegister && formLogin && formRegister) {
         tabLogin.addEventListener('click', () => {
@@ -2606,7 +2649,7 @@ function registerAuthEventListeners() {
             if (await showConfirm('Tem certeza de que deseja sair?', { title: 'Sair do sistema', confirmText: 'Sair' })) {
                 await window.db.signOut();
                 state.currentUser = null;
-                updateUI();
+                goToLanding();
             }
         });
     }
@@ -2954,7 +2997,7 @@ function registerSubscriptionEventListeners() {
         btnPaywallLogout.addEventListener('click', () => {
             state.currentUser = null;
             localStorage.removeItem('import_rateio_logged_user');
-            updateUI();
+            goToLanding();
         });
     }
 
