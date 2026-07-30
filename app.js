@@ -3281,6 +3281,19 @@ function updateCatalogBadge(count) {
     }
 }
 
+// Banner curto explicando exatamente qual mudança gerou o alerta daquele item
+// (não só que ele está "não lido") — usado no topo do card, catálogo e
+// promoções, só enquanto o alerta segue sem leitura.
+function buildAlertBanner(text) {
+    const banner = document.createElement('p');
+    banner.className = 'small';
+    banner.style.color = 'var(--danger, #ef4444)';
+    banner.style.fontWeight = '600';
+    banner.style.margin = '0 0 0.5rem 0';
+    banner.textContent = `⚠ ${text}`;
+    return banner;
+}
+
 function buildCatalogCard(item) {
     const card = document.createElement('section');
     card.className = 'card';
@@ -3307,6 +3320,13 @@ function buildCatalogCard(item) {
 
     header.appendChild(titleGroup);
     header.appendChild(statusSpan);
+    card.appendChild(header);
+
+    if (!item.is_read && item.previous_status && item.previous_status !== item.status) {
+        const oldLabel = (CATALOG_STATUS_LABELS[item.previous_status] || { label: item.previous_status }).label;
+        const newLabel = statusInfo.label;
+        card.appendChild(buildAlertBanner(`Mudou agora: estava "${oldLabel}" e passou a "${newLabel}"`));
+    }
 
     const detailP = document.createElement('p');
     detailP.className = 'small';
@@ -3317,7 +3337,6 @@ function buildCatalogCard(item) {
     if (item.status !== 'winning' && item.price_to_win != null) priceParts.push(`Preço pra ganhar: R$ ${Number(item.price_to_win).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`);
     detailP.textContent = priceParts.join(' · ');
 
-    card.appendChild(header);
     card.appendChild(detailP);
 
     if (item.reason) {
@@ -3525,6 +3544,14 @@ function buildPromotionCard(item) {
     header.appendChild(titleGroup);
     header.appendChild(statusSpan);
     card.appendChild(header);
+
+    if (!item.is_read) {
+        if (item.status === 'ended') {
+            card.appendChild(buildAlertBanner('Esta promoção terminou agora'));
+        } else if (daysLeft != null && daysLeft <= 3) {
+            card.appendChild(buildAlertBanner(daysLeft <= 0 ? 'Está terminando hoje' : `Está terminando em ${daysLeft} dia${daysLeft > 1 ? 's' : ''}`));
+        }
+    }
 
     const detailP = document.createElement('p');
     detailP.className = 'small';

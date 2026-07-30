@@ -59,7 +59,7 @@ async function checkCatalogCompetition(userId, itemIds, meta) {
 
     const { data: existingRows, error: existingError } = await supabaseAdmin
         .from('ml_catalog_status')
-        .select('ml_item_id, status, is_read')
+        .select('ml_item_id, status, is_read, previous_status')
         .eq('user_id', userId)
         .in('ml_item_id', catalogItemIds);
     if (existingError) throw new Error(existingError.message);
@@ -78,14 +78,22 @@ async function checkCatalogCompetition(userId, itemIds, meta) {
         const status = data.status;
         const old = oldByItemId[itemId];
 
+        // previousStatus guarda o status de ANTES da transição que gerou o alerta
+        // atual (ex: "winning" antes de virar "competing") — carregado adiante sem
+        // mudar enquanto o alerta seguir sem leitura, pra o card conseguir mostrar
+        // "estava Ganhando, passou a Perder" mesmo em checagens seguintes, não só
+        // na primeira em que a mudança foi detectada.
         let isRead;
+        let previousStatus = old ? old.previous_status : null;
         if (!old) {
             isRead = true; // primeira vez que vemos este item — não é uma transição
         } else if (old.status === 'winning' && status !== 'winning') {
             isRead = false;
+            previousStatus = old.status;
             catalogLost++;
         } else if (old.status !== 'winning' && status === 'winning') {
             isRead = true; // recuperou a posição, resolve o alerta sozinho
+            previousStatus = null;
         } else {
             isRead = old.is_read;
         }
@@ -98,6 +106,7 @@ async function checkCatalogCompetition(userId, itemIds, meta) {
             catalog_product_id: meta[itemId].catalogProductId,
             user_product_id: meta[itemId].userProductId,
             status,
+            previous_status: previousStatus,
             current_price: data.current_price ?? null,
             price_to_win: data.price_to_win ?? null,
             winner_item_id: (data.winner && data.winner.item_id) || null,
@@ -429,7 +438,7 @@ async function handleUserGet(req, res, userId) {
     if (req.query.resource === 'catalog') {
         const { data: items, error } = await supabaseAdmin
             .from('ml_catalog_status')
-            .select('id, ml_item_id, user_product_id, item_title, item_thumbnail, status, current_price, price_to_win, winner_item_id, winner_price, reason, is_read, updated_at')
+            .select('id, ml_item_id, user_product_id, item_title, item_thumbnail, status, previous_status, current_price, price_to_win, winner_item_id, winner_price, reason, is_read, updated_at')
             .eq('user_id', userId)
             .order('updated_at', { ascending: false })
             .limit(100);
