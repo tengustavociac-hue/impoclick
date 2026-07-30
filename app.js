@@ -3202,7 +3202,7 @@ async function markReviewsRead(payload) {
     try {
         await fetch('/api/ml-reviews', {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json', 'user-token': state.currentUser.id },
+            headers: { 'Content-Type': 'application/json', 'user-token': state.currentUser.id, 'Authorization': `Bearer ${state.currentUser.access_token}` },
             body: JSON.stringify(payload),
         });
     } catch (err) {
@@ -3351,7 +3351,7 @@ async function markCatalogRead(payload) {
     try {
         await fetch('/api/ml-reviews?resource=catalog', {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json', 'user-token': state.currentUser.id },
+            headers: { 'Content-Type': 'application/json', 'user-token': state.currentUser.id, 'Authorization': `Bearer ${state.currentUser.access_token}` },
             body: JSON.stringify(payload),
         });
     } catch (err) {
@@ -3558,7 +3558,7 @@ async function markPromotionsRead(payload) {
     try {
         await fetch('/api/ml-reviews?resource=promotions', {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json', 'user-token': state.currentUser.id },
+            headers: { 'Content-Type': 'application/json', 'user-token': state.currentUser.id, 'Authorization': `Bearer ${state.currentUser.access_token}` },
             body: JSON.stringify(payload),
         });
     } catch (err) {
@@ -4498,11 +4498,12 @@ async function mlApiFetch(path) {
     try {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 6000); // Mercado Livre pode demorar
-        const resp = await fetch(path, { 
+        const resp = await fetch(path, {
             headers: {
-                'user-token': state.currentUser.id
+                'user-token': state.currentUser.id,
+                'Authorization': `Bearer ${state.currentUser.access_token}`,
             },
-            signal: controller.signal 
+            signal: controller.signal
         });
         clearTimeout(timeout);
         if (!resp.ok) return null;
@@ -5431,7 +5432,7 @@ function syncViabMlStatus() {
             try {
                 await fetch('/api/ml-status', {
                     method: 'POST',
-                    headers: { 'user-token': state.currentUser.id }
+                    headers: { 'user-token': state.currentUser.id, 'Authorization': `Bearer ${state.currentUser.access_token}` }
                 });
             } catch (err) {
                 console.error('Erro ao desconectar ML:', err);
@@ -5510,7 +5511,7 @@ function syncSettingsUI() {
                 try {
                     await fetch('/api/ml-status', {
                         method: 'POST',
-                        headers: { 'user-token': state.currentUser.id }
+                        headers: { 'user-token': state.currentUser.id, 'Authorization': `Bearer ${state.currentUser.access_token}` }
                     });
                 } catch (err) {
                     console.error('Erro ao desconectar ML:', err);

@@ -1,12 +1,12 @@
-const { mlFetch, supabaseAdmin } = require('./_ml-helper');
+const { mlFetch, supabaseAdmin, getVerifiedUserId } = require('./_ml-helper');
 
 // GET  -> status da conexao com o Mercado Livre
 // POST -> desconecta (apaga os tokens salvos)
 // Junto num arquivo so porque o plano Hobby da Vercel limita a 12 funcoes
 // serverless por deploy, e sao dois endpoints pequenos e relacionados.
 module.exports = async (req, res) => {
-    const userId = req.headers['user-token'];
-    if (!userId) return res.status(401).json({ connected: false, error: 'User token is required in headers.' });
+    const userId = await getVerifiedUserId(req);
+    if (!userId) return res.status(401).json({ connected: false, error: 'Sessão inválida ou expirada. Faça login novamente.' });
 
     if (req.method === 'POST') {
         if (!supabaseAdmin) {

@@ -51,7 +51,10 @@ window.db = {
         return {
             ...data.session.user,
             ...profile,
-            name: profile?.name || data.session.user.user_metadata?.name || 'Usuário'
+            name: profile?.name || data.session.user.user_metadata?.name || 'Usuário',
+            // access_token da sessão (supabase-js já renova sozinho) — usado pra
+            // autenticar as chamadas às nossas próprias APIs (Authorization: Bearer).
+            access_token: data.session.access_token,
         };
     },
     async updateProfile(profileData) {

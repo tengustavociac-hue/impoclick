@@ -30,6 +30,8 @@ async function login(email, password) {
         email: data.user.email,
         name: (data.user.user_metadata && data.user.user_metadata.name) || data.user.email,
         accessToken: data.access_token,
+        refreshToken: data.refresh_token,
+        expiresAt: Date.now() + (data.expires_in || 3600) * 1000 - 60000, // 1 min de margem
     };
     await chrome.storage.local.set({ session });
     refreshReviewsBadge();
@@ -42,6 +44,47 @@ async function logout() {
     return { ok: true };
 }
 
+// A sessão do popup é feita "na mão" (grant_type=password) em vez de usar o
+// supabase-js, que renovaria sozinho — por isso replicamos aqui o mesmo padrão
+// de refresh usado no backend (_ml-helper.js): se o access_token já vai vencer,
+// troca pelo refresh_token antes de usar.
+async function refreshSupabaseSession(refreshToken) {
+    const resp = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+    if (!resp.ok) return null;
+    return resp.json();
+}
+
+async function ensureFreshAccessToken(session) {
+    if (session.expiresAt && Date.now() < session.expiresAt) return session.accessToken;
+    if (!session.refreshToken) return session.accessToken;
+
+    const refreshed = await refreshSupabaseSession(session.refreshToken);
+    if (!refreshed) return session.accessToken; // refresh falhou — segue com o que tem, a API vai recusar se estiver vencido
+
+    const updated = {
+        ...session,
+        accessToken: refreshed.access_token,
+        refreshToken: refreshed.refresh_token || session.refreshToken,
+        expiresAt: Date.now() + (refreshed.expires_in || 3600) * 1000 - 60000,
+    };
+    await chrome.storage.local.set({ session: updated });
+    return updated.accessToken;
+}
+
+// Header duplo (user-token + Authorization) igual ao site: o backend valida o
+// JWT de verdade e só usa o user-token como referência — não basta mais só
+// saber o UUID de alguém pra ler os dados dela.
+async function getAuthHeaders() {
+    const session = await getSession();
+    if (!session) return null;
+    const token = await ensureFreshAccessToken(session);
+    return { 'user-token': session.userId, 'Authorization': `Bearer ${token}` };
+}
+
 // A API do Mercado Livre bloqueia (403) consultar /items/{id} de anúncios
 // que não pertencem ao token OAuth usado — tanto anônimo quanto autenticado
 // só enxerga os PRÓPRIOS itens do vendedor logado. Não dá pra usar isso para
@@ -50,24 +93,22 @@ async function logout() {
 // do usuário) e mandados aqui só pra resolver a categoria — reaproveitando
 // a mesma busca por nome que a Comparação de Mercado do site já usa.
 async function resolveCategory(query) {
-    const session = await getSession();
-    if (!session) return { error: 'not_logged_in' };
+    const headers = await getAuthHeaders();
+    if (!headers) return { error: 'not_logged_in' };
 
-    const resp = await fetch(`${IMPOCLICK_API}/ml-market?action=category&q=${encodeURIComponent(query)}`, {
-        headers: { 'user-token': session.userId },
-    });
+    const resp = await fetch(`${IMPOCLICK_API}/ml-market?action=category&q=${encodeURIComponent(query)}`, { headers });
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok) return { error: data.error || 'Não foi possível identificar a categoria deste produto.' };
     return { category: data };
 }
 
 async function getFee(price, categoryId) {
-    const session = await getSession();
-    if (!session) return { error: 'not_logged_in' };
+    const headers = await getAuthHeaders();
+    if (!headers) return { error: 'not_logged_in' };
 
     const resp = await fetch(
         `${IMPOCLICK_API}/ml-market?action=fee&price=${encodeURIComponent(price)}&category=${encodeURIComponent(categoryId)}`,
-        { headers: { 'user-token': session.userId } }
+        { headers }
     );
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok) return { error: data.error || 'Não foi possível calcular a taxa de venda.' };
@@ -78,13 +119,11 @@ async function getFee(price, categoryId) {
 // usuário clica), pra checar se um nome de marca visto num anúncio de
 // catálogo tem registro no INPI e em qual classe de Nice.
 async function checkTrademark(query, page) {
-    const session = await getSession();
-    if (!session) return { error: 'not_logged_in' };
+    const headers = await getAuthHeaders();
+    if (!headers) return { error: 'not_logged_in' };
 
     const qs = new URLSearchParams({ q: query, page: page || 1 });
-    const resp = await fetch(`${IMPOCLICK_API}/inpi-marca?${qs.toString()}`, {
-        headers: { 'user-token': session.userId },
-    });
+    const resp = await fetch(`${IMPOCLICK_API}/inpi-marca?${qs.toString()}`, { headers });
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok) return { error: data.error || 'Não foi possível consultar a marca no INPI.' };
     return { trademark: data };
@@ -93,12 +132,10 @@ async function checkTrademark(query, page) {
 // Avaliações novas nos anúncios — a checagem de verdade roda no backend (cron via
 // GitHub Actions); aqui só lemos o resultado pra acender o badge no ícone.
 async function getReviews() {
-    const session = await getSession();
-    if (!session) return { error: 'not_logged_in' };
+    const headers = await getAuthHeaders();
+    if (!headers) return { error: 'not_logged_in' };
 
-    const resp = await fetch(`${IMPOCLICK_API}/ml-reviews`, {
-        headers: { 'user-token': session.userId },
-    });
+    const resp = await fetch(`${IMPOCLICK_API}/ml-reviews`, { headers });
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok) return { error: data.error || 'Não foi possível consultar as avaliações.' };
     return { reviews: data };
@@ -107,12 +144,10 @@ async function getReviews() {
 // Status de catálogo (ganhando/perdendo a competição) — mesmo endpoint de
 // avaliações, só muda o parâmetro resource=catalog.
 async function getCatalogStatus() {
-    const session = await getSession();
-    if (!session) return { error: 'not_logged_in' };
+    const headers = await getAuthHeaders();
+    if (!headers) return { error: 'not_logged_in' };
 
-    const resp = await fetch(`${IMPOCLICK_API}/ml-reviews?resource=catalog`, {
-        headers: { 'user-token': session.userId },
-    });
+    const resp = await fetch(`${IMPOCLICK_API}/ml-reviews?resource=catalog`, { headers });
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok) return { error: data.error || 'Não foi possível consultar o status de catálogo.' };
     return { catalog: data };
@@ -121,12 +156,10 @@ async function getCatalogStatus() {
 // Promoções com prazo terminando (ou já terminadas) — mesmo endpoint,
 // resource=promotions.
 async function getPromotionsStatus() {
-    const session = await getSession();
-    if (!session) return { error: 'not_logged_in' };
+    const headers = await getAuthHeaders();
+    if (!headers) return { error: 'not_logged_in' };
 
-    const resp = await fetch(`${IMPOCLICK_API}/ml-reviews?resource=promotions`, {
-        headers: { 'user-token': session.userId },
-    });
+    const resp = await fetch(`${IMPOCLICK_API}/ml-reviews?resource=promotions`, { headers });
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok) return { error: data.error || 'Não foi possível consultar as promoções.' };
     return { promotions: data };
@@ -160,10 +193,10 @@ async function refreshReviewsBadge() {
 // o popup já vale como "vi o aviso" — marca tudo como lido e zera o badge na hora,
 // em vez de esperar os até 15 min do próximo alarme pra refletir o que já foi visto.
 async function markAllAsRead() {
-    const session = await getSession();
-    if (!session) return { error: 'not_logged_in' };
+    const authHeaders = await getAuthHeaders();
+    if (!authHeaders) return { error: 'not_logged_in' };
 
-    const headers = { 'Content-Type': 'application/json', 'user-token': session.userId };
+    const headers = { 'Content-Type': 'application/json', ...authHeaders };
     const body = JSON.stringify({ all: true });
     await Promise.all([
         fetch(`${IMPOCLICK_API}/ml-reviews`, { method: 'PATCH', headers, body }).catch(() => {}),
@@ -181,13 +214,11 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 refreshReviewsBadge();
 
 async function getFreight(price, weight, length, width, height, freeShipping) {
-    const session = await getSession();
-    if (!session) return { error: 'not_logged_in' };
+    const headers = await getAuthHeaders();
+    if (!headers) return { error: 'not_logged_in' };
 
     const qs = new URLSearchParams({ price, weight, length, width, height, freeShipping: freeShipping ? 'true' : 'false' });
-    const resp = await fetch(`${IMPOCLICK_API}/ml-freight?${qs.toString()}`, {
-        headers: { 'user-token': session.userId },
-    });
+    const resp = await fetch(`${IMPOCLICK_API}/ml-freight?${qs.toString()}`, { headers });
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok) return { error: data.error || 'Não foi possível calcular o frete da plataforma.' };
     return { freight: data };

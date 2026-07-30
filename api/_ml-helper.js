@@ -116,8 +116,26 @@ async function mlFetch(userId, pathAndQuery, opts = {}, returnMlUserId = false) 
     return resp;
 }
 
+// Antes, todo endpoint confiava cegamente no header user-token (o próprio
+// front-end mandava o UUID do usuário sem provar que era ele mesmo) — bastava
+// alguém saber/adivinhar o UUID de outra pessoa pra ler os dados dela. Agora
+// exigimos o access_token real da sessão Supabase (Authorization: Bearer) e
+// validamos contra o Supabase Auth antes de confiar em qualquer user_id.
+async function getVerifiedUserId(req) {
+    if (!supabaseAdmin) return null;
+
+    const authHeader = req.headers['authorization'] || '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    if (!token) return null;
+
+    const { data, error } = await supabaseAdmin.auth.getUser(token);
+    if (error || !data || !data.user) return null;
+    return data.user.id;
+}
+
 module.exports = {
     ML_BASE,
     mlFetch,
-    supabaseAdmin
+    supabaseAdmin,
+    getVerifiedUserId,
 };

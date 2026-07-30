@@ -6,6 +6,8 @@
 // mudar ou sair do ar sem aviso. Por isso o resultado deve ser tratado como
 // referência rápida, não como certidão oficial (a busca definitiva continua
 // sendo feita pelo usuário direto no site do INPI antes de qualquer decisão).
+const { getVerifiedUserId } = require('./_ml-helper');
+
 const INPI_SEARCH_URL = 'https://pi-api-dev.ibict.br/api/trademarks/search';
 
 // A base beta acima às vezes mostra a SITUAÇÃO do processo desatualizada
@@ -146,8 +148,8 @@ async function fetchInpiWithRetry(payload, attempts = 2) {
 }
 
 module.exports = async (req, res) => {
-    const userId = req.headers['user-token'];
-    if (!userId) return res.status(401).json({ error: 'User token is required.' });
+    const userId = await getVerifiedUserId(req);
+    if (!userId) return res.status(401).json({ error: 'Sessão inválida ou expirada. Faça login novamente.' });
 
     const { q, page } = req.query;
     if (!q || q.trim().length < 2) {

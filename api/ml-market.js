@@ -1,4 +1,4 @@
-const { mlFetch } = require('./_ml-helper');
+const { mlFetch, getVerifiedUserId } = require('./_ml-helper');
 
 const SITE_ID = 'MLB';
 
@@ -113,8 +113,8 @@ async function handleBestSeller(req, res, userId) {
 }
 
 module.exports = async (req, res) => {
-    const userId = req.headers['user-token'];
-    if (!userId) return res.status(401).json({ error: 'User token is required.' });
+    const userId = await getVerifiedUserId(req);
+    if (!userId) return res.status(401).json({ error: 'Sessão inválida ou expirada. Faça login novamente.' });
 
     try {
         switch (req.query.action) {

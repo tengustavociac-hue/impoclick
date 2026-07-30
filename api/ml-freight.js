@@ -1,8 +1,8 @@
-const { mlFetch } = require('./_ml-helper');
+const { mlFetch, getVerifiedUserId } = require('./_ml-helper');
 
 module.exports = async (req, res) => {
-    const userId = req.headers['user-token'];
-    if (!userId) return res.status(401).json({ error: 'User token is required.' });
+    const userId = await getVerifiedUserId(req);
+    if (!userId) return res.status(401).json({ error: 'Sessão inválida ou expirada. Faça login novamente.' });
 
     const { weight, length, width, height, price, listingType, freeShipping } = req.query;
     if (!weight || !length || !width || !height || !price) {
