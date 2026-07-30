@@ -313,12 +313,18 @@ async function checkUser(userId) {
 
     let newReviews = 0;
     if (rows.length > 0) {
-        const { data: inserted, error } = await supabaseAdmin
+        // ignoreDuplicates:false (padrão) faz DO UPDATE em vez de DO NOTHING — assim
+        // item_title/item_thumbnail/item_rating_average/item_rating_count ficam sempre
+        // atualizados, mesmo pra reviews já vistas antes. is_read não entra no payload,
+        // então continua preservado pelas linhas que já existiam. Por isso "newReviews"
+        // aqui vira uma contagem de "avaliações processadas nesta rodada", não só as
+        // genuinamente novas (o upsert não distingue mais insert de update no retorno).
+        const { data: processed, error } = await supabaseAdmin
             .from('ml_reviews')
-            .upsert(rows, { onConflict: 'user_id,ml_item_id,ml_review_id', ignoreDuplicates: true })
+            .upsert(rows, { onConflict: 'user_id,ml_item_id,ml_review_id' })
             .select('id');
         if (error) throw new Error(error.message);
-        newReviews = inserted ? inserted.length : 0;
+        newReviews = processed ? processed.length : 0;
     }
 
     const catalogResult = await checkCatalogCompetition(userId, itemIds, meta);
