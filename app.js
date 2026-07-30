@@ -3048,9 +3048,43 @@ function starsText(rating) {
     return '★'.repeat(r) + '☆'.repeat(5 - r);
 }
 
+// Foto pequena do produto, reaproveitada nos cards de Avaliações, Catálogo e
+// Promoções — os três já recebem o mesmo item_thumbnail do backend.
+function buildThumbnailImg(src) {
+    const img = document.createElement('img');
+    img.src = src;
+    img.alt = '';
+    img.style.width = '48px';
+    img.style.height = '48px';
+    img.style.objectFit = 'cover';
+    img.style.borderRadius = 'var(--border-radius-md, 8px)';
+    img.style.flexShrink = '0';
+    return img;
+}
+
 // As avaliações vêm de compradores (texto livre) — nunca usar innerHTML com esses
 // campos, sempre textContent, para não abrir XSS armazenado no painel. O backend já
 // devolve só o produto avaliado mais recentemente, 1 card por produto (até 10).
+// O Mercado Livre replica a mesma avaliação em todas as publicações vinculadas como
+// variação de cor/tamanho — a API não informa qual variação foi realmente comprada,
+// então agrupamos aqui pra não mostrar o mesmo comentário repetido em cada cor.
+function groupDuplicateReviews(reviews) {
+    const groups = [];
+    const byKey = new Map();
+    reviews.forEach(r => {
+        const key = `${r.rating}|${r.reviewed_at}|${r.comment}`;
+        const existing = byKey.get(key);
+        if (existing) {
+            existing.alsoTitles.push(r.item_title || r.ml_item_id);
+        } else {
+            const group = { ...r, alsoTitles: [] };
+            byKey.set(key, group);
+            groups.push(group);
+        }
+    });
+    return groups;
+}
+
 function buildReviewCard(r) {
     const card = document.createElement('section');
     card.className = 'card';
@@ -3137,11 +3171,20 @@ function buildReviewCard(r) {
     highlight.appendChild(commentP);
 
     card.appendChild(highlight);
+
+    if (r.alsoTitles && r.alsoTitles.length > 0) {
+        const alsoP = document.createElement('p');
+        alsoP.className = 'small';
+        alsoP.style.color = 'var(--text-muted)';
+        alsoP.style.marginTop = '0.5rem';
+        alsoP.textContent = `O Mercado Livre também mostra esta avaliação em: ${r.alsoTitles.join(', ')}`;
+        card.appendChild(alsoP);
+    }
     return card;
 }
 
 function renderReviewsList(reviews) {
-    renderIntoList('reviews-list', 'reviews-empty', reviews, buildReviewCard);
+    renderIntoList('reviews-list', 'reviews-empty', groupDuplicateReviews(reviews || []), buildReviewCard);
 }
 
 async function loadReviews() {
@@ -3234,8 +3277,17 @@ function renderCatalogList(items) {
         header.style.marginBottom = '0.35rem';
         header.style.gap = '0.75rem';
 
+        const titleGroup = document.createElement('div');
+        titleGroup.style.display = 'flex';
+        titleGroup.style.alignItems = 'center';
+        titleGroup.style.gap = '0.6rem';
+        titleGroup.style.minWidth = '0';
+
+        if (item.item_thumbnail) titleGroup.appendChild(buildThumbnailImg(item.item_thumbnail));
+
         const title = document.createElement('strong');
         title.textContent = item.item_title || item.ml_item_id;
+        titleGroup.appendChild(title);
 
         const statusInfo = CATALOG_STATUS_LABELS[item.status] || { label: item.status, color: 'var(--text-muted)' };
         const statusSpan = document.createElement('span');
@@ -3244,7 +3296,7 @@ function renderCatalogList(items) {
         statusSpan.style.whiteSpace = 'nowrap';
         statusSpan.textContent = statusInfo.label;
 
-        header.appendChild(title);
+        header.appendChild(titleGroup);
         header.appendChild(statusSpan);
 
         const detailP = document.createElement('p');
@@ -3387,8 +3439,17 @@ function buildPromotionCard(item) {
     header.style.marginBottom = '0.35rem';
     header.style.gap = '0.75rem';
 
+    const titleGroup = document.createElement('div');
+    titleGroup.style.display = 'flex';
+    titleGroup.style.alignItems = 'center';
+    titleGroup.style.gap = '0.6rem';
+    titleGroup.style.minWidth = '0';
+
+    if (item.item_thumbnail) titleGroup.appendChild(buildThumbnailImg(item.item_thumbnail));
+
     const title = document.createElement('strong');
     title.textContent = item.item_title || item.ml_item_id;
+    titleGroup.appendChild(title);
 
     const daysLeft = item.finish_date ? Math.ceil((new Date(item.finish_date).getTime() - Date.now()) / 86400000) : null;
     const statusSpan = document.createElement('span');
@@ -3405,7 +3466,7 @@ function buildPromotionCard(item) {
         statusSpan.textContent = 'Ativa';
     }
 
-    header.appendChild(title);
+    header.appendChild(titleGroup);
     header.appendChild(statusSpan);
     card.appendChild(header);
 
@@ -3453,9 +3514,18 @@ function buildLightningCandidateCard(item) {
     card.className = 'card';
     card.style.marginBottom = '0.75rem';
 
+    const titleGroup = document.createElement('div');
+    titleGroup.style.display = 'flex';
+    titleGroup.style.alignItems = 'center';
+    titleGroup.style.gap = '0.6rem';
+
+    if (item.item_thumbnail) titleGroup.appendChild(buildThumbnailImg(item.item_thumbnail));
+
     const title = document.createElement('strong');
     title.textContent = item.item_title || item.ml_item_id;
-    card.appendChild(title);
+    titleGroup.appendChild(title);
+
+    card.appendChild(titleGroup);
 
     const detailP = document.createElement('p');
     detailP.className = 'small';

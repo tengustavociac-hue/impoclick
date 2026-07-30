@@ -94,6 +94,7 @@ async function checkCatalogCompetition(userId, itemIds, meta) {
             user_id: userId,
             ml_item_id: itemId,
             item_title: meta[itemId].title || null,
+            item_thumbnail: meta[itemId].thumbnail || null,
             catalog_product_id: meta[itemId].catalogProductId,
             user_product_id: meta[itemId].userProductId,
             status,
@@ -131,7 +132,7 @@ async function checkPromotions(userId, itemIds, meta) {
     const [activeRes, candidateRes] = await Promise.all([
         supabaseAdmin
             .from('ml_promotions')
-            .select('ml_item_id, promotion_id, item_title, promotion_type, promotion_name, finish_date, soon_alerted, is_read')
+            .select('ml_item_id, promotion_id, item_title, item_thumbnail, promotion_type, promotion_name, finish_date, soon_alerted, is_read')
             .eq('user_id', userId)
             .eq('status', 'active'),
         supabaseAdmin
@@ -171,6 +172,7 @@ async function checkPromotions(userId, itemIds, meta) {
                 user_id: userId,
                 ml_item_id: itemId,
                 item_title: (meta[itemId] && meta[itemId].title) || null,
+                item_thumbnail: (meta[itemId] && meta[itemId].thumbnail) || null,
                 updated_at: new Date().toISOString(),
             });
         }
@@ -200,6 +202,7 @@ async function checkPromotions(userId, itemIds, meta) {
                 user_id: userId,
                 ml_item_id: itemId,
                 item_title: (meta[itemId] && meta[itemId].title) || null,
+                item_thumbnail: (meta[itemId] && meta[itemId].thumbnail) || null,
                 promotion_id: p.id,
                 promotion_type: p.type || null,
                 promotion_name: p.name || null,
@@ -224,6 +227,7 @@ async function checkPromotions(userId, itemIds, meta) {
             user_id: userId,
             ml_item_id: itemId,
             item_title: old.item_title,
+            item_thumbnail: old.item_thumbnail,
             promotion_id: promotionId,
             promotion_type: old.promotion_type,
             promotion_name: old.promotion_name,
@@ -380,7 +384,7 @@ async function handleUserGet(req, res, userId) {
     if (req.query.resource === 'catalog') {
         const { data: items, error } = await supabaseAdmin
             .from('ml_catalog_status')
-            .select('id, ml_item_id, user_product_id, item_title, status, current_price, price_to_win, winner_item_id, winner_price, reason, is_read, updated_at')
+            .select('id, ml_item_id, user_product_id, item_title, item_thumbnail, status, current_price, price_to_win, winner_item_id, winner_price, reason, is_read, updated_at')
             .eq('user_id', userId)
             .order('updated_at', { ascending: false })
             .limit(100);
@@ -402,13 +406,13 @@ async function handleUserGet(req, res, userId) {
         const [promotionsRes, candidatesRes, countRes] = await Promise.all([
             supabaseAdmin
                 .from('ml_promotions')
-                .select('id, ml_item_id, item_title, promotion_id, promotion_type, promotion_name, finish_date, status, is_read, updated_at')
+                .select('id, ml_item_id, item_title, item_thumbnail, promotion_id, promotion_type, promotion_name, finish_date, status, is_read, updated_at')
                 .eq('user_id', userId)
                 .order('finish_date', { ascending: true })
                 .limit(300),
             supabaseAdmin
                 .from('ml_lightning_candidates')
-                .select('id, ml_item_id, item_title, updated_at')
+                .select('id, ml_item_id, item_title, item_thumbnail, updated_at')
                 .eq('user_id', userId)
                 .limit(300),
             supabaseAdmin
