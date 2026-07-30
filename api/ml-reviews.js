@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const { mlFetch, supabaseAdmin, getVerifiedUserId } = require('./_ml-helper');
+const { mlFetch, supabaseAdmin, getVerifiedUserId, getVerifiedUserIdDebug } = require('./_ml-helper');
 
 const ITEMS_PER_USER_CAP = 100; // 1 página de /items/search (máx permitido pela API); evita estourar o tempo de execução da function
 const ITEM_CHECK_CONCURRENCY = 8; // chamadas simultâneas à API do ML por item, pra caber no limite de 60s da function
@@ -549,8 +549,9 @@ module.exports = async (req, res) => {
         }
     }
 
-    const userId = await getVerifiedUserId(req);
-    if (!userId) return res.status(401).json({ error: 'Sessão inválida ou expirada. Faça login novamente.' });
+    const authDebug = await getVerifiedUserIdDebug(req);
+    const userId = authDebug.userId;
+    if (!userId) return res.status(401).json({ error: 'Sessão inválida ou expirada. Faça login novamente.', debugReason: authDebug.reason });
 
     // Sem isso a Vercel gera ETag e responde 304 em GETs repetidos com os mesmos
     // headers, e como 304 não é "ok" pro fetch do navegador, o painel via o
