@@ -3412,12 +3412,19 @@ function buildLightningCandidateCard(item) {
 
 const TEN_DAYS_MS = 10 * 86400000;
 
+// As 4 abas são mutuamente exclusivas: "Vencem em 10 dias" é tirada de dentro de
+// "Ativas" (não aparece nas duas), e "Podem ter Relâmpago" vem de uma lista à parte
+// (ml_lightning_candidates, marcada com kind: 'lightning_candidate'), não misturada
+// com promoções reais.
 function renderPromotionsTabs(items) {
     const all = items || [];
-    const active = all.filter(i => i.status === 'active');
-    const soon = active.filter(i => i.finish_date && (new Date(i.finish_date).getTime() - Date.now()) <= TEN_DAYS_MS);
-    const ended = all.filter(i => i.status === 'ended');
-    const lightning = all.filter(i => i.status === 'candidate' && i.promotion_type === 'LIGHTNING');
+    const promotions = all.filter(i => i.kind === 'promotion');
+    const lightning = all.filter(i => i.kind === 'lightning_candidate');
+
+    const soon = promotions.filter(i => i.status === 'active' && i.finish_date && (new Date(i.finish_date).getTime() - Date.now()) <= TEN_DAYS_MS);
+    const soonIds = new Set(soon.map(i => i.id));
+    const active = promotions.filter(i => i.status === 'active' && !soonIds.has(i.id));
+    const ended = promotions.filter(i => i.status === 'ended');
 
     renderIntoList('promo-list-active', 'promo-empty-active', active, buildPromotionCard);
     renderIntoList('promo-list-soon', 'promo-empty-soon', soon, buildPromotionCard);

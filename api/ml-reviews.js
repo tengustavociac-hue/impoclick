@@ -2,12 +2,27 @@ const crypto = require('crypto');
 const { mlFetch, supabaseAdmin } = require('./_ml-helper');
 
 const ITEMS_PER_USER_CAP = 100; // 1 página de /items/search (máx permitido pela API); evita estourar o tempo de execução da function
+const ITEM_CHECK_CONCURRENCY = 8; // chamadas simultâneas à API do ML por item, pra caber no limite de 60s da function
 
 function safeEqual(a, b) {
     const bufA = Buffer.from(String(a || ''), 'utf8');
     const bufB = Buffer.from(String(b || ''), 'utf8');
     if (bufA.length !== bufB.length) return false;
     return crypto.timingSafeEqual(bufA, bufB);
+}
+
+// Roda fn(item) para cada item da lista, com no máximo `limit` chamadas em paralelo.
+// Sem isso, checar reviews + catálogo + promoções item por item em série estoura os
+// 60s da function assim que a base de itens/usuários cresce um pouco.
+async function mapWithConcurrency(items, limit, fn) {
+    let idx = 0;
+    async function worker() {
+        while (idx < items.length) {
+            const current = idx++;
+            await fn(items[current], current);
+        }
+    }
+    await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
 }
 
 // Também traz catalog_product_id: em anúncios de catálogo, as opiniões ficam
@@ -53,9 +68,10 @@ async function checkCatalogCompetition(userId, itemIds, meta) {
 
     const rows = [];
     let catalogLost = 0;
-    for (const itemId of catalogItemIds) {
+
+    await mapWithConcurrency(catalogItemIds, ITEM_CHECK_CONCURRENCY, async (itemId) => {
         const resp = await mlFetch(userId, `/items/${itemId}/price_to_win?version=v2`);
-        if (!resp.ok) continue;
+        if (!resp.ok) return;
 
         const data = await resp.json();
         const status = data.status;
@@ -88,7 +104,7 @@ async function checkCatalogCompetition(userId, itemIds, meta) {
             is_read: isRead,
             updated_at: new Date().toISOString(),
         });
-    }
+    });
 
     if (rows.length > 0) {
         const { error } = await supabaseAdmin
@@ -100,55 +116,53 @@ async function checkCatalogCompetition(userId, itemIds, meta) {
     return { catalogChecked: catalogItemIds.length, catalogLost };
 }
 
-// Promoções com prazo de término (GET /seller-promotions/items/{id}?app_version=v2).
-// Nem toda modalidade tem prazo (LIGHTNING, DOD, SMART e PRICE_MATCHING rodam sem data
-// fixa) — essas simplesmente não aparecem aqui porque não vêm com finish_date.
-// Dois gatilhos de alerta, independentes do soon_alerted salvo pra não re-notificar
-// a cada checagem depois que o usuário já viu:
-//   1) faltam <= 3 dias pro fim (soon_alerted vira true na primeira vez que cruza o limite)
-//   2) a promoção estava ativa e sumiu da lista da API = terminou
-const LIGHTNING_CANDIDATE_ID = 'LIGHTNING_CANDIDATE';
-
+// Promoções (GET /seller-promotions/items/{id}?app_version=v2) se dividem em dois
+// conceitos bem diferentes, guardados em tabelas separadas:
+//   - ml_promotions: promoções REAIS com prazo definido (finish_date sempre presente).
+//     Dois gatilhos de alerta, via soon_alerted salvo (pra não re-notificar a cada
+//     checagem depois que o usuário já viu):
+//       1) faltam <= 3 dias pro fim
+//       2) a promoção estava ativa e sumiu da lista da API = terminou
+//   - ml_lightning_candidates: anúncios elegíveis pra Oferta Relâmpago (status=candidate,
+//     type=LIGHTNING) — modalidade sem prazo fixo, então é só uma lista informativa de
+//     oportunidade, sem alerta e sem is_read.
 async function checkPromotions(userId, itemIds, meta) {
     const [activeRes, candidateRes] = await Promise.all([
-        supabaseAdmin.from('ml_promotions').select('ml_item_id, promotion_id, soon_alerted, is_read').eq('user_id', userId).eq('status', 'active'),
-        supabaseAdmin.from('ml_promotions').select('ml_item_id, promotion_id').eq('user_id', userId).eq('status', 'candidate'),
+        supabaseAdmin
+            .from('ml_promotions')
+            .select('ml_item_id, promotion_id, item_title, promotion_type, promotion_name, finish_date, soon_alerted, is_read')
+            .eq('user_id', userId)
+            .eq('status', 'active'),
+        supabaseAdmin
+            .from('ml_lightning_candidates')
+            .select('ml_item_id')
+            .eq('user_id', userId),
     ]);
     if (activeRes.error) throw new Error(activeRes.error.message);
     if (candidateRes.error) throw new Error(candidateRes.error.message);
 
     const oldByKey = {};
     for (const row of activeRes.data || []) oldByKey[`${row.ml_item_id}|${row.promotion_id}`] = row;
-    const oldCandidateKeys = new Set((candidateRes.data || []).map(r => `${r.ml_item_id}|${r.promotion_id}`));
+    const oldCandidateItemIds = new Set((candidateRes.data || []).map(r => r.ml_item_id));
 
     const seenKeys = new Set();
-    const seenCandidateKeys = new Set();
-    const rows = [];
+    const seenCandidateItemIds = new Set();
+    const promotionRows = [];
+    const candidateRows = [];
     let endingSoon = 0;
 
-    for (const itemId of itemIds) {
+    await mapWithConcurrency(itemIds, ITEM_CHECK_CONCURRENCY, async (itemId) => {
         const resp = await mlFetch(userId, `/seller-promotions/items/${itemId}?app_version=v2`);
-        if (!resp.ok) continue;
+        if (!resp.ok) return;
 
         const promos = await resp.json();
         for (const p of (Array.isArray(promos) ? promos : [])) {
-            // Candidato a Oferta Relâmpago: o anúncio é elegível mas ainda não está
-            // inscrito. Não tem finish_date/id — é só uma oportunidade informativa,
-            // sem alerta de prazo (LIGHTNING não tem prazo fixo).
             if (p.type === 'LIGHTNING' && p.status === 'candidate') {
-                const key = `${itemId}|${LIGHTNING_CANDIDATE_ID}`;
-                seenCandidateKeys.add(key);
-                rows.push({
+                seenCandidateItemIds.add(itemId);
+                candidateRows.push({
                     user_id: userId,
                     ml_item_id: itemId,
                     item_title: (meta[itemId] && meta[itemId].title) || null,
-                    promotion_id: LIGHTNING_CANDIDATE_ID,
-                    promotion_type: 'LIGHTNING',
-                    promotion_name: null,
-                    finish_date: null,
-                    status: 'candidate',
-                    soon_alerted: false,
-                    is_read: true,
                     updated_at: new Date().toISOString(),
                 });
                 continue;
@@ -172,7 +186,7 @@ async function checkPromotions(userId, itemIds, meta) {
                 soonAlerted = false; // data foi estendida pra frente — reseta pra poder alertar de novo depois
             }
 
-            rows.push({
+            promotionRows.push({
                 user_id: userId,
                 ml_item_id: itemId,
                 item_title: (meta[itemId] && meta[itemId].title) || null,
@@ -186,52 +200,66 @@ async function checkPromotions(userId, itemIds, meta) {
                 updated_at: new Date().toISOString(),
             });
         }
-    }
+    });
 
+    // Promoções que estavam ativas e sumiram da resposta da API = terminaram. finish_date
+    // agora é NOT NULL na tabela, então reaproveita o último valor conhecido (old) em vez
+    // de omitir a coluna — cada linha do upsert sempre tem o mesmo formato completo.
     let justEnded = 0;
     for (const key of Object.keys(oldByKey)) {
         if (seenKeys.has(key)) continue;
         const [itemId, promotionId] = key.split('|');
-        rows.push({
+        const old = oldByKey[key];
+        promotionRows.push({
             user_id: userId,
             ml_item_id: itemId,
+            item_title: old.item_title,
             promotion_id: promotionId,
+            promotion_type: old.promotion_type,
+            promotion_name: old.promotion_name,
+            finish_date: old.finish_date,
             status: 'ended',
+            soon_alerted: old.soon_alerted,
             is_read: false,
             updated_at: new Date().toISOString(),
         });
         justEnded++;
     }
 
-    if (rows.length > 0) {
+    if (promotionRows.length > 0) {
         const { error } = await supabaseAdmin
             .from('ml_promotions')
-            .upsert(rows, { onConflict: 'user_id,ml_item_id,promotion_id' });
+            .upsert(promotionRows, { onConflict: 'user_id,ml_item_id,promotion_id' });
+        if (error) throw new Error(error.message);
+    }
+
+    if (candidateRows.length > 0) {
+        const { error } = await supabaseAdmin
+            .from('ml_lightning_candidates')
+            .upsert(candidateRows, { onConflict: 'user_id,ml_item_id' });
         if (error) throw new Error(error.message);
     }
 
     // Itens que eram candidatos a Relâmpago e não são mais (já foram inscritos,
     // deixaram de ser elegíveis, etc.) — remove pra não mostrar oportunidade que já passou.
-    const staleCandidateItemIds = [...oldCandidateKeys]
-        .filter(key => !seenCandidateKeys.has(key))
-        .map(key => key.split('|')[0]);
+    const staleCandidateItemIds = [...oldCandidateItemIds].filter(id => !seenCandidateItemIds.has(id));
     if (staleCandidateItemIds.length > 0) {
         const { error } = await supabaseAdmin
-            .from('ml_promotions')
+            .from('ml_lightning_candidates')
             .delete()
             .eq('user_id', userId)
-            .eq('promotion_id', LIGHTNING_CANDIDATE_ID)
             .in('ml_item_id', staleCandidateItemIds);
         if (error) throw new Error(error.message);
     }
 
-    return { promotionsChecked: seenKeys.size, endingSoon, justEnded, lightningCandidates: seenCandidateKeys.size };
+    return { promotionsChecked: seenKeys.size, endingSoon, justEnded, lightningCandidates: seenCandidateItemIds.size };
 }
 
-// Verifica as avaliações e o status de catálogo de um usuário conectado, gravando
-// tudo que for novo/mudou no Supabase. A dedupe de avaliações acontece via upsert
-// com a constraint unique(user_id, ml_item_id, ml_review_id) — inclui user_id porque
-// duas contas Impoclick podem estar ligadas à mesma conta do Mercado Livre (mesmos itens).
+// Verifica as avaliações, o status de catálogo e as promoções de um usuário conectado,
+// gravando tudo que for novo/mudou no Supabase. A dedupe de avaliações acontece via
+// upsert com a constraint unique(user_id, ml_item_id, ml_review_id) — inclui user_id
+// porque duas contas Impoclick podem estar ligadas à mesma conta do Mercado Livre
+// (mesmos itens).
 async function checkUser(userId) {
     const searchResp = await mlFetch(userId, mlUserId => `/users/${mlUserId}/items/search?status=active&limit=${ITEMS_PER_USER_CAP}`);
     if (!searchResp.ok) throw new Error(`items/search falhou (${searchResp.status})`);
@@ -243,14 +271,14 @@ async function checkUser(userId) {
     const meta = await fetchItemMeta(userId, itemIds);
 
     const rows = [];
-    for (const itemId of itemIds) {
+    await mapWithConcurrency(itemIds, ITEM_CHECK_CONCURRENCY, async (itemId) => {
         const catalogProductId = meta[itemId] && meta[itemId].catalogProductId;
         const reviewsPath = catalogProductId
             ? `/reviews/item/${itemId}?catalog_product_id=${encodeURIComponent(catalogProductId)}`
             : `/reviews/item/${itemId}`;
 
         const resp = await mlFetch(userId, reviewsPath);
-        if (!resp.ok) continue; // item sem reviews habilitadas ou erro pontual — segue para o próximo
+        if (!resp.ok) return; // item sem reviews habilitadas ou erro pontual — segue para o próximo
 
         const data = await resp.json();
         for (const r of data.reviews || []) {
@@ -264,7 +292,7 @@ async function checkUser(userId) {
                 reviewed_at: r.date_created || null,
             });
         }
-    }
+    });
 
     let newReviews = 0;
     if (rows.length > 0) {
@@ -348,24 +376,33 @@ async function handleUserGet(req, res, userId) {
     }
 
     if (req.query.resource === 'promotions') {
-        const { data: items, error } = await supabaseAdmin
-            .from('ml_promotions')
-            .select('id, ml_item_id, item_title, promotion_id, promotion_type, promotion_name, finish_date, status, is_read, updated_at')
-            .eq('user_id', userId)
-            .order('finish_date', { ascending: true })
-            .limit(300);
+        const [promotionsRes, candidatesRes, countRes] = await Promise.all([
+            supabaseAdmin
+                .from('ml_promotions')
+                .select('id, ml_item_id, item_title, promotion_id, promotion_type, promotion_name, finish_date, status, is_read, updated_at')
+                .eq('user_id', userId)
+                .order('finish_date', { ascending: true })
+                .limit(300),
+            supabaseAdmin
+                .from('ml_lightning_candidates')
+                .select('id, ml_item_id, item_title, updated_at')
+                .eq('user_id', userId)
+                .limit(300),
+            supabaseAdmin
+                .from('ml_promotions')
+                .select('id', { count: 'exact', head: true })
+                .eq('user_id', userId)
+                .eq('is_read', false),
+        ]);
 
-        if (error) return res.status(500).json({ error: error.message });
+        if (promotionsRes.error) return res.status(500).json({ error: promotionsRes.error.message });
+        if (candidatesRes.error) return res.status(500).json({ error: candidatesRes.error.message });
+        if (countRes.error) return res.status(500).json({ error: countRes.error.message });
 
-        const { count, error: countError } = await supabaseAdmin
-            .from('ml_promotions')
-            .select('id', { count: 'exact', head: true })
-            .eq('user_id', userId)
-            .eq('is_read', false);
+        const promotions = (promotionsRes.data || []).map(p => ({ ...p, kind: 'promotion' }));
+        const candidates = (candidatesRes.data || []).map(c => ({ ...c, kind: 'lightning_candidate' }));
 
-        if (countError) return res.status(500).json({ error: countError.message });
-
-        return res.json({ items: items || [], unreadCount: count || 0 });
+        return res.json({ items: [...promotions, ...candidates], unreadCount: countRes.count || 0 });
     }
 
     const { data: reviews, error } = await supabaseAdmin
@@ -395,6 +432,7 @@ async function handleUserMarkRead(req, res, userId) {
     }
     body = body || {};
 
+    // ml_lightning_candidates não tem is_read (é só lista informativa, sem alerta)
     const tableByResource = { catalog: 'ml_catalog_status', promotions: 'ml_promotions' };
     const table = tableByResource[req.query.resource] || 'ml_reviews';
     let query = supabaseAdmin.from(table).update({ is_read: true }).eq('user_id', userId);
