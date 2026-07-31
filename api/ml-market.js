@@ -112,6 +112,94 @@ async function handleBestSeller(req, res, userId) {
     });
 }
 
+// Qualidade do anúncio, direto da API oficial do Mercado Livre. É a mesma
+// checagem que o ML mostra ao vendedor no painel dele: pontuação de 0 a 100,
+// nível (Básica/Satisfatória/Profissional) e a lista de ações pendentes,
+// separadas entre WARNING (problema que derruba a pontuação) e OPPORTUNITY
+// (melhoria possível). Cada ação já vem com o link do ML para corrigir.
+//
+// Só funciona nos anúncios da PRÓPRIA conta conectada — a API responde 401
+// "Caller must be the seller of the item" para anúncios de terceiros, por
+// desenho. Não dá para auditar anúncio de concorrente por aqui.
+//
+// Substitui a antiga /health, descontinuada pelo ML em 07/02/2025.
+async function handlePerformance(req, res, userId) {
+    const itemId = req.query.itemId;
+    if (!itemId) return res.status(400).json({ error: 'Parâmetro itemId é obrigatório.' });
+
+    const isUserProduct = /^MLB?U/i.test(itemId) || /^[A-Z]{3}U\d+$/i.test(itemId);
+    const path = isUserProduct
+        ? `/user-product/${encodeURIComponent(itemId)}/performance`
+        : `/item/${encodeURIComponent(itemId)}/performance`;
+
+    const resp = await mlFetch(userId, path);
+
+    if (!resp.ok) {
+        const raw = await resp.text();
+        let message = raw;
+        try { message = (JSON.parse(raw).message) || raw; } catch (e) { /* resposta não-JSON */ }
+
+        if (resp.status === 401) {
+            return res.status(403).json({
+                error: 'not_own_item',
+                message: 'Este anúncio não pertence à conta do Mercado Livre conectada. A análise de qualidade só está disponível para os seus próprios anúncios.',
+            });
+        }
+        if (resp.status === 404) {
+            return res.status(404).json({
+                error: 'no_data',
+                message: 'O Mercado Livre ainda não gerou os dados de qualidade deste anúncio. Isso costuma acontecer com anúncios recém-criados.',
+            });
+        }
+        return res.status(resp.status).json({ error: message });
+    }
+
+    const data = await resp.json();
+
+    // Achata buckets -> variables -> rules numa lista única de ações, que é
+    // o formato que o painel da extensão realmente precisa exibir.
+    const actions = [];
+    (data.buckets || []).forEach((bucket) => {
+        (bucket.variables || []).forEach((variable) => {
+            (variable.rules || []).forEach((rule) => {
+                const wordings = rule.wordings || {};
+                actions.push({
+                    group: bucket.title || null,
+                    topic: variable.title || null,
+                    key: rule.key,
+                    status: rule.status,
+                    mode: rule.mode,
+                    progress: typeof rule.progress === 'number' ? rule.progress : null,
+                    text: wordings.title || null,
+                    label: wordings.label || null,
+                    link: wordings.link || null,
+                });
+            });
+        });
+    });
+
+    const pending = actions.filter((a) => a.status === 'PENDING');
+
+    res.json({
+        itemId: data.entity_id || itemId,
+        entityType: data.entity_type || null,
+        score: typeof data.score === 'number' ? data.score : null,
+        level: data.level_wording || data.level || null,
+        calculatedAt: data.calculated_at || null,
+        totals: {
+            actions: actions.length,
+            completed: actions.length - pending.length,
+            warnings: pending.filter((a) => a.mode === 'WARNING').length,
+            opportunities: pending.filter((a) => a.mode === 'OPPORTUNITY').length,
+        },
+        // Problemas primeiro, depois oportunidades — a ordem em que o
+        // vendedor deve atacar a lista.
+        warnings: pending.filter((a) => a.mode === 'WARNING'),
+        opportunities: pending.filter((a) => a.mode === 'OPPORTUNITY'),
+        completed: actions.filter((a) => a.status === 'COMPLETED'),
+    });
+}
+
 module.exports = async (req, res) => {
     const userId = await getVerifiedUserId(req);
     if (!userId) return res.status(401).json({ error: 'Sessão inválida ou expirada. Faça login novamente.' });
@@ -122,7 +210,8 @@ module.exports = async (req, res) => {
             case 'fee': return await handleFee(req, res, userId);
             case 'item': return await handleItem(req, res, userId);
             case 'bestseller': return await handleBestSeller(req, res, userId);
-            default: return res.status(400).json({ error: 'Parâmetro action inválido. Use category, fee, item ou bestseller.' });
+            case 'performance': return await handlePerformance(req, res, userId);
+            default: return res.status(400).json({ error: 'Parâmetro action inválido. Use category, fee, item, bestseller ou performance.' });
         }
     } catch (err) {
         res.status(500).json({ error: err.message });

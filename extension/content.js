@@ -75,6 +75,165 @@
         return value;
     }
 
+    // ---------------------------------------------------------------------
+    // ANÁLISE DE TÍTULO / MARCA / MODELO
+    //
+    // O Mercado Livre indexa só os ~30 primeiros caracteres dos campos Marca
+    // e Modelo. Como esses campos entram na busca junto com o título, repetir
+    // neles uma palavra que já está no título desperdiça esse espaço — o
+    // ideal é usar termos complementares (sinônimos, uso, compatibilidade)
+    // que ampliem por quantas buscas diferentes o anúncio pode ser achado.
+    //
+    // Isso é lido da própria página, então funciona em qualquer anúncio,
+    // inclusive de concorrente — diferente da API oficial de qualidade, que
+    // só responde para anúncios da sua própria conta.
+    // ---------------------------------------------------------------------
+    const ATTR_INDEXED_CHARS = 30;
+    const TITLE_MAX_CHARS = 60;
+
+    // Palavras curtas/genéricas que não valem como termo de busca próprio.
+    const STOPWORDS = new Set([
+        'de', 'da', 'do', 'das', 'dos', 'e', 'a', 'o', 'as', 'os', 'em', 'no',
+        'na', 'nos', 'nas', 'para', 'pra', 'por', 'com', 'sem', 'um', 'uma',
+        'the', 'of', 'to',
+    ]);
+
+    function normalizeWord(text) {
+        return String(text)
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[̀-ͯ]/g, '') // tira acentos
+            .replace(/[^a-z0-9]/g, '');
+    }
+
+    function toWordSet(text) {
+        if (!text) return [];
+        return String(text)
+            .split(/[\s/,\-–—_+.]+/)
+            .map(normalizeWord)
+            .filter((w) => w.length > 1 && !STOPWORDS.has(w));
+    }
+
+    // Lê os atributos da ficha técnica (Marca, Modelo e afins) da página.
+    function extractListingAttributes() {
+        const specs = {};
+        document.querySelectorAll('table tr, .andes-table__row').forEach((row) => {
+            const cells = row.querySelectorAll('th, td');
+            if (cells.length >= 2) {
+                const key = cells[0].textContent.trim().toLowerCase();
+                const value = cells[1].textContent.trim();
+                if (key && value) specs[key] = value;
+            }
+        });
+        // Layout de "ficha técnica" em lista (chave/valor em elementos irmãos)
+        document.querySelectorAll('.ui-pdp-specs__table tr, .ui-vpp-highlighted-specs__key-value').forEach((row) => {
+            const text = row.textContent.trim();
+            const m = text.match(/^([^:]{2,30}):\s*(.+)$/);
+            if (m) {
+                const key = m[1].trim().toLowerCase();
+                if (!specs[key]) specs[key] = m[2].trim();
+            }
+        });
+
+        const find = (names) => {
+            for (const [key, value] of Object.entries(specs)) {
+                if (names.some((n) => key === n || key.startsWith(n))) return value;
+            }
+            return null;
+        };
+
+        return {
+            brand: find(['marca']),
+            model: find(['modelo']),
+        };
+    }
+
+    // Avalia um campo de atributo (Marca/Modelo) contra o título.
+    function analyzeAttributeField(label, value, titleWords) {
+        if (!value) {
+            return {
+                label,
+                filled: false,
+                text: null,
+                used: 0,
+                remaining: ATTR_INDEXED_CHARS,
+                repeated: [],
+                wastedChars: 0,
+            };
+        }
+
+        const indexedPart = value.slice(0, ATTR_INDEXED_CHARS);
+        const words = toWordSet(indexedPart);
+        const titleSet = new Set(titleWords);
+        const repeated = [...new Set(words.filter((w) => titleSet.has(w)))];
+
+        // Quantos dos caracteres indexados estão sendo gastos repetindo o
+        // título (aproximação por soma do tamanho das palavras repetidas).
+        const wastedChars = repeated.reduce((sum, w) => sum + w.length, 0);
+
+        return {
+            label,
+            filled: true,
+            text: value,
+            truncated: value.length > ATTR_INDEXED_CHARS,
+            used: Math.min(value.length, ATTR_INDEXED_CHARS),
+            remaining: Math.max(0, ATTR_INDEXED_CHARS - value.length),
+            repeated,
+            wastedChars,
+        };
+    }
+
+    function analyzeListingText(pageData) {
+        const title = pageData.title || '';
+        const titleWords = toWordSet(title);
+        const attrs = extractListingAttributes();
+
+        const brand = analyzeAttributeField('Marca', attrs.brand, titleWords);
+        const model = analyzeAttributeField('Modelo', attrs.model, titleWords);
+
+        // Palavras repetidas dentro do próprio título também desperdiçam
+        // espaço dos 60 caracteres.
+        const seen = new Set();
+        const titleDuplicates = [];
+        titleWords.forEach((w) => {
+            if (seen.has(w) && !titleDuplicates.includes(w)) titleDuplicates.push(w);
+            seen.add(w);
+        });
+
+        return {
+            title: {
+                text: title,
+                length: title.length,
+                max: TITLE_MAX_CHARS,
+                tooLong: title.length > TITLE_MAX_CHARS,
+                duplicates: titleDuplicates,
+            },
+            fields: [brand, model],
+        };
+    }
+
+    // O ML usa vários formatos de URL para a mesma coisa, e o ID do item nem
+    // sempre está na URL (páginas /p/ e /up/ carregam o item escolhido via
+    // parâmetro ou só no HTML). Tentamos, em ordem: parâmetro item_id da URL,
+    // permalink clássico MLB-123, e por fim uma varredura no HTML da página.
+    function extractItemId() {
+        const url = window.location.href;
+
+        const fromParam = url.match(/item_id[=:](MLB\d+)/i);
+        if (fromParam) return fromParam[1].toUpperCase();
+
+        const fromPermalink = url.match(/\/(MLB)-?(\d{6,})/i);
+        if (fromPermalink) return (fromPermalink[1] + fromPermalink[2]).toUpperCase();
+
+        const html = document.documentElement.innerHTML;
+        const fromHtml = html.match(/"item_id"\s*:\s*"(MLB\d+)"/i)
+            || html.match(/\bitemId["'\s:=]+(MLB\d+)/i)
+            || html.match(/\/(MLB\d{8,})\b/);
+        if (fromHtml) return fromHtml[1].toUpperCase();
+
+        return null;
+    }
+
     // Não dá pra saber quanto o VENDEDOR daquele anúncio paga de frete (é
     // dado privado da conta dele, e nem seria o número certo — depende da
     // reputação/nível de cada vendedor). O que dá pra fazer é ler o peso e
@@ -149,6 +308,86 @@
             return { cost: parseFloat(match[1].replace(/\./g, '') + '.' + match[2]), isFree: false };
         }
         return null;
+    }
+
+    // Renderiza a parte da análise que é calculada aqui mesmo, a partir do
+    // texto da página — funciona em qualquer anúncio, sem depender da API.
+    function renderTextAnalysis(analysis) {
+        const t = analysis.title;
+        const titleClass = t.tooLong ? 'impoclick-an-warn' : 'impoclick-an-ok';
+
+        const fieldsHtml = analysis.fields.map((f) => {
+            if (!f.filled) {
+                return `
+                    <div class="impoclick-an-item impoclick-an-warn">
+                        <strong>${escapeHtml(f.label)}: não preenchido</strong>
+                        <p>Preencher esse campo adiciona até ${ATTR_INDEXED_CHARS} caracteres indexados na busca. Deixar vazio joga fora esse espaço.</p>
+                    </div>
+                `;
+            }
+
+            const temRepetido = f.repeated.length > 0;
+            const cls = temRepetido ? 'impoclick-an-warn' : 'impoclick-an-ok';
+            const repetidoHtml = temRepetido
+                ? `<p>Repete o título em: <strong>${f.repeated.map(escapeHtml).join(', ')}</strong> — cerca de ${f.wastedChars} caracteres desperdiçados. Troque por termos que o título ainda não tem (sinônimos, uso, compatibilidade).</p>`
+                : '<p>Nenhuma palavra repetida do título. Esse campo está somando buscas novas.</p>';
+            const truncHtml = f.truncated
+                ? `<p class="impoclick-note">O texto tem ${f.text.length} caracteres, mas o ML indexa só os ${ATTR_INDEXED_CHARS} primeiros — o resto não conta na busca.</p>`
+                : (f.remaining > 0 ? `<p class="impoclick-note">Sobram ${f.remaining} caracteres indexáveis nesse campo.</p>` : '');
+
+            return `
+                <div class="impoclick-an-item ${cls}">
+                    <strong>${escapeHtml(f.label)}: ${escapeHtml(f.text)}</strong>
+                    ${repetidoHtml}
+                    ${truncHtml}
+                </div>
+            `;
+        }).join('');
+
+        const dupHtml = t.duplicates.length
+            ? `<p>Palavras repetidas dentro do próprio título: <strong>${t.duplicates.map(escapeHtml).join(', ')}</strong>.</p>`
+            : '';
+
+        return `
+            <div class="impoclick-an-block">
+                <div class="impoclick-an-block-title">Título e atributos</div>
+                <div class="impoclick-an-item ${titleClass}">
+                    <strong>Título: ${t.length}/${t.max} caracteres</strong>
+                    ${t.tooLong ? `<p>Passou de ${t.max} caracteres — o excedente pode ser cortado na exibição.</p>` : '<p>Tamanho dentro do limite.</p>'}
+                    ${dupHtml}
+                </div>
+                ${fieldsHtml}
+            </div>
+        `;
+    }
+
+    // Renderiza a análise oficial do Mercado Livre (API /performance).
+    function renderPerformance(perf) {
+        const nivel = perf.level ? ` · ${escapeHtml(perf.level)}` : '';
+        const scoreClass = perf.score >= 75 ? 'impoclick-good' : (perf.score >= 50 ? 'impoclick-warn' : 'impoclick-bad');
+
+        const lista = (items, tipo) => items.map((a) => `
+            <div class="impoclick-an-item ${tipo === 'warning' ? 'impoclick-an-warn' : 'impoclick-an-opp'}">
+                <strong>${escapeHtml(a.topic || a.key)}</strong>
+                ${a.text ? `<p>${escapeHtml(a.text)}</p>` : ''}
+                ${a.link ? `<a href="${escapeHtml(a.link)}" target="_blank" rel="noopener">${escapeHtml(a.label || 'Corrigir no Mercado Livre')} →</a>` : ''}
+            </div>
+        `).join('');
+
+        const nada = perf.warnings.length === 0 && perf.opportunities.length === 0
+            ? '<p class="impoclick-text">Nenhuma ação pendente — o anúncio já cumpre todos os objetivos de qualidade do Mercado Livre.</p>'
+            : '';
+
+        return `
+            <div class="impoclick-an-block">
+                <div class="impoclick-an-block-title">Qualidade oficial do Mercado Livre</div>
+                <div class="impoclick-verdict ${scoreClass}">${perf.score != null ? perf.score : '—'}/100${nivel}</div>
+                <p class="impoclick-note">${perf.totals.completed} de ${perf.totals.actions} objetivos cumpridos · ${perf.totals.warnings} problema(s) · ${perf.totals.opportunities} oportunidade(s)</p>
+                ${nada}
+                ${perf.warnings.length ? `<div class="impoclick-an-block-title">Problemas que derrubam a pontuação</div>${lista(perf.warnings, 'warning')}` : ''}
+                ${perf.opportunities.length ? `<div class="impoclick-an-block-title">Oportunidades de melhoria</div>${lista(perf.opportunities, 'opp')}` : ''}
+            </div>
+        `;
     }
 
     function sendMessage(message) {
@@ -353,6 +592,10 @@
             <button id="impoclick-calc-btn" class="impoclick-btn">Calcular viabilidade</button>
             <div id="impoclick-result"></div>
 
+            <label class="impoclick-label">Análise do anúncio</label>
+            <button id="impoclick-analyze-btn" class="impoclick-btn impoclick-btn-secondary">Analisar erros e melhorias</button>
+            <div id="impoclick-analyze-result"></div>
+
             <label class="impoclick-label" for="impoclick-trademark-input">Verificar marca no INPI (opcional)</label>
             <div class="impoclick-trademark-search">
                 <input type="text" id="impoclick-trademark-input" class="impoclick-input impoclick-input-sm" placeholder="ex: JBL">
@@ -396,6 +639,39 @@
         } else {
             feeValueEl.textContent = '—';
         }
+
+        document.getElementById('impoclick-analyze-btn').addEventListener('click', async () => {
+            const el = document.getElementById('impoclick-analyze-result');
+
+            // Parte 1: análise de título/marca/modelo, feita a partir da
+            // própria página — sempre disponível, em qualquer anúncio.
+            const textoHtml = renderTextAnalysis(analyzeListingText(pageData));
+            el.innerHTML = textoHtml + '<p class="impoclick-text">Consultando a qualidade oficial do anúncio...</p>';
+
+            // Parte 2: qualidade oficial do ML, só para anúncios da conta
+            // conectada (a API do ML recusa anúncio de terceiros).
+            const itemId = extractItemId();
+            if (!itemId) {
+                el.innerHTML = textoHtml + '<p class="impoclick-note">Não consegui identificar o código do anúncio nesta página, então a análise oficial do Mercado Livre não pôde ser consultada.</p>';
+                return;
+            }
+
+            const resp = await sendMessage({ type: 'GET_PERFORMANCE', itemId });
+            if (resp.performance) {
+                el.innerHTML = textoHtml + renderPerformance(resp.performance);
+                return;
+            }
+
+            let aviso;
+            if (resp.error === 'not_logged_in') {
+                aviso = 'Faça login na extensão para consultar a qualidade oficial do anúncio.';
+            } else if (resp.error === 'not_own_item') {
+                aviso = 'A análise oficial do Mercado Livre só funciona nos seus próprios anúncios — a API deles não libera esse dado para anúncios de outros vendedores. A análise de título e atributos acima vale para qualquer anúncio.';
+            } else {
+                aviso = resp.message || 'Não foi possível consultar a qualidade oficial agora.';
+            }
+            el.innerHTML = textoHtml + `<p class="impoclick-note">${escapeHtml(aviso)}</p>`;
+        });
 
         document.getElementById('impoclick-calc-btn').addEventListener('click', async () => {
             const resultEl = document.getElementById('impoclick-result');
