@@ -6,7 +6,7 @@
     <title>Impoclick - Simulador de Rateio e Viabilidade de Importação</title>
     <link rel="icon" type="image/png" href="impoclick_logo.png">
     <link rel="apple-touch-icon" href="impoclick_logo.png">
-    <meta name="description" content="Simulador inteligente de rateio de custos e viabilidade de importação: calcule impostos, frete, ICMS e o preço ideal de revenda antes de importar.">
+    <meta name="description" content="Calcule o custo real da importação: impostos, frete, câmbio e rateio por produto. Monitore catálogo, avaliações e promoções no Mercado Livre e veja se compensa vender, com extensão para Chrome.">
     <meta name="theme-color" content="#b8860b">
     <link rel="canonical" href="https://www.impoclick.com.br/">
     <meta property="og:title" content="Impoclick - Simulador de Rateio e Viabilidade de Importação">
@@ -120,7 +120,8 @@
             </a>
             <nav class="lp-nav-links">
                 <a href="#recursos">Recursos</a>
-                <a href="#regimes">Regimes</a>
+                <a href="#mercado-livre">Mercado Livre</a>
+                <a href="#extensao">Extensão</a>
                 <a href="#planos">Planos</a>
                 <a href="#duvidas">Dúvidas</a>
             </nav>
@@ -217,6 +218,89 @@
                 </div>
             </section>
 
+            <section class="lp-section lp-section-alt" id="mercado-livre">
+                <h2>Monitoramento dos seus anúncios no Mercado Livre</h2>
+                <p class="lp-section-lead">
+                    Conecte sua conta do Mercado Livre e o Impoclick passa a vigiar sozinho o que
+                    costuma passar batido no dia a dia — verificando a cada 15 minutos e avisando
+                    só quando algo realmente muda.
+                </p>
+                <div class="lp-grid">
+                    <article class="lp-card">
+                        <h3>Catálogo: ganhando ou perdendo</h3>
+                        <p>
+                            Acompanhe a disputa dos seus anúncios de catálogo pela primeira posição.
+                            O aviso chega quando um anúncio que estava ganhando passa a perder — que é
+                            justamente quando as vendas caem sem explicação aparente.
+                        </p>
+                    </article>
+                    <article class="lp-card">
+                        <h3>Avaliações novas</h3>
+                        <p>
+                            Veja o comentário mais recente dos seus últimos produtos avaliados em uma
+                            lista só, sem precisar abrir anúncio por anúncio para descobrir que alguém
+                            deixou uma nota baixa.
+                        </p>
+                    </article>
+                    <article class="lp-card">
+                        <h3>Promoções vencendo</h3>
+                        <p>
+                            Saiba quando faltam 3 dias ou menos para uma promoção terminar — campanha
+                            tradicional, cofinanciada, desconto por quantidade, pré-acordado, campanha
+                            do vendedor e liquidação Full — e evite que o preço volte ao normal sem
+                            você perceber.
+                        </p>
+                    </article>
+                </div>
+            </section>
+
+            <section class="lp-section" id="extensao">
+                <div class="lp-ext">
+                    <div class="lp-ext-text">
+                        <p class="lp-eyebrow">Extensão para Chrome</p>
+                        <h2>Analise qualquer anúncio sem sair do Mercado Livre</h2>
+                        <p class="lp-section-lead">
+                            Instale a extensão e um painel do Impoclick aparece junto do anúncio que você
+                            está vendo, puxando os dados da sua conta para responder a pergunta que importa:
+                            vale a pena vender isso?
+                        </p>
+                        <ul class="lp-ext-list">
+                            <li>
+                                <strong>Cálculo aberto, linha a linha.</strong> Preço do anúncio, comissão do
+                                Mercado Livre, frete da plataforma, imposto e o seu custo de importação —
+                                até o resultado líquido por unidade e a margem.
+                            </li>
+                            <li>
+                                <strong>Frete real da sua conta.</strong> Peso e dimensões são lidos
+                                automaticamente da ficha técnica do anúncio, e o frete vem cotado pelo
+                                Mercado Envios na modalidade que você escolher.
+                            </li>
+                            <li>
+                                <strong>Produtos de catálogo destacados na busca.</strong> Uma etiqueta marca
+                                quais resultados são de catálogo, para você identificar de longe onde existe
+                                disputa pela primeira posição.
+                            </li>
+                            <li>
+                                <strong>Consulta de marca no INPI.</strong> Verifique se o nome do produto já
+                                tem registro de marca, com titular, classe e a situação conferida na base
+                                oficial — antes de comprar um lote inteiro.
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="lp-ext-panel" aria-hidden="true">
+                        <div class="lp-ext-panel-head">Viabilidade Impoclick</div>
+                        <div class="lp-ext-verdict">COMPENSA</div>
+                        <div class="lp-panel-row"><span>Valor do produto</span><strong>R$ 200,00</strong></div>
+                        <div class="lp-panel-row"><span>(–) Comissão do ML (13%)</span><strong>R$ 26,00</strong></div>
+                        <div class="lp-panel-row"><span>(–) Frete da plataforma</span><strong>R$ 19,90</strong></div>
+                        <div class="lp-panel-row"><span>(–) Imposto (6%)</span><strong>R$ 12,00</strong></div>
+                        <div class="lp-panel-row"><span>(–) Seu custo</span><strong>R$ 89,51</strong></div>
+                        <div class="lp-panel-row lp-panel-total"><span>Resultado por unidade</span><strong>R$ 52,59</strong></div>
+                        <p class="lp-panel-foot">Exemplo ilustrativo</p>
+                    </div>
+                </div>
+            </section>
+
             <section class="lp-section lp-section-alt" id="regimes">
                 <h2>Importação Simplificada ou Formal?</h2>
                 <p class="lp-section-lead">
@@ -265,7 +349,9 @@
                             <li>Rateio de frete, seguro e taxas por lote</li>
                             <li>Impostos por NCM e comparação de regimes</li>
                             <li>Câmbio efetivo com spread e IOF</li>
-                            <li>Integração com o Mercado Livre</li>
+                            <li>Monitoramento de catálogo, avaliações e promoções</li>
+                            <li>Extensão para Chrome com análise no anúncio</li>
+                            <li>Consulta de marca no INPI</li>
                             <li>Proforma, Commercial Invoice e Packing List</li>
                             <li>Exportação para Excel e histórico na nuvem</li>
                         </ul>
@@ -307,6 +393,18 @@
                         <summary>Preciso ter CNPJ para usar?</summary>
                         <div>
                             <p>Não para simular. A Importação Simplificada não exige CNPJ nem Radar, e você pode usar a calculadora normalmente como pessoa física. O CNPJ e o Radar SISCOMEX só são necessários para operar de fato no regime de Importação Formal.</p>
+                        </div>
+                    </details>
+                    <details class="lp-faq-item">
+                        <summary>Preciso conectar minha conta do Mercado Livre?</summary>
+                        <div>
+                            <p>Só para as funções que dependem dela: monitoramento de catálogo, avaliações e promoções, além da taxa de venda e do frete reais da sua conta. A conexão é feita pelo login oficial do Mercado Livre (OAuth), em Configurações. A calculadora de importação funciona normalmente sem isso.</p>
+                        </div>
+                    </details>
+                    <details class="lp-faq-item">
+                        <summary>Como funciona a extensão para Chrome?</summary>
+                        <div>
+                            <p>A extensão abre um painel do Impoclick junto do anúncio que você está vendo no Mercado Livre. Ela lê o preço e a ficha técnica da página, cruza com o seu custo de importação e mostra o cálculo aberto — comissão, frete, imposto e resultado líquido por unidade. Também marca produtos de catálogo nos resultados de busca e consulta registro de marca no INPI.</p>
                         </div>
                     </details>
                     <details class="lp-faq-item">

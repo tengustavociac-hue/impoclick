@@ -3831,3 +3831,84 @@ html.has-session #landing-container {
         width: 100%;
     }
 }
+
+/* --- Seção da extensão para Chrome --- */
+.lp-ext {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+    gap: 3rem;
+    align-items: center;
+}
+
+.lp-ext-text .lp-section-lead {
+    margin-bottom: 1.75rem;
+}
+
+.lp-ext-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
+}
+
+.lp-ext-list li {
+    position: relative;
+    padding-left: 1.7rem;
+    font-size: 0.97rem;
+    line-height: 1.6;
+    color: var(--text-muted);
+}
+
+.lp-ext-list li::before {
+    content: "\2713";
+    position: absolute;
+    left: 0;
+    top: 0;
+    color: var(--success);
+    font-weight: 800;
+}
+
+.lp-ext-list strong {
+    color: var(--text-primary);
+}
+
+/* Mini-réplica do painel que a extensão injeta no anúncio */
+.lp-ext-panel {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--card-shadow);
+    padding: 1.5rem;
+}
+
+.lp-ext-panel-head {
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    padding-bottom: 0.9rem;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 1rem;
+}
+
+.lp-ext-verdict {
+    text-align: center;
+    font-weight: 800;
+    font-size: 1.05rem;
+    letter-spacing: 0.04em;
+    color: var(--success);
+    background: var(--success-bg);
+    border-radius: var(--border-radius-sm);
+    padding: 0.6rem;
+    margin-bottom: 1rem;
+}
+
+@media (max-width: 900px) {
+    .lp-ext {
+        grid-template-columns: 1fr;
+        gap: 2.25rem;
+    }
+}
