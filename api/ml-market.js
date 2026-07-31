@@ -200,6 +200,245 @@ async function handlePerformance(req, res, userId) {
     });
 }
 
+// ---------------------------------------------------------------------
+// ANÁLISE COMPLETA DO ANÚNCIO
+//
+// Junta numa resposta só tudo que o painel da extensão precisa pra auditar
+// um anúncio: dados do item, descrição, campos que a categoria espera,
+// visitas por dia, avaliações e vendas do período. São 6 recursos
+// diferentes da API do ML — buscar um a um a partir da extensão daria 6
+// idas e voltas até a Vercel, então agregamos aqui.
+//
+// Vale só para anúncios da PRÓPRIA conta conectada: desde 2024 o ML recusa
+// /items/{id} de terceiros com o token de outro vendedor. A análise que
+// funciona em anúncio de qualquer um (título, marca, modelo) continua sendo
+// feita no content script, lendo a página.
+// ---------------------------------------------------------------------
+
+// Nenhuma das consultas abaixo é essencial sozinha — se avaliações ou
+// visitas falharem, a análise ainda vale pelo resto. Por isso cada uma
+// devolve null em vez de derrubar a resposta inteira.
+async function fetchJsonOrNull(userId, path) {
+    try {
+        const resp = await mlFetch(userId, path);
+        if (!resp.ok) return null;
+        return await resp.json();
+    } catch (err) {
+        return null;
+    }
+}
+
+// O ML expõe os campos que a categoria espera numa árvore
+// grupos → componentes → atributos. Pro painel só interessa a lista plana
+// de campos preenchíveis, então achatamos e descartamos os ocultos (que o
+// vendedor não tem como preencher pela interface).
+function flattenCategoryFields(specs) {
+    const fields = [];
+    const seen = new Set();
+
+    (specs.groups || []).forEach((group) => {
+        (group.components || []).forEach((component) => {
+            (component.attributes || []).forEach((attr) => {
+                if (!attr.id || seen.has(attr.id)) return;
+
+                // technical_specs/input devolve tags como array; o recurso
+                // antigo /attributes devolve como objeto. Aceitamos os dois.
+                const rawTags = attr.tags || [];
+                const tagList = Array.isArray(rawTags) ? rawTags : Object.keys(rawTags).filter((k) => rawTags[k]);
+                if (tagList.includes('hidden') || tagList.includes('read_only')) return;
+
+                seen.add(attr.id);
+                fields.push({
+                    id: attr.id,
+                    name: attr.name || component.label || attr.id,
+                    required: tagList.includes('required') || tagList.includes('catalog_required'),
+                });
+            });
+        });
+    });
+
+    return fields;
+}
+
+// Quantas unidades DESTE anúncio saíram na janela. O ML não tem endpoint de
+// "vendas por item por período" — a única forma é varrer os pedidos do
+// vendedor e somar os order_items do anúncio, que é o mesmo caminho usado
+// no alerta de estoque. Paramos em MAX_PAGES pra não estourar o tempo
+// limite da função serverless em conta com muito pedido; quando isso
+// acontece a resposta vem marcada como parcial, pra tela não afirmar um
+// número que está incompleto.
+const ORDERS_MAX_PAGES = 8;
+const ORDERS_PAGE_SIZE = 50;
+
+async function fetchItemSales(userId, mlUserId, itemId, days) {
+    if (!mlUserId) return null;
+
+    const to = new Date();
+    const from = new Date(to.getTime() - days * 86400000);
+    const halfway = new Date(to.getTime() - (days / 2) * 86400000);
+    const fmt = (d) => d.toISOString().replace('Z', '-00:00');
+
+    let sold = 0;
+    let soldRecentHalf = 0;
+    let offset = 0;
+    let pages = 0;
+    let partial = false;
+
+    while (pages < ORDERS_MAX_PAGES) {
+        const qs = new URLSearchParams({
+            seller: mlUserId,
+            'order.date_created.from': fmt(from),
+            'order.date_created.to': fmt(to),
+            limit: String(ORDERS_PAGE_SIZE),
+            offset: String(offset),
+        });
+
+        const data = await fetchJsonOrNull(userId, `/orders/search?${qs.toString()}`);
+        if (!data || !Array.isArray(data.results)) return null;
+
+        data.results.forEach((order) => {
+            if (order.status === 'cancelled') return;
+            const createdAt = new Date(order.date_created);
+            (order.order_items || []).forEach((line) => {
+                if (!line.item || line.item.id !== itemId) return;
+                const qty = line.quantity || 0;
+                sold += qty;
+                if (createdAt >= halfway) soldRecentHalf += qty;
+            });
+        });
+
+        const total = (data.paging && data.paging.total) || 0;
+        offset += ORDERS_PAGE_SIZE;
+        pages += 1;
+
+        if (offset >= total) break;
+        if (pages >= ORDERS_MAX_PAGES) partial = true;
+    }
+
+    return { days, sold, soldRecentHalf, halfDays: days / 2, partial };
+}
+
+// Soma as visitas de uma fatia do fim da série (os N dias mais recentes),
+// pra comparar período contra período — é isso que diz se o anúncio está
+// ganhando ou perdendo tração, coisa que o total sozinho não mostra.
+function sumLastDays(daily, count, skipFromEnd = 0) {
+    const end = daily.length - skipFromEnd;
+    const start = Math.max(0, end - count);
+    if (end <= 0) return 0;
+    return daily.slice(start, end).reduce((acc, d) => acc + (d.total || 0), 0);
+}
+
+async function handleAnalise(req, res, userId) {
+    const itemId = req.query.itemId;
+    if (!itemId) return res.status(400).json({ error: 'Parâmetro itemId é obrigatório.' });
+
+    const { resp: itemResp, mlUserId } = await mlFetch(userId, `/items/${encodeURIComponent(itemId)}`, {}, true);
+
+    if (!itemResp.ok) {
+        if (itemResp.status === 401 || itemResp.status === 403) {
+            return res.status(403).json({
+                error: 'not_own_item',
+                message: 'Este anúncio não é da conta do Mercado Livre conectada. A análise completa só funciona nos seus próprios anúncios — a API do ML não libera os dados de anúncios de terceiros.',
+            });
+        }
+        if (itemResp.status === 404) {
+            return res.status(404).json({ error: 'not_found', message: 'Anúncio não encontrado.' });
+        }
+        return res.status(itemResp.status).json({ error: await itemResp.text() });
+    }
+
+    const item = await itemResp.json();
+
+    const [description, visitsRaw, reviewsRaw] = await Promise.all([
+        fetchJsonOrNull(userId, `/items/${encodeURIComponent(itemId)}/description`),
+        fetchJsonOrNull(userId, `/items/${encodeURIComponent(itemId)}/visits/time_window?last=30&unit=day`),
+        fetchJsonOrNull(userId, `/reviews/item/${encodeURIComponent(itemId)}`),
+    ]);
+
+    const [categorySpecs, sales] = await Promise.all([
+        item.category_id ? fetchJsonOrNull(userId, `/categories/${encodeURIComponent(item.category_id)}/technical_specs/input`) : Promise.resolve(null),
+        fetchItemSales(userId, mlUserId, itemId, 30),
+    ]);
+
+    // Atributos preenchidos no anúncio, já sem os que o ML preenche sozinho
+    // e o vendedor não controla.
+    const itemAttributes = (item.attributes || [])
+        .filter((a) => a.value_name || (a.values && a.values.length))
+        .map((a) => ({
+            id: a.id,
+            name: a.name || a.id,
+            value: a.value_name || (a.values || []).map((v) => v.name).filter(Boolean).join(', '),
+        }))
+        .filter((a) => a.value);
+
+    const filledIds = new Set(itemAttributes.map((a) => a.id));
+
+    let categoryFields = null;
+    if (categorySpecs) {
+        const all = flattenCategoryFields(categorySpecs);
+        categoryFields = {
+            total: all.length,
+            filled: all.filter((f) => filledIds.has(f.id)).length,
+            missing: all.filter((f) => !filledIds.has(f.id)),
+        };
+    }
+
+    let visits = null;
+    if (visitsRaw && Array.isArray(visitsRaw.results)) {
+        const daily = visitsRaw.results.map((r) => ({ date: r.date, total: r.total || 0 }));
+        visits = {
+            daily,
+            total30: daily.reduce((acc, d) => acc + d.total, 0),
+            last7: sumLastDays(daily, 7),
+            prev7: sumLastDays(daily, 7, 7),
+            last15: sumLastDays(daily, 15),
+            prev15: sumLastDays(daily, 15, 15),
+        };
+    }
+
+    let reviews = null;
+    if (reviewsRaw && (reviewsRaw.rating_average != null || Array.isArray(reviewsRaw.reviews))) {
+        const levels = reviewsRaw.rating_levels || {};
+        reviews = {
+            average: reviewsRaw.rating_average != null ? reviewsRaw.rating_average : null,
+            total: Object.values(levels).reduce((acc, n) => acc + (n || 0), 0),
+            levels,
+            latest: (reviewsRaw.reviews || [])
+                .slice(0, 3)
+                .map((r) => ({ rate: r.rate, title: r.title || null, content: r.content || null, date: r.date_created || null })),
+        };
+    }
+
+    const descriptionText = description ? (description.plain_text || description.text || '') : '';
+
+    res.json({
+        item: {
+            id: item.id,
+            title: item.title || '',
+            price: item.price,
+            categoryId: item.category_id || null,
+            permalink: item.permalink || null,
+            thumbnail: item.secure_thumbnail || item.thumbnail || null,
+            condition: item.condition || null,
+            listingTypeId: item.listing_type_id || null,
+            availableQuantity: item.available_quantity != null ? item.available_quantity : null,
+            soldQuantity: item.sold_quantity != null ? item.sold_quantity : null,
+            warranty: item.warranty || null,
+            pictureCount: (item.pictures || []).length,
+            hasVideo: !!item.video_id,
+            freeShipping: !!(item.shipping && item.shipping.free_shipping),
+            catalogListing: !!item.catalog_listing,
+            tags: item.tags || [],
+        },
+        description: { present: descriptionText.trim().length > 0, length: descriptionText.trim().length },
+        attributes: itemAttributes,
+        categoryFields,
+        visits,
+        reviews,
+        sales,
+    });
+}
+
 module.exports = async (req, res) => {
     const userId = await getVerifiedUserId(req);
     if (!userId) return res.status(401).json({ error: 'Sessão inválida ou expirada. Faça login novamente.' });
@@ -211,7 +450,8 @@ module.exports = async (req, res) => {
             case 'item': return await handleItem(req, res, userId);
             case 'bestseller': return await handleBestSeller(req, res, userId);
             case 'performance': return await handlePerformance(req, res, userId);
-            default: return res.status(400).json({ error: 'Parâmetro action inválido. Use category, fee, item, bestseller ou performance.' });
+            case 'analise': return await handleAnalise(req, res, userId);
+            default: return res.status(400).json({ error: 'Parâmetro action inválido. Use category, fee, item, bestseller, performance ou analise.' });
         }
     } catch (err) {
         res.status(500).json({ error: err.message });

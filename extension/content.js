@@ -76,17 +76,19 @@
     }
 
     // ---------------------------------------------------------------------
-    // ANÁLISE DE TÍTULO / MARCA / MODELO
+    // ANÁLISE DE TÍTULO E ATRIBUTOS
     //
-    // O Mercado Livre indexa só os ~30 primeiros caracteres dos campos Marca
-    // e Modelo. Como esses campos entram na busca junto com o título, repetir
-    // neles uma palavra que já está no título desperdiça esse espaço — o
-    // ideal é usar termos complementares (sinônimos, uso, compatibilidade)
-    // que ampliem por quantas buscas diferentes o anúncio pode ser achado.
+    // O Mercado Livre indexa só os ~30 primeiros caracteres de cada campo da
+    // ficha técnica. Como esses campos entram na busca junto com o título,
+    // repetir neles uma palavra que já está no título desperdiça esse espaço
+    // — o ideal é usar termos complementares (sinônimos, uso,
+    // compatibilidade) que ampliem por quantas buscas diferentes o anúncio
+    // pode ser achado.
     //
-    // Isso é lido da própria página, então funciona em qualquer anúncio,
-    // inclusive de concorrente — diferente da API oficial de qualidade, que
-    // só responde para anúncios da sua própria conta.
+    // Os dados analisados vêm da API (action=analise), não da página: a
+    // análise é uma auditoria dos anúncios da própria conta, e a API entrega
+    // todos os atributos com o valor exato — a página mostra só parte deles,
+    // já formatada pra leitura.
     // ---------------------------------------------------------------------
     const ATTR_INDEXED_CHARS = 30;
     const TITLE_MAX_CHARS = 60;
@@ -114,101 +116,94 @@
             .filter((w) => w.length > 1 && !STOPWORDS.has(w));
     }
 
-    // Lê os atributos da ficha técnica (Marca, Modelo e afins) da página.
-    function extractListingAttributes() {
-        const specs = {};
-        document.querySelectorAll('table tr, .andes-table__row').forEach((row) => {
-            const cells = row.querySelectorAll('th, td');
-            if (cells.length >= 2) {
-                const key = cells[0].textContent.trim().toLowerCase();
-                const value = cells[1].textContent.trim();
-                if (key && value) specs[key] = value;
+    // O ML remove ou penaliza título com apelo publicitário: o campo é pra
+    // descrever o produto (o que é + marca + modelo + especificação), não pra
+    // vender. Termos daqui costumam voltar como moderação ou simplesmente
+    // ocupam espaço que renderia mais se fosse termo de busca.
+    const PROMO_TERMS = [
+        'promocao', 'promocional', 'oferta', 'ofertao', 'desconto', 'liquidacao',
+        'imperdivel', 'barato', 'baratissimo', 'gratis', 'brinde', 'aproveite',
+        'compreja', 'novidade', 'exclusivo', 'semjuros', 'parcelado',
+    ];
+    // Expressões de duas palavras, checadas no título normalizado inteiro.
+    const PROMO_PHRASES = [
+        ['frete', 'gratis'], ['melhor', 'preco'], ['mais', 'barato'],
+        ['ultimas', 'unidades'], ['envio', 'imediato'], ['pronta', 'entrega'],
+        ['sem', 'juros'], ['menor', 'preco'],
+    ];
+
+    // Título curto demais desperdiça espaço de busca: o ML indexa os 60
+    // caracteres e cada palavra a mais é uma busca a mais em que o anúncio
+    // pode aparecer. Abaixo disso a recomendação do próprio ML é completar.
+    const TITLE_MIN_RECOMMENDED = 50;
+
+    function detectPromoTerms(title) {
+        const words = String(title)
+            .split(/[\s/,\-–—_+.]+/)
+            .map(normalizeWord)
+            .filter(Boolean);
+        const wordSet = new Set(words);
+
+        const found = PROMO_TERMS.filter((t) => wordSet.has(t));
+
+        // "frete grátis" casa com a expressão e também com o termo solto
+        // "gratis". Guardamos as palavras já cobertas por uma expressão pra
+        // não apontar o mesmo problema duas vezes na tela.
+        const cobertasPorFrase = new Set();
+        PROMO_PHRASES.forEach(([a, b]) => {
+            for (let i = 0; i < words.length - 1; i += 1) {
+                if (words[i] === a && words[i + 1] === b) {
+                    found.push(`${a} ${b}`);
+                    cobertasPorFrase.add(a);
+                    cobertasPorFrase.add(b);
+                    break;
+                }
             }
         });
-        // Layout de "ficha técnica" em lista (chave/valor em elementos irmãos)
-        document.querySelectorAll('.ui-pdp-specs__table tr, .ui-vpp-highlighted-specs__key-value').forEach((row) => {
-            const text = row.textContent.trim();
-            const m = text.match(/^([^:]{2,30}):\s*(.+)$/);
-            if (m) {
-                const key = m[1].trim().toLowerCase();
-                if (!specs[key]) specs[key] = m[2].trim();
-            }
-        });
 
-        const find = (names) => {
-            for (const [key, value] of Object.entries(specs)) {
-                if (names.some((n) => key === n || key.startsWith(n))) return value;
-            }
-            return null;
-        };
-
-        return {
-            brand: find(['marca']),
-            model: find(['modelo']),
-        };
+        return [...new Set(found)].filter((t) => t.includes(' ') || !cobertasPorFrase.has(t));
     }
 
-    // Avalia um campo de atributo (Marca/Modelo) contra o título.
-    function analyzeAttributeField(label, value, titleWords) {
-        if (!value) {
-            return {
-                label,
-                filled: false,
-                text: null,
-                used: 0,
-                remaining: ATTR_INDEXED_CHARS,
-                repeated: [],
-                wastedChars: 0,
-            };
-        }
-
-        const indexedPart = value.slice(0, ATTR_INDEXED_CHARS);
-        const words = toWordSet(indexedPart);
-        const titleSet = new Set(titleWords);
-        const repeated = [...new Set(words.filter((w) => titleSet.has(w)))];
-
-        // Quantos dos caracteres indexados estão sendo gastos repetindo o
-        // título (aproximação por soma do tamanho das palavras repetidas).
-        const wastedChars = repeated.reduce((sum, w) => sum + w.length, 0);
-
-        return {
-            label,
-            filled: true,
-            text: value,
-            truncated: value.length > ATTR_INDEXED_CHARS,
-            used: Math.min(value.length, ATTR_INDEXED_CHARS),
-            remaining: Math.max(0, ATTR_INDEXED_CHARS - value.length),
-            repeated,
-            wastedChars,
-        };
+    // Palavra inteira em maiúscula não melhora a busca (o ML normaliza) e o
+    // excesso deixa o título com cara de spam. Uma ou outra sigla é normal,
+    // por isso só apontamos a partir de três.
+    function detectShoutingWords(title) {
+        return String(title)
+            .split(/\s+/)
+            .filter((w) => w.length > 3 && w === w.toUpperCase() && /[A-ZÀ-Ý]/.test(w));
     }
 
-    function analyzeListingText(pageData) {
-        const title = pageData.title || '';
-        const titleWords = toWordSet(title);
-        const attrs = extractListingAttributes();
+    function analyzeTitle(title) {
+        const text = String(title || '');
+        const titleWords = toWordSet(text);
 
-        const brand = analyzeAttributeField('Marca', attrs.brand, titleWords);
-        const model = analyzeAttributeField('Modelo', attrs.model, titleWords);
-
-        // Palavras repetidas dentro do próprio título também desperdiçam
-        // espaço dos 60 caracteres.
+        // Palavras repetidas dentro do próprio título desperdiçam espaço dos
+        // 60 caracteres.
         const seen = new Set();
-        const titleDuplicates = [];
+        const duplicates = [];
         titleWords.forEach((w) => {
-            if (seen.has(w) && !titleDuplicates.includes(w)) titleDuplicates.push(w);
+            if (seen.has(w) && !duplicates.includes(w)) duplicates.push(w);
             seen.add(w);
         });
 
+        const promoTerms = detectPromoTerms(text);
+        const shouting = detectShoutingWords(text);
+
         return {
-            title: {
-                text: title,
-                length: title.length,
-                max: TITLE_MAX_CHARS,
-                tooLong: title.length > TITLE_MAX_CHARS,
-                duplicates: titleDuplicates,
-            },
-            fields: [brand, model],
+            text,
+            words: titleWords,
+            length: text.length,
+            max: TITLE_MAX_CHARS,
+            min: TITLE_MIN_RECOMMENDED,
+            tooLong: text.length > TITLE_MAX_CHARS,
+            tooShort: text.length > 0 && text.length < TITLE_MIN_RECOMMENDED,
+            duplicates,
+            promoTerms,
+            shouting: shouting.length >= 3 ? shouting : [],
+            clean: text.length <= TITLE_MAX_CHARS
+                && text.length >= TITLE_MIN_RECOMMENDED
+                && duplicates.length === 0
+                && promoTerms.length === 0,
         };
     }
 
@@ -310,54 +305,493 @@
         return null;
     }
 
-    // Renderiza a parte da análise que é calculada aqui mesmo, a partir do
-    // texto da página — funciona em qualquer anúncio, sem depender da API.
-    function renderTextAnalysis(analysis) {
-        const t = analysis.title;
-        const titleClass = t.tooLong ? 'impoclick-an-warn' : 'impoclick-an-ok';
+    function renderTitleFindings(t) {
+        const problema = t.tooLong || t.tooShort || t.duplicates.length || t.promoTerms.length || t.shouting.length;
+        const cls = problema ? 'impoclick-an-warn' : 'impoclick-an-ok';
 
-        const fieldsHtml = analysis.fields.map((f) => {
-            if (!f.filled) {
-                return `
-                    <div class="impoclick-an-item impoclick-an-warn">
-                        <strong>${escapeHtml(f.label)}: não preenchido</strong>
-                        <p>Preencher esse campo adiciona até ${ATTR_INDEXED_CHARS} caracteres indexados na busca. Deixar vazio joga fora esse espaço.</p>
-                    </div>
-                `;
+        const barPct = Math.min(100, Math.round((t.length / t.max) * 100));
+        const barClass = t.tooLong ? 'impoclick-bar-bad' : (t.tooShort ? 'impoclick-bar-warn' : 'impoclick-bar-good');
+
+        const avisos = [];
+        if (t.tooLong) {
+            avisos.push(`<p>Passou de ${t.max} caracteres — o excedente pode ser cortado na exibição.</p>`);
+        } else if (t.tooShort) {
+            avisos.push(`<p>Abaixo dos ${t.min} caracteres recomendados. Sobram ${t.max - t.length} caracteres indexáveis sem uso — cada palavra a mais é uma busca a mais em que o anúncio pode aparecer.</p>`);
+        }
+        if (t.duplicates.length) {
+            avisos.push(`<p>Palavras repetidas dentro do próprio título: <strong>${t.duplicates.map(escapeHtml).join(', ')}</strong>.</p>`);
+        }
+        if (t.promoTerms.length) {
+            avisos.push(`<p>Termos promocionais no título: <strong>${t.promoTerms.map(escapeHtml).join(', ')}</strong>. O ML modera esse tipo de apelo e o espaço rende mais com termo de busca.</p>`);
+        }
+        if (t.shouting.length) {
+            avisos.push(`<p>${t.shouting.length} palavras em CAIXA ALTA. A busca do ML ignora maiúsculas — não ajuda no ranqueamento e deixa o título com cara de spam.</p>`);
+        }
+        if (!avisos.length) avisos.push('<p>Tamanho, palavras e linguagem dentro do recomendado.</p>');
+
+        return `
+            <div class="impoclick-an-item ${cls}">
+                <strong>Título: ${t.length}/${t.max} caracteres</strong>
+                <div class="impoclick-bar"><span class="${barClass}" style="width:${barPct}%"></span></div>
+                ${avisos.join('')}
+            </div>
+        `;
+    }
+
+    // =====================================================================
+    // ANÁLISE COMPLETA (dados vindos da API do ML, via action=analise)
+    //
+    // A análise acima lê a página e serve pra qualquer anúncio. Esta aqui
+    // usa os dados reais do anúncio na API — o que permite auditar coisas
+    // que a página não mostra: quais campos a categoria espera e estão
+    // vazios, tags de moderação, visitas por dia, vendas do período.
+    // Em troca, só funciona nos anúncios da conta conectada.
+    // =====================================================================
+
+    // Tradução das tags que o ML devolve no item. As desconhecidas caem no
+    // fallback como neutras — a lista do ML muda com o tempo e é melhor
+    // mostrar a tag crua do que esconder informação.
+    const TAG_INFO = {
+        good_quality_picture: { label: 'As fotos do anúncio são de boa qualidade', kind: 'good' },
+        good_quality_thumbnail: { label: 'A foto principal (miniatura) do anúncio é de boa qualidade', kind: 'good' },
+        poor_quality_picture: { label: 'Fotos em baixa qualidade — trocar por imagens maiores', kind: 'bad' },
+        poor_quality_thumbnail: { label: 'Foto principal (miniatura) em baixa qualidade', kind: 'bad' },
+        incomplete_technical_specs: { label: 'Ficha técnica incompleta — o anúncio está perdendo exposição nas listagens', kind: 'bad' },
+        catalog_listing_eligible: { label: 'Elegível para competir no catálogo', kind: 'good' },
+        best_seller_candidate: { label: 'Candidato a mais vendido da categoria', kind: 'good' },
+        brand_verified: { label: 'Marca verificada', kind: 'good' },
+        deal_of_the_day: { label: 'Participando da oferta do dia', kind: 'good' },
+        lightning_deal: { label: 'Participando de oferta relâmpago', kind: 'good' },
+        immediate_payment: { label: 'Pagamento deve ser feito imediatamente', kind: 'neutral' },
+        cart_eligible: { label: 'O produto pode ser adicionado ao carrinho de compras', kind: 'neutral' },
+        standard_price_by_quantity: { label: 'Preço padrão por quantidade', kind: 'neutral' },
+        user_product_listing: { label: 'Anúncio vinculado a um produto do vendedor', kind: 'neutral' },
+        dragged_bids_and_visits: { label: 'Herdou visitas e vendas de um anúncio republicado', kind: 'neutral' },
+        free_relist: { label: 'Republicação gratuita', kind: 'neutral' },
+        extended_warranty_eligible: { label: 'Elegível para garantia estendida', kind: 'neutral' },
+        shipping_guaranteed: { label: 'Envio garantido pelo Mercado Livre', kind: 'neutral' },
+    };
+
+    function classifyTags(tags) {
+        const groups = { good: [], bad: [], neutral: [] };
+        (tags || []).forEach((tag) => {
+            const info = TAG_INFO[tag] || { label: tag.replace(/_/g, ' '), kind: 'neutral' };
+            groups[info.kind].push(info.label);
+        });
+        return groups;
+    }
+
+    // Analisa TODOS os atributos preenchidos, não só Marca e Modelo. Além da
+    // repetição com o título (que a versão da página já fazia), aqui dá pra
+    // cruzar os atributos entre si: repetir a mesma palavra em "Marcas
+    // compatíveis" e "Modelos compatíveis" gasta duas vezes o mesmo espaço
+    // indexado sem ampliar por quantas buscas o anúncio é encontrado.
+    function analyzeAttributeSet(attributes, titleWords) {
+        const titleSet = new Set(titleWords);
+
+        const enriched = (attributes || []).map((a) => ({
+            id: a.id,
+            name: a.name,
+            value: String(a.value || ''),
+            words: toWordSet(String(a.value || '').slice(0, ATTR_INDEXED_CHARS)),
+        }));
+
+        return enriched.map((a) => {
+            const repeated = [...new Set(a.words.filter((w) => titleSet.has(w)))];
+
+            const duplicates = [];
+            enriched.forEach((other) => {
+                if (other.id === a.id) return;
+                const otherSet = new Set(other.words);
+                const shared = [...new Set(a.words.filter((w) => otherSet.has(w)))];
+                if (shared.length) duplicates.push({ name: other.name, words: shared });
+            });
+
+            const truncated = a.value.length > ATTR_INDEXED_CHARS;
+
+            return {
+                id: a.id,
+                name: a.name,
+                value: a.value,
+                truncated,
+                repeated,
+                wastedChars: repeated.reduce((sum, w) => sum + w.length, 0),
+                duplicates,
+                clean: !truncated && repeated.length === 0 && duplicates.length === 0,
+            };
+        });
+    }
+
+    function pctChange(current, previous) {
+        if (!previous) return null;
+        return ((current - previous) / previous) * 100;
+    }
+
+    function formatPct(value, digits = 1) {
+        if (value == null) return '—';
+        const sign = value > 0 ? '+' : '';
+        return `${sign}${value.toFixed(digits)}%`;
+    }
+
+    // Monta a lista de verificações e a nota. Os pesos somam 100 quando
+    // todas as verificações se aplicam; quando alguma não se aplica (anúncio
+    // sem avaliação ainda, categoria sem ficha técnica), ela sai da conta e
+    // a nota é normalizada pelo peso do que sobrou — assim um anúncio novo
+    // não é punido por não ter avaliação nenhuma.
+    function buildAudit(data, titleAnalysis, attrAnalysis) {
+        const item = data.item;
+        const checks = [];
+
+        checks.push({
+            ok: titleAnalysis.clean,
+            weight: 15,
+            label: titleAnalysis.clean ? 'Título otimizado' : 'Título pode melhorar',
+        });
+
+        checks.push({
+            ok: data.description.present,
+            weight: 10,
+            label: data.description.present ? 'Descrição presente' : 'Sem descrição',
+        });
+
+        const fotosOk = item.pictureCount >= 6;
+        checks.push({
+            ok: fotosOk,
+            weight: 10,
+            label: `${item.pictureCount} foto${item.pictureCount === 1 ? '' : 's'}`,
+            detail: fotosOk ? null : 'O ML aceita até 10 fotos e usa a quantidade como sinal de qualidade. Abaixo de 6 você perde exposição.',
+        });
+
+        checks.push({
+            ok: item.hasVideo,
+            weight: 5,
+            label: item.hasVideo ? 'Tem vídeo' : 'Sem vídeo',
+            detail: item.hasVideo ? null : 'Anúncio com vídeo converte mais e o ML trata como objetivo de qualidade.',
+        });
+
+        checks.push({
+            ok: !!item.warranty,
+            weight: 5,
+            label: item.warranty ? 'Garantia informada' : 'Garantia não informada',
+        });
+
+        if (data.categoryFields) {
+            const cf = data.categoryFields;
+            const complete = cf.missing.length === 0;
+            checks.push({
+                ok: complete,
+                partial: cf.total ? cf.filled / cf.total : 1,
+                weight: 20,
+                label: complete
+                    ? `${cf.total} campos da categoria preenchidos`
+                    : `${cf.missing.length} campo${cf.missing.length === 1 ? '' : 's'} da categoria faltando`,
+            });
+        }
+
+        const sujos = attrAnalysis.filter((a) => !a.clean);
+        checks.push({
+            ok: sujos.length === 0,
+            weight: 15,
+            label: sujos.length === 0
+                ? `${attrAnalysis.length} atributos sem repetição`
+                : `${sujos.length} atributo${sujos.length === 1 ? '' : 's'} desperdiçando espaço`,
+        });
+
+        const tags = classifyTags(item.tags);
+        checks.push({
+            ok: tags.bad.length === 0,
+            weight: 5,
+            label: tags.bad.length === 0 ? 'Sem tags negativas' : `${tags.bad.length} tag${tags.bad.length === 1 ? '' : 's'} de atenção`,
+        });
+
+        if (data.reviews && data.reviews.total > 0) {
+            checks.push({
+                ok: data.reviews.average >= 4,
+                weight: 5,
+                label: `Avaliações: ${data.reviews.average.toFixed(1)} estrelas`,
+            });
+        }
+
+        if (data.visits && (data.visits.prev15 > 0 || data.visits.last15 > 0)) {
+            const change = pctChange(data.visits.last15, data.visits.prev15);
+            const subindo = data.visits.last15 >= data.visits.prev15;
+            checks.push({
+                ok: subindo,
+                weight: 10,
+                label: change == null
+                    ? `Visitas: ${data.visits.last15} em 15 dias`
+                    : `Visitas ${subindo ? 'subindo' : 'caindo'} (${formatPct(change, 0)})`,
+            });
+        }
+
+        const totalWeight = checks.reduce((sum, c) => sum + c.weight, 0);
+        const earned = checks.reduce((sum, c) => {
+            const ratio = c.partial != null ? c.partial : (c.ok ? 1 : 0);
+            return sum + c.weight * ratio;
+        }, 0);
+        const score = totalWeight ? Math.round((earned / totalWeight) * 100) : 0;
+
+        let classe;
+        if (score >= 85) classe = { letra: 'A', texto: 'EXCELENTE' };
+        else if (score >= 65) classe = { letra: 'B', texto: 'TEM POTENCIAL' };
+        else if (score >= 45) classe = { letra: 'C', texto: 'PRECISA MELHORAR' };
+        else classe = { letra: 'D', texto: 'CRÍTICO' };
+
+        // Problemas primeiro — é a ordem em que o vendedor deve atacar.
+        checks.sort((a, b) => (a.ok === b.ok ? b.weight - a.weight : (a.ok ? 1 : -1)));
+
+        return { checks, score, classe, tags };
+    }
+
+    function renderScoreBlock(audit) {
+        const cls = audit.score >= 85 ? 'impoclick-good' : (audit.score >= 65 ? 'impoclick-warn' : 'impoclick-bad');
+        return `
+            <div class="impoclick-score">
+                <div class="impoclick-score-value ${cls}">${audit.score}<span>/100</span></div>
+                <div class="impoclick-score-class">Classe ${audit.classe.letra}: ${audit.classe.texto}</div>
+            </div>
+        `;
+    }
+
+    function renderChecklist(audit) {
+        const linhas = audit.checks.map((c) => `
+            <div class="impoclick-check ${c.ok ? 'impoclick-check-ok' : 'impoclick-check-bad'}">
+                <span class="impoclick-check-icon">${c.ok ? '✓' : '✗'}</span>
+                <span class="impoclick-check-label">${escapeHtml(c.label)}</span>
+            </div>
+            ${!c.ok && c.detail ? `<p class="impoclick-note impoclick-check-detail">${escapeHtml(c.detail)}</p>` : ''}
+        `).join('');
+
+        return `
+            <div class="impoclick-an-block-title">O que melhorar</div>
+            ${linhas}
+        `;
+    }
+
+    function renderAttributeAudit(attrAnalysis) {
+        if (!attrAnalysis.length) {
+            return `
+                <div class="impoclick-an-block-title">Ficha técnica</div>
+                <p class="impoclick-text">Nenhum atributo preenchido neste anúncio.</p>
+            `;
+        }
+
+        const problemas = attrAnalysis.filter((a) => !a.clean);
+        const okCount = attrAnalysis.length - problemas.length;
+
+        const blocos = problemas.map((a) => {
+            const linhas = [];
+            if (a.truncated) {
+                linhas.push(`<p>Tem ${a.value.length} caracteres, mas o ML indexa só os primeiros ${ATTR_INDEXED_CHARS} — o resto não entra na busca.</p>`);
             }
-
-            const temRepetido = f.repeated.length > 0;
-            const cls = temRepetido ? 'impoclick-an-warn' : 'impoclick-an-ok';
-            const repetidoHtml = temRepetido
-                ? `<p>Repete o título em: <strong>${f.repeated.map(escapeHtml).join(', ')}</strong> — cerca de ${f.wastedChars} caracteres desperdiçados. Troque por termos que o título ainda não tem (sinônimos, uso, compatibilidade).</p>`
-                : '<p>Nenhuma palavra repetida do título. Esse campo está somando buscas novas.</p>';
-            const truncHtml = f.truncated
-                ? `<p class="impoclick-note">O texto tem ${f.text.length} caracteres, mas o ML indexa só os ${ATTR_INDEXED_CHARS} primeiros — o resto não conta na busca.</p>`
-                : (f.remaining > 0 ? `<p class="impoclick-note">Sobram ${f.remaining} caracteres indexáveis nesse campo.</p>` : '');
+            if (a.repeated.length) {
+                linhas.push(`<p>Repete o título em: <strong>${a.repeated.map(escapeHtml).join(', ')}</strong> — cerca de ${a.wastedChars} caracteres desperdiçados.</p>`);
+            }
+            a.duplicates.forEach((d) => {
+                linhas.push(`<p>Duplica com <strong>${escapeHtml(d.name)}</strong>: ${d.words.map(escapeHtml).join(', ')}</p>`);
+            });
 
             return `
-                <div class="impoclick-an-item ${cls}">
-                    <strong>${escapeHtml(f.label)}: ${escapeHtml(f.text)}</strong>
-                    ${repetidoHtml}
-                    ${truncHtml}
+                <div class="impoclick-an-item impoclick-an-warn">
+                    <strong>${escapeHtml(a.name)}</strong>
+                    <p class="impoclick-attr-value">${escapeHtml(a.value)}</p>
+                    ${linhas.join('')}
                 </div>
             `;
         }).join('');
 
-        const dupHtml = t.duplicates.length
-            ? `<p>Palavras repetidas dentro do próprio título: <strong>${t.duplicates.map(escapeHtml).join(', ')}</strong>.</p>`
-            : '';
+        return `
+            <div class="impoclick-an-block-title">Ficha técnica · ${attrAnalysis.length} atributos</div>
+            ${problemas.length
+                ? `<p class="impoclick-note">${problemas.length} com atenção · ${okCount} sem problema</p>${blocos}`
+                : '<div class="impoclick-an-item impoclick-an-ok"><strong>Todos os atributos estão bem aproveitados</strong><p>Nenhum repete o título nem outro campo.</p></div>'}
+        `;
+    }
+
+    function renderCategoryFields(cf) {
+        if (!cf) return '';
+
+        if (!cf.missing.length) {
+            return `
+                <div class="impoclick-an-block-title">Campos da categoria · ${cf.total}</div>
+                <div class="impoclick-an-item impoclick-an-ok">
+                    <strong>Todos os campos preenchidos</strong>
+                    <p>A categoria não espera nenhum dado que esteja faltando.</p>
+                </div>
+            `;
+        }
+
+        // Os obrigatórios primeiro: são os que efetivamente derrubam a
+        // posição do anúncio nas listagens.
+        const ordenados = [...cf.missing].sort((a, b) => (a.required === b.required ? 0 : (a.required ? -1 : 1)));
+        const chips = ordenados.map((f) => `
+            <span class="impoclick-field-chip ${f.required ? 'impoclick-field-required' : ''}">${escapeHtml(f.name)}</span>
+        `).join('');
+        const obrigatorios = ordenados.filter((f) => f.required).length;
 
         return `
-            <div class="impoclick-an-block">
-                <div class="impoclick-an-block-title">Título e atributos</div>
-                <div class="impoclick-an-item ${titleClass}">
-                    <strong>Título: ${t.length}/${t.max} caracteres</strong>
-                    ${t.tooLong ? `<p>Passou de ${t.max} caracteres — o excedente pode ser cortado na exibição.</p>` : '<p>Tamanho dentro do limite.</p>'}
-                    ${dupHtml}
-                </div>
-                ${fieldsHtml}
+            <div class="impoclick-an-block-title">Campos da categoria · ${cf.filled}/${cf.total}</div>
+            <div class="impoclick-an-item impoclick-an-warn">
+                <strong>${cf.missing.length} campos não preenchidos</strong>
+                <p>${obrigatorios > 0
+                    ? `${obrigatorios} ${obrigatorios === 1 ? 'é obrigatório' : 'são obrigatórios'} nesta categoria (marcados em vermelho). Campo vazio é filtro de busca em que o anúncio não aparece.`
+                    : 'Cada campo vazio é um filtro de busca em que o anúncio não aparece.'}</p>
+                <div class="impoclick-field-chips">${chips}</div>
             </div>
+        `;
+    }
+
+    function renderTagsBlock(tags) {
+        const total = tags.good.length + tags.bad.length + tags.neutral.length;
+        if (!total) return '';
+
+        const linha = (lista, cls) => lista.map((t) => `<span class="impoclick-tag ${cls}">${escapeHtml(t)}</span>`).join('');
+
+        return `
+            <div class="impoclick-an-block-title">Tags ativas · ${total}</div>
+            <div class="impoclick-tag-list">
+                ${linha(tags.bad, 'impoclick-tag-bad')}
+                ${linha(tags.good, 'impoclick-tag-good')}
+                ${linha(tags.neutral, 'impoclick-tag-neutral')}
+            </div>
+        `;
+    }
+
+    function renderVisitsBlock(visits) {
+        if (!visits) return '';
+
+        const max = Math.max(...visits.daily.map((d) => d.total), 1);
+        const barras = visits.daily.map((d) => {
+            const dia = d.date ? d.date.slice(8, 10) + '/' + d.date.slice(5, 7) : '';
+            return `<span class="impoclick-spark-bar" style="height:${Math.max(3, Math.round((d.total / max) * 100))}%" title="${dia}: ${d.total} visitas"></span>`;
+        }).join('');
+
+        const linha = (rotulo, atual, anterior) => {
+            const change = pctChange(atual, anterior);
+            const cls = change == null ? '' : (change >= 0 ? 'impoclick-up' : 'impoclick-down');
+            return `
+                <div class="impoclick-breakdown-row">
+                    <span>${rotulo}</span>
+                    <strong>${atual} <span class="${cls}">${formatPct(change)}</span></strong>
+                </div>
+            `;
+        };
+
+        return `
+            <div class="impoclick-an-block-title">Visitas · últimos 30 dias</div>
+            <div class="impoclick-spark">${barras}</div>
+            <div class="impoclick-breakdown">
+                ${linha('Últimos 7 dias', visits.last7, visits.prev7)}
+                ${linha('Últimos 15 dias', visits.last15, visits.prev15)}
+                <div class="impoclick-breakdown-row impoclick-breakdown-subtotal">
+                    <span>Total em 30 dias</span>
+                    <strong>${visits.total30}</strong>
+                </div>
+            </div>
+        `;
+    }
+
+    // Estoque, ritmo de venda e o quanto vale mexer na conversão. São os
+    // números que respondem "o que fazer com esse anúncio agora".
+    function renderNumbersBlock(data) {
+        const { item, sales, visits } = data;
+        if (!sales && !visits) return '';
+
+        const linhas = [];
+
+        if (sales) {
+            const porDia = sales.sold / sales.days;
+            linhas.push(`
+                <div class="impoclick-breakdown-row">
+                    <span>Vendas em ${sales.days} dias</span>
+                    <strong>${sales.sold} un.${sales.partial ? ' *' : ''}</strong>
+                </div>
+            `);
+
+            if (item.availableQuantity != null) {
+                if (porDia > 0) {
+                    const dias = Math.floor(item.availableQuantity / porDia);
+                    const critico = dias <= 15;
+                    linhas.push(`
+                        <div class="impoclick-breakdown-row ${critico ? 'impoclick-breakdown-minus' : ''}">
+                            <span>Estoque acaba em</span>
+                            <strong>~${dias} dias (${item.availableQuantity} un.)</strong>
+                        </div>
+                    `);
+                } else {
+                    linhas.push(`
+                        <div class="impoclick-breakdown-row">
+                            <span>Estoque</span>
+                            <strong>${item.availableQuantity} un. · sem venda no período</strong>
+                        </div>
+                    `);
+                }
+            }
+        }
+
+        if (visits && visits.total30 > 0 && sales) {
+            const conversao = (sales.sold / visits.total30) * 100;
+            // Quanto entra por mês a cada 0,1 ponto percentual a mais de
+            // conversão, mantendo as visitas de hoje. Serve pra comparar o
+            // esforço de melhorar o anúncio com o de buscar mais tráfego.
+            const ganho = visits.total30 * 0.001 * (item.price || 0);
+            linhas.push(`
+                <div class="impoclick-breakdown-row">
+                    <span>Conversão (30 dias)</span>
+                    <strong>${conversao.toFixed(2)}%</strong>
+                </div>
+                <div class="impoclick-breakdown-row impoclick-breakdown-subtotal">
+                    <span>Cada +0,1% de conversão</span>
+                    <strong>${formatBRL(ganho)}/mês</strong>
+                </div>
+            `);
+        }
+
+        if (!linhas.length) return '';
+
+        return `
+            <div class="impoclick-an-block-title">Números do anúncio</div>
+            <div class="impoclick-breakdown">${linhas.join('')}</div>
+            ${sales && sales.partial ? '<p class="impoclick-note">* A conta parou nos primeiros pedidos do período para não estourar o tempo da consulta — o total real pode ser maior.</p>' : ''}
+        `;
+    }
+
+    function renderReviewsBlock(reviews) {
+        if (!reviews || !reviews.total) return '';
+
+        const estrelas = '★'.repeat(Math.round(reviews.average)) + '☆'.repeat(5 - Math.round(reviews.average));
+        const ultimas = reviews.latest.map((r) => `
+            <div class="impoclick-review">
+                <span class="impoclick-review-stars">${'★'.repeat(r.rate)}</span>
+                ${r.content ? `<p>${escapeHtml(r.content.slice(0, 140))}${r.content.length > 140 ? '…' : ''}</p>` : ''}
+            </div>
+        `).join('');
+
+        return `
+            <div class="impoclick-an-block-title">Avaliações</div>
+            <div class="impoclick-an-item">
+                <strong>${reviews.average.toFixed(1)} ${estrelas} · ${reviews.total} ${reviews.total === 1 ? 'opinião' : 'opiniões'}</strong>
+                ${ultimas}
+            </div>
+        `;
+    }
+
+    function renderFullAnalysis(data) {
+        const titleAnalysis = analyzeTitle(data.item.title);
+        const attrAnalysis = analyzeAttributeSet(data.attributes, titleAnalysis.words);
+        const audit = buildAudit(data, titleAnalysis, attrAnalysis);
+
+        return `
+            ${renderScoreBlock(audit)}
+            ${renderChecklist(audit)}
+            ${renderNumbersBlock(data)}
+            ${renderVisitsBlock(data.visits)}
+            <div class="impoclick-an-block-title">Título</div>
+            ${renderTitleFindings(titleAnalysis)}
+            ${renderAttributeAudit(attrAnalysis)}
+            ${renderCategoryFields(data.categoryFields)}
+            ${renderTagsBlock(audit.tags)}
+            ${renderReviewsBlock(data.reviews)}
         `;
     }
 
@@ -390,16 +824,69 @@
         `;
     }
 
-    // Monta o conteúdo da aba "Análise" (separada da Viabilidade).
-    function renderAnalyzeTab(pageData) {
+    function mensagemDeErroAnalise(resp) {
+        if (resp.error === 'not_logged_in') {
+            return 'Faça login na extensão para a análise completa.';
+        }
+        if (resp.error === 'not_own_item') {
+            return 'Este anúncio não é da conta do Mercado Livre conectada. A análise audita os seus próprios anúncios — a API do ML não libera ficha técnica, visitas e vendas de anúncios de terceiros.';
+        }
+        return resp.message || 'Não foi possível fazer a análise completa agora.';
+    }
+
+    // Monta a aba "Análise" (separada da Viabilidade). É chamada assim que o
+    // painel existe, ANTES de qualquer consulta de rede — antes disso a aba
+    // ficava em branco enquanto a Viabilidade carregava a taxa, e ficava em
+    // branco pra sempre em quem não estava logado.
+    //
+    // A análise é uma auditoria dos anúncios da PRÓPRIA conta: todos os
+    // dados vêm da API do ML, que só responde sobre os itens do vendedor
+    // autenticado. Em anúncio de terceiro a resposta é uma explicação, não
+    // uma análise pela metade.
+    function setupAnalyzeTab(pageData, loggedIn) {
         const pane = document.getElementById('impoclick-panel-analise');
         if (!pane) return;
+
+        if (!loggedIn) {
+            pane.innerHTML = `
+                <p class="impoclick-text">A análise audita os anúncios da sua conta: título, ficha técnica, campos da categoria, fotos, tags, visitas, vendas e avaliações.</p>
+                <p class="impoclick-text">Clique no ícone da extensão <strong>Impoclick</strong> na barra do navegador para entrar.</p>
+            `;
+            return;
+        }
+
         pane.innerHTML = `
             ${pageData.title ? `<p class="impoclick-item-title">${escapeHtml(pageData.title)}</p>` : ''}
-            <p class="impoclick-text">Verifica o que pode ser melhorado neste anúncio: aproveitamento do título, dos campos Marca e Modelo, e os objetivos de qualidade do próprio Mercado Livre.</p>
-            <button id="impoclick-analyze-btn" class="impoclick-btn">Analisar erros e melhorias</button>
+            <p class="impoclick-text">Audita este anúncio: título, ficha técnica, campos da categoria, fotos, tags, visitas, vendas e avaliações.</p>
+            <button id="impoclick-analyze-btn" class="impoclick-btn">Analisar anúncio</button>
             <div id="impoclick-analyze-result"></div>
         `;
+
+        document.getElementById('impoclick-analyze-btn').addEventListener('click', async () => {
+            const el = document.getElementById('impoclick-analyze-result');
+
+            const itemId = extractItemId();
+            if (!itemId) {
+                el.innerHTML = '<p class="impoclick-text impoclick-error">Não consegui identificar o código do anúncio nesta página.</p>';
+                return;
+            }
+
+            el.innerHTML = '<p class="impoclick-text">Consultando os dados do anúncio no Mercado Livre...</p>';
+
+            const [analiseResp, perfResp] = await Promise.all([
+                sendMessage({ type: 'GET_ANALISE', itemId }),
+                sendMessage({ type: 'GET_PERFORMANCE', itemId }),
+            ]);
+
+            if (!analiseResp.analise) {
+                el.innerHTML = `<p class="impoclick-text impoclick-error">${escapeHtml(mensagemDeErroAnalise(analiseResp))}</p>`;
+                return;
+            }
+
+            let html = renderFullAnalysis(analiseResp.analise);
+            if (perfResp.performance) html += renderPerformance(perfResp.performance);
+            el.innerHTML = html;
+        });
     }
 
     function sendMessage(message) {
@@ -669,41 +1156,6 @@
             feeValueEl.textContent = '—';
         }
 
-        renderAnalyzeTab(pageData);
-
-        document.getElementById('impoclick-analyze-btn').addEventListener('click', async () => {
-            const el = document.getElementById('impoclick-analyze-result');
-
-            // Parte 1: análise de título/marca/modelo, feita a partir da
-            // própria página — sempre disponível, em qualquer anúncio.
-            const textoHtml = renderTextAnalysis(analyzeListingText(pageData));
-            el.innerHTML = textoHtml + '<p class="impoclick-text">Consultando a qualidade oficial do anúncio...</p>';
-
-            // Parte 2: qualidade oficial do ML, só para anúncios da conta
-            // conectada (a API do ML recusa anúncio de terceiros).
-            const itemId = extractItemId();
-            if (!itemId) {
-                el.innerHTML = textoHtml + '<p class="impoclick-note">Não consegui identificar o código do anúncio nesta página, então a análise oficial do Mercado Livre não pôde ser consultada.</p>';
-                return;
-            }
-
-            const resp = await sendMessage({ type: 'GET_PERFORMANCE', itemId });
-            if (resp.performance) {
-                el.innerHTML = textoHtml + renderPerformance(resp.performance);
-                return;
-            }
-
-            let aviso;
-            if (resp.error === 'not_logged_in') {
-                aviso = 'Faça login na extensão para consultar a qualidade oficial do anúncio.';
-            } else if (resp.error === 'not_own_item') {
-                aviso = 'A análise oficial do Mercado Livre só funciona nos seus próprios anúncios — a API deles não libera esse dado para anúncios de outros vendedores. A análise de título e atributos acima vale para qualquer anúncio.';
-            } else {
-                aviso = resp.message || 'Não foi possível consultar a qualidade oficial agora.';
-            }
-            el.innerHTML = textoHtml + `<p class="impoclick-note">${escapeHtml(aviso)}</p>`;
-        });
-
         document.getElementById('impoclick-calc-btn').addEventListener('click', async () => {
             const resultEl = document.getElementById('impoclick-result');
             const priceInput = document.getElementById('impoclick-price-input');
@@ -780,14 +1232,21 @@
         if (!looksLikeProductPage()) return;
 
         const container = buildPanel();
+        const pageData = extractPageData();
 
         const session = await sendMessage({ type: 'GET_SESSION' });
-        if (!session.session) {
+        const loggedIn = !!session.session;
+
+        // A aba Análise é montada nos dois casos: a parte lida da página não
+        // depende de login nem de rede, e a Viabilidade abaixo ainda vai
+        // esperar as consultas de categoria e taxa.
+        setupAnalyzeTab(pageData, loggedIn);
+
+        if (!loggedIn) {
             renderNotLoggedIn(container);
             return;
         }
 
-        const pageData = extractPageData();
         await renderCalculator(container, pageData);
     }
 

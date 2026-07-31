@@ -242,11 +242,33 @@ async function getPerformance(itemId) {
     return { performance: data };
 }
 
+// Análise completa do anúncio: um único pedido que já traz item, descrição,
+// campos da categoria, visitas, avaliações e vendas do período. Como o
+// backend consulta 6 recursos do ML em sequência/paralelo, essa chamada é
+// bem mais lenta que as outras — a tela mostra "analisando..." enquanto isso.
+async function getAnalise(itemId) {
+    const headers = await getAuthHeaders();
+    if (!headers) return { error: 'not_logged_in' };
+
+    const resp = await fetch(`${IMPOCLICK_API}/ml-market?action=analise&itemId=${encodeURIComponent(itemId)}`, { headers });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+        return {
+            error: data.error || 'erro',
+            message: data.message || data.error || 'Não foi possível analisar este anúncio.',
+        };
+    }
+    return { analise: data };
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     (async () => {
         switch (message.type) {
             case 'GET_PERFORMANCE':
                 sendResponse(await getPerformance(message.itemId));
+                break;
+            case 'GET_ANALISE':
+                sendResponse(await getAnalise(message.itemId));
                 break;
             case 'GET_SESSION':
                 sendResponse({ session: await getSession() });
