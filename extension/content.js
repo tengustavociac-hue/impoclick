@@ -390,6 +390,18 @@
         `;
     }
 
+    // Monta o conteúdo da aba "Análise" (separada da Viabilidade).
+    function renderAnalyzeTab(pageData) {
+        const pane = document.getElementById('impoclick-panel-analise');
+        if (!pane) return;
+        pane.innerHTML = `
+            ${pageData.title ? `<p class="impoclick-item-title">${escapeHtml(pageData.title)}</p>` : ''}
+            <p class="impoclick-text">Verifica o que pode ser melhorado neste anúncio: aproveitamento do título, dos campos Marca e Modelo, e os objetivos de qualidade do próprio Mercado Livre.</p>
+            <button id="impoclick-analyze-btn" class="impoclick-btn">Analisar erros e melhorias</button>
+            <div id="impoclick-analyze-result"></div>
+        `;
+    }
+
     function sendMessage(message) {
         return new Promise((resolve) => chrome.runtime.sendMessage(message, resolve));
     }
@@ -452,24 +464,45 @@
         `;
     }
 
+    // O painel tem duas ferramentas independentes, cada uma na sua aba:
+    // Viabilidade (o cálculo de custo x preço) e Análise (erros e melhorias
+    // do anúncio). Ficavam juntas na mesma tela e uma atrapalhava a leitura
+    // da outra.
     function buildPanel() {
         const panel = document.createElement('div');
         panel.id = 'impoclick-panel';
         panel.innerHTML = `
             <div id="impoclick-panel-header">
-                <span id="impoclick-panel-title">Viabilidade Impoclick</span>
+                <span id="impoclick-panel-title">Impoclick</span>
                 <button id="impoclick-panel-toggle" aria-label="Minimizar">–</button>
+            </div>
+            <div id="impoclick-panel-tabs">
+                <button class="impoclick-tab impoclick-tab-active" data-tab="viab">Viabilidade</button>
+                <button class="impoclick-tab" data-tab="analise">Análise</button>
             </div>
             <div id="impoclick-panel-body">
                 <div id="impoclick-panel-content">Carregando anúncio...</div>
+                <div id="impoclick-panel-analise" class="impoclick-hidden"></div>
             </div>
         `;
         document.body.appendChild(panel);
 
         document.getElementById('impoclick-panel-toggle').addEventListener('click', () => {
             const body = document.getElementById('impoclick-panel-body');
+            const tabs = document.getElementById('impoclick-panel-tabs');
             const collapsed = body.classList.toggle('impoclick-hidden');
+            tabs.classList.toggle('impoclick-hidden', collapsed);
             document.getElementById('impoclick-panel-toggle').textContent = collapsed ? '+' : '–';
+        });
+
+        panel.querySelectorAll('.impoclick-tab').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                panel.querySelectorAll('.impoclick-tab').forEach((b) => b.classList.remove('impoclick-tab-active'));
+                btn.classList.add('impoclick-tab-active');
+                const isAnalise = btn.dataset.tab === 'analise';
+                document.getElementById('impoclick-panel-content').classList.toggle('impoclick-hidden', isAnalise);
+                document.getElementById('impoclick-panel-analise').classList.toggle('impoclick-hidden', !isAnalise);
+            });
         });
 
         return document.getElementById('impoclick-panel-content');
@@ -592,10 +625,6 @@
             <button id="impoclick-calc-btn" class="impoclick-btn">Calcular viabilidade</button>
             <div id="impoclick-result"></div>
 
-            <label class="impoclick-label">Análise do anúncio</label>
-            <button id="impoclick-analyze-btn" class="impoclick-btn impoclick-btn-secondary">Analisar erros e melhorias</button>
-            <div id="impoclick-analyze-result"></div>
-
             <label class="impoclick-label" for="impoclick-trademark-input">Verificar marca no INPI (opcional)</label>
             <div class="impoclick-trademark-search">
                 <input type="text" id="impoclick-trademark-input" class="impoclick-input impoclick-input-sm" placeholder="ex: JBL">
@@ -639,6 +668,8 @@
         } else {
             feeValueEl.textContent = '—';
         }
+
+        renderAnalyzeTab(pageData);
 
         document.getElementById('impoclick-analyze-btn').addEventListener('click', async () => {
             const el = document.getElementById('impoclick-analyze-result');

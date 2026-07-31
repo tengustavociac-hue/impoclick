@@ -428,3 +428,44 @@
     border-left-color: #b45309;
     background: #fffaf0;
 }
+
+/* --- Abas do painel (Viabilidade / Análise) --- */
+#impoclick-panel-tabs {
+    display: flex;
+    border-bottom: 1px solid #f0e0b0;
+    background: #fffdf7;
+}
+
+#impoclick-panel-tabs.impoclick-hidden {
+    display: none;
+}
+
+.impoclick-tab {
+    all: unset;
+    box-sizing: border-box;
+    flex: 1;
+    text-align: center;
+    padding: 9px 6px;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    color: #9a8a63;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+}
+
+.impoclick-tab:hover {
+    color: #5c4a12;
+    background: #fff6e0;
+}
+
+.impoclick-tab-active {
+    color: #5c4a12;
+    border-bottom-color: #b8860b;
+    background: #fffaf0;
+}
+
+#impoclick-panel-analise.impoclick-hidden,
+#impoclick-panel-content.impoclick-hidden {
+    display: none;
+}
