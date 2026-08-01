@@ -400,10 +400,26 @@ async function fetchAdsMetrics(userId, itemId, days) {
 // texto que o vendedor escreveu — é Cor, Tamanho e afins — e não deveria
 // contar contra o limite de 60 caracteres do título. Devolvemos os valores
 // para o painel poder descontá-los.
-const VARIATION_ATTR_IDS = new Set([
-    'COLOR', 'MAIN_COLOR', 'SECONDARY_COLOR', 'SIZE', 'FABRIC_DESIGN',
-    'GENDER', 'FLAVOR', 'VOLTAGE', 'CAPACITY', 'FORMAT', 'PACKAGE_QUANTITY',
+// Atributos de identidade do produto ou de dados técnicos: o ML nunca cola
+// nenhum deles no fim do título. Tudo o que NÃO está aqui é candidato a ser
+// parte do sufixo de variação.
+//
+// A primeira versão fazia o contrário — mantinha a lista dos ids QUE SÃO
+// variação (COLOR, SIZE...) — e isso não tem fim, porque cada categoria tem
+// os seus. Num colete tático o tamanho vem como "Tamanho do colete táctico",
+// ficava de fora da lista, e como o corte vai do fim para dentro ele travava
+// nesse primeiro valor desconhecido e nem chegava no "Preto" seguinte.
+const IDENTITY_ATTR_IDS = new Set([
+    'BRAND', 'MODEL', 'MANUFACTURER', 'MPN', 'PART_NUMBER',
+    'GTIN', 'EAN', 'UPC', 'SELLER_SKU', 'EMPTY_GTIN_REASON',
+    'ITEM_CONDITION', 'IS_KIT', 'SALES_UNIT', 'YIELD_OF_SALES_UNIT',
+    'WARRANTY_TYPE', 'WARRANTY_TIME', 'PRODUCT_FEATURES',
+    'PACKAGE_LENGTH', 'PACKAGE_WIDTH', 'PACKAGE_HEIGHT', 'PACKAGE_WEIGHT',
 ]);
+
+// Valor de variação é sempre curto ("Preto", "M", "Único"). Texto longo é
+// descrição, não variação.
+const VARIATION_VALUE_MAX_CHARS = 25;
 
 // Tira do fim do título os valores da variação, pra busca de concorrentes
 // não sair com "Branco Liso Único" no meio da consulta.
@@ -465,23 +481,28 @@ async function fetchCompetitors(userId, mlUserId, title, categoryId) {
 }
 
 function collectVariationValues(item) {
-    const values = new Set();
-
+    // Quando o anúncio traz o array de variações, ele é a fonte exata: são
+    // literalmente os valores que o ML usou para montar o sufixo.
+    const fromCombinations = new Set();
     (item.variations || []).forEach((variation) => {
         (variation.attribute_combinations || []).forEach((combo) => {
-            if (combo.value_name) values.add(combo.value_name);
+            if (combo.value_name) fromCombinations.add(combo.value_name);
         });
     });
+    if (fromCombinations.size) return [...fromCombinations];
 
-    // Anúncio sem array de variações (caso dos user products) ainda traz os
-    // mesmos dados como atributos comuns — mas aí só aceitamos os ids que
-    // sabemos ser de variação, pra não descontar do título uma palavra que o
-    // vendedor escreveu de propósito.
-    if (values.size === 0) {
-        (item.attributes || []).forEach((attr) => {
-            if (VARIATION_ATTR_IDS.has(attr.id) && attr.value_name) values.add(attr.value_name);
-        });
-    }
+    // Sem esse array, o que existe é só o título já montado. Isso acontece
+    // nos itens ligados a um user product — e é exatamente nesses que o ML
+    // monta o título com o sufixo. Fora daí não mexemos em nada, para nunca
+    // comer uma palavra que o vendedor escreveu.
+    if (!item.user_product_id) return [];
+
+    const values = new Set();
+    (item.attributes || []).forEach((attr) => {
+        if (IDENTITY_ATTR_IDS.has(attr.id)) return;
+        const value = attr.value_name;
+        if (value && value.length <= VARIATION_VALUE_MAX_CHARS) values.add(value);
+    });
 
     return [...values];
 }

@@ -205,6 +205,9 @@
     //
     // Só cortamos do FIM e só quando o valor bate inteiro, pra nunca comer
     // uma palavra que o vendedor pôs de propósito.
+    const MAX_VARIATION_STRIPS = 5;
+    const MIN_TITLE_AFTER_STRIP = 15;
+
     function stripVariationSuffix(title, variationValues) {
         let text = normalizeText(title);
         const removed = [];
@@ -218,11 +221,17 @@
         const disponiveis = variationValues.map((v) => normalizeText(v)).filter(Boolean);
 
         let cortou = true;
-        while (cortou) {
+        while (cortou && removed.length < MAX_VARIATION_STRIPS) {
             cortou = false;
             for (let i = 0; i < disponiveis.length; i += 1) {
                 const valor = disponiveis[i];
                 if (text.length <= valor.length) continue;
+
+                const restante = text.length - (valor.length + 1);
+                // Trava de segurança: a lista de candidatos inclui atributos
+                // que não sabemos com certeza serem da variação, então nunca
+                // deixamos o título virar um toco.
+                if (restante < MIN_TITLE_AFTER_STRIP) continue;
 
                 const sufixo = text.slice(-(valor.length + 1));
                 if (foldCase(sufixo) === foldCase(` ${valor}`)) {
