@@ -318,6 +318,55 @@ async function fetchItemSales(userId, mlUserId, itemId, days) {
     return { days, sold, soldRecentHalf, halfDays: days / 2, partial };
 }
 
+// Métricas de Product Ads do anúncio. Os endpoints antigos de Product Ads
+// foram desligados pelo ML em 26/02/2026 — este é o atual, por item, e exige
+// o header api-version: 2.
+//
+// Um 404 aqui quer dizer que a conta não tem Publicidade habilitada (o ML
+// pede reputação amarela, 15 dias de cadastro e um mínimo de vendas). Já um
+// anúncio com status "idle" existe para publicidade mas não está em campanha
+// nenhuma — coisas diferentes, e a tela explica cada uma.
+const ADS_METRICS = [
+    'clicks', 'prints', 'ctr', 'cost', 'cpc', 'acos', 'cvr', 'roas', 'sov',
+    'organic_units_quantity', 'direct_units_quantity', 'indirect_units_quantity',
+    'units_quantity', 'total_amount',
+].join(',');
+
+async function fetchAdsMetrics(userId, itemId, days) {
+    const to = new Date();
+    const from = new Date(to.getTime() - days * 86400000);
+    const asDate = (d) => d.toISOString().slice(0, 10);
+
+    const qs = new URLSearchParams({
+        date_from: asDate(from),
+        date_to: asDate(to),
+        metrics: ADS_METRICS,
+    });
+
+    try {
+        const resp = await mlFetch(
+            userId,
+            `/advertising/${SITE_ID}/product_ads/ads/${encodeURIComponent(itemId)}?${qs.toString()}`,
+            { headers: { 'api-version': '2' } }
+        );
+
+        if (resp.status === 404) return { enabled: false, reason: 'sem_publicidade' };
+        if (!resp.ok) return null;
+
+        const data = await resp.json();
+        return {
+            enabled: true,
+            days,
+            status: data.status || null,
+            campaignId: data.campaign_id || null,
+            recommended: !!data.recommended,
+            metrics: data.metrics_summary || data.metrics || {},
+        };
+    } catch (err) {
+        return null;
+    }
+}
+
 // Soma as visitas de uma fatia do fim da série (os N dias mais recentes),
 // pra comparar período contra período — é isso que diz se o anúncio está
 // ganhando ou perdendo tração, coisa que o total sozinho não mostra.
@@ -355,9 +404,13 @@ async function handleAnalise(req, res, userId) {
         fetchJsonOrNull(userId, `/reviews/item/${encodeURIComponent(itemId)}`),
     ]);
 
-    const [categorySpecs, sales] = await Promise.all([
+    // /trends devolve os termos que os compradores realmente buscaram na
+    // categoria na última semana — é a fonte das sugestões de palavra-chave.
+    const [categorySpecs, sales, trends, ads] = await Promise.all([
         item.category_id ? fetchJsonOrNull(userId, `/categories/${encodeURIComponent(item.category_id)}/technical_specs/input`) : Promise.resolve(null),
         fetchItemSales(userId, mlUserId, itemId, 30),
+        item.category_id ? fetchJsonOrNull(userId, `/trends/${SITE_ID}/${encodeURIComponent(item.category_id)}`) : Promise.resolve(null),
+        fetchAdsMetrics(userId, itemId, 30),
     ]);
 
     // Atributos preenchidos no anúncio, já sem os que o ML preenche sozinho
@@ -436,6 +489,10 @@ async function handleAnalise(req, res, userId) {
         visits,
         reviews,
         sales,
+        trends: Array.isArray(trends)
+            ? trends.filter((t) => t && t.keyword).map((t) => ({ keyword: t.keyword, url: t.url || null }))
+            : null,
+        ads,
     });
 }
 

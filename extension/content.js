@@ -381,24 +381,30 @@
         return groups;
     }
 
-    // Analisa TODOS os atributos preenchidos, não só Marca e Modelo. Além da
-    // repetição com o título (que a versão da página já fazia), aqui dá pra
-    // cruzar os atributos entre si: repetir a mesma palavra em "Marcas
-    // compatíveis" e "Modelos compatíveis" gasta duas vezes o mesmo espaço
-    // indexado sem ampliar por quantas buscas o anúncio é encontrado.
+    // A regra de não repetir palavra vale só entre Título, Marca e Modelo —
+    // são os três campos que o ML indexa como identidade do produto, e
+    // repetir entre eles gasta duas vezes o mesmo espaço de busca. Os demais
+    // atributos (compatibilidades, medidas, cor...) podem repetir à vontade:
+    // ali a palavra repetida é parte da descrição do produto, não desperdício.
+    const IDENTITY_ATTRS = ['BRAND', 'MODEL'];
+
     function analyzeAttributeSet(attributes, titleWords) {
         const titleSet = new Set(titleWords);
 
-        const enriched = (attributes || []).map((a) => ({
-            id: a.id,
-            name: a.name,
-            value: String(a.value || ''),
-            words: toWordSet(String(a.value || '').slice(0, ATTR_INDEXED_CHARS)),
-        }));
+        const enriched = (attributes || [])
+            .filter((a) => IDENTITY_ATTRS.includes(a.id))
+            .map((a) => ({
+                id: a.id,
+                name: a.name,
+                value: String(a.value || ''),
+                words: toWordSet(String(a.value || '').slice(0, ATTR_INDEXED_CHARS)),
+            }));
 
         return enriched.map((a) => {
             const repeated = [...new Set(a.words.filter((w) => titleSet.has(w)))];
 
+            // Marca contra Modelo (e vice-versa) — o único cruzamento que
+            // importa, já que a lista acima tem só esses dois.
             const duplicates = [];
             enriched.forEach((other) => {
                 if (other.id === a.id) return;
@@ -420,6 +426,50 @@
                 clean: !truncated && repeated.length === 0 && duplicates.length === 0,
             };
         });
+    }
+
+    // Junta todas as palavras repetidas do trio Título/Marca/Modelo — são as
+    // que valem a pena trocar por um termo que traga busca nova.
+    function collectRepeatedWords(titleAnalysis, attrAnalysis) {
+        const palavras = new Set(titleAnalysis.duplicates);
+        attrAnalysis.forEach((a) => {
+            a.repeated.forEach((w) => palavras.add(w));
+            a.duplicates.forEach((d) => d.words.forEach((w) => palavras.add(w)));
+        });
+        return [...palavras];
+    }
+
+    // Sugere termos de busca reais da categoria (recurso /trends do ML, que
+    // devolve o que os compradores digitaram na última semana) que o anúncio
+    // ainda não cobre. Prioriza os que já têm relação com o produto — um
+    // termo da categoria que não conversa com o título não serve de troca.
+    function suggestKeywords(trends, titleAnalysis, attrAnalysis) {
+        if (!trends || !trends.length) return null;
+
+        // Tudo que o anúncio já diz, somando título, marca e modelo.
+        const jaUsadas = new Set(titleAnalysis.words);
+        attrAnalysis.forEach((a) => a.words && a.words.forEach((w) => jaUsadas.add(w)));
+        attrAnalysis.forEach((a) => toWordSet(a.value).forEach((w) => jaUsadas.add(w)));
+
+        const candidatos = trends
+            .map((t) => {
+                const palavras = toWordSet(t.keyword);
+                const novas = palavras.filter((w) => !jaUsadas.has(w));
+                const emComum = palavras.filter((w) => jaUsadas.has(w)).length;
+                return { keyword: t.keyword, url: t.url || null, novas, emComum };
+            })
+            // Só interessa termo que acrescenta alguma palavra nova.
+            .filter((c) => c.novas.length > 0);
+
+        // Relacionados primeiro (compartilham ao menos uma palavra com o
+        // anúncio); se a categoria for muito ampla e nada se relacionar,
+        // ainda mostramos os mais buscados dela.
+        const relacionados = candidatos.filter((c) => c.emComum > 0);
+        const lista = relacionados.length >= 3 ? relacionados : candidatos;
+
+        return lista
+            .sort((a, b) => b.emComum - a.emComum || a.novas.length - b.novas.length)
+            .slice(0, 6);
     }
 
     function pctChange(current, previous) {
@@ -489,12 +539,15 @@
         }
 
         const sujos = attrAnalysis.filter((a) => !a.clean);
+        const semIdentidade = attrAnalysis.length === 0;
         checks.push({
-            ok: sujos.length === 0,
+            ok: !semIdentidade && sujos.length === 0,
             weight: 15,
-            label: sujos.length === 0
-                ? `${attrAnalysis.length} atributos sem repetição`
-                : `${sujos.length} atributo${sujos.length === 1 ? '' : 's'} desperdiçando espaço`,
+            label: semIdentidade
+                ? 'Marca e Modelo não preenchidos'
+                : (sujos.length === 0
+                    ? 'Marca e Modelo sem repetição'
+                    : `${sujos.length} campo${sujos.length === 1 ? '' : 's'} repetindo palavras já usadas`),
         });
 
         const tags = classifyTags(item.tags);
@@ -510,6 +563,23 @@
                 weight: 5,
                 label: `Avaliações: ${data.reviews.average.toFixed(1)} estrelas`,
             });
+        }
+
+        // Só entra na conta quando houve investimento no período: anúncio
+        // fora de campanha não é um defeito do anúncio.
+        if (data.ads && data.ads.enabled && data.ads.status !== 'idle') {
+            const d = adsDerived(data.ads.metrics || {});
+            if (d.custo > 0) {
+                const paga = d.roas >= 1;
+                checks.push({
+                    ok: paga,
+                    weight: 10,
+                    label: paga
+                        ? `Ads com retorno (ROAS ${d.roas.toFixed(1)}x)`
+                        : `Ads no prejuízo (ROAS ${d.roas.toFixed(1)}x)`,
+                    detail: paga ? null : `Investiu ${formatBRL(d.custo)} e a receita atribuída à publicidade foi ${formatBRL(d.receita)}.`,
+                });
+            }
         }
 
         if (data.visits && (data.visits.prev15 > 0 || data.visits.last15 > 0)) {
@@ -571,8 +641,11 @@
     function renderAttributeAudit(attrAnalysis) {
         if (!attrAnalysis.length) {
             return `
-                <div class="impoclick-an-block-title">Ficha técnica</div>
-                <p class="impoclick-text">Nenhum atributo preenchido neste anúncio.</p>
+                <div class="impoclick-an-block-title">Marca e Modelo</div>
+                <div class="impoclick-an-item impoclick-an-warn">
+                    <strong>Marca e Modelo não preenchidos</strong>
+                    <p>Cada um vale até ${ATTR_INDEXED_CHARS} caracteres indexados na busca, somados ao título. Deixar vazio joga fora esse espaço.</p>
+                </div>
             `;
         }
 
@@ -601,10 +674,10 @@
         }).join('');
 
         return `
-            <div class="impoclick-an-block-title">Ficha técnica · ${attrAnalysis.length} atributos</div>
+            <div class="impoclick-an-block-title">Marca e Modelo</div>
             ${problemas.length
                 ? `<p class="impoclick-note">${problemas.length} com atenção · ${okCount} sem problema</p>${blocos}`
-                : '<div class="impoclick-an-item impoclick-an-ok"><strong>Todos os atributos estão bem aproveitados</strong><p>Nenhum repete o título nem outro campo.</p></div>'}
+                : '<div class="impoclick-an-item impoclick-an-ok"><strong>Marca e Modelo bem aproveitados</strong><p>Não repetem o título nem um ao outro — cada campo está somando buscas novas.</p></div>'}
         `;
     }
 
@@ -776,19 +849,157 @@
         `;
     }
 
+    function renderKeywordsBlock(repetidas, sugestoes) {
+        if (!repetidas.length && (!sugestoes || !sugestoes.length)) return '';
+
+        const repetidasHtml = repetidas.length
+            ? `
+                <div class="impoclick-an-item impoclick-an-warn">
+                    <strong>Palavras gastas mais de uma vez</strong>
+                    <p>${repetidas.map((w) => `<span class="impoclick-kw-old">${escapeHtml(w)}</span>`).join(' ')}</p>
+                    <p>Aparecem em mais de um dos três campos que o ML indexa como identidade do produto — Título, Marca e Modelo. Trocar por um termo que o anúncio ainda não tem amplia por quantas buscas ele aparece.</p>
+                </div>
+            `
+            : '';
+
+        const sugestoesHtml = (sugestoes && sugestoes.length)
+            ? `
+                <div class="impoclick-an-item impoclick-an-opp">
+                    <strong>Termos buscados na categoria que faltam no anúncio</strong>
+                    ${sugestoes.map((s) => `
+                        <div class="impoclick-kw-row">
+                            <span class="impoclick-kw-term">${escapeHtml(s.keyword)}</span>
+                            <span class="impoclick-kw-new">${s.novas.map(escapeHtml).join(' · ')}</span>
+                        </div>
+                    `).join('')}
+                    <p class="impoclick-note">Buscas reais dos compradores na última semana, do recurso /trends do Mercado Livre. À direita, as palavras de cada termo que o seu anúncio ainda não usa.</p>
+                </div>
+            `
+            : '';
+
+        return `
+            <div class="impoclick-an-block-title">Palavras-chave</div>
+            ${repetidasHtml}
+            ${sugestoesHtml}
+        `;
+    }
+
+    // Investimento em publicidade contra o retorno. CTR e conversão são
+    // calculados aqui a partir de cliques/impressões/unidades — a API
+    // devolve esses percentuais em escalas que variam, e a divisão direta
+    // não deixa dúvida sobre o que o número significa.
+    function adsDerived(m) {
+        const custo = m.cost || 0;
+        const receita = m.total_amount || 0;
+        const cliques = m.clicks || 0;
+        const impressoes = m.prints || 0;
+        const vendasAds = (m.direct_units_quantity || 0) + (m.indirect_units_quantity || 0);
+
+        return {
+            custo,
+            receita,
+            cliques,
+            impressoes,
+            vendasAds,
+            vendasOrganicas: m.organic_units_quantity || 0,
+            cpc: cliques > 0 ? custo / cliques : 0,
+            ctr: impressoes > 0 ? (cliques / impressoes) * 100 : 0,
+            conversao: cliques > 0 ? (vendasAds / cliques) * 100 : 0,
+            roas: typeof m.roas === 'number' && m.roas > 0 ? m.roas : (custo > 0 ? receita / custo : 0),
+            acos: typeof m.acos === 'number' && m.acos > 0 ? m.acos : (receita > 0 ? (custo / receita) * 100 : 0),
+        };
+    }
+
+    function renderAdsBlock(ads) {
+        if (!ads) return '';
+
+        const titulo = '<div class="impoclick-an-block-title">Publicidade (Product Ads)</div>';
+
+        if (!ads.enabled) {
+            return `
+                ${titulo}
+                <div class="impoclick-an-item">
+                    <strong>Conta sem Publicidade habilitada</strong>
+                    <p>O Mercado Livre exige reputação amarela ou melhor, 15 dias de cadastro e um mínimo de vendas (1 para empresa, 10 para pessoa física). Ative em Mercado Livre &gt; Meu perfil &gt; Publicidade.</p>
+                </div>
+            `;
+        }
+
+        const d = adsDerived(ads.metrics || {});
+
+        if (ads.status === 'idle' || (!d.custo && !d.impressoes)) {
+            return `
+                ${titulo}
+                <div class="impoclick-an-item">
+                    <strong>Anúncio fora de campanha</strong>
+                    <p>Ele está liberado para publicidade, mas não teve investimento nem impressão nos últimos ${ads.days} dias.</p>
+                    ${ads.recommended ? '<p>O Mercado Livre marca este anúncio como <strong>recomendado</strong> para publicidade — pelo modelo deles, responderia bem ao investimento.</p>' : ''}
+                </div>
+            `;
+        }
+
+        const totalVendas = d.vendasAds + d.vendasOrganicas;
+        const pctAds = totalVendas ? (d.vendasAds / totalVendas) * 100 : 0;
+
+        // ROAS abaixo de 1 é dinheiro saindo: cada real investido volta
+        // menos de um real em receita atribuída.
+        const pagaSe = d.roas >= 1;
+        const vereditoClass = pagaSe ? 'impoclick-good' : 'impoclick-bad';
+        const veredito = d.custo > 0
+            ? `Cada ${formatBRL(1)} investido devolveu ${formatBRL(d.roas)}`
+            : 'Sem investimento no período';
+
+        return `
+            ${titulo}
+            <div class="impoclick-verdict ${vereditoClass}">${veredito}</div>
+            <div class="impoclick-breakdown">
+                <div class="impoclick-breakdown-row impoclick-breakdown-minus">
+                    <span>Investido em ${ads.days} dias</span><strong>${formatBRL(d.custo)}</strong>
+                </div>
+                <div class="impoclick-breakdown-row">
+                    <span>Receita atribuída a Ads</span><strong>${formatBRL(d.receita)}</strong>
+                </div>
+                <div class="impoclick-breakdown-row impoclick-breakdown-subtotal">
+                    <span>ROAS</span><strong class="${pagaSe ? 'impoclick-up' : 'impoclick-down'}">${d.roas.toFixed(1)}x</strong>
+                </div>
+                <div class="impoclick-breakdown-row">
+                    <span>ACOS</span><strong>${d.acos.toFixed(1)}%</strong>
+                </div>
+                <div class="impoclick-breakdown-row">
+                    <span>Impressões · cliques</span><strong>${d.impressoes} · ${d.cliques}</strong>
+                </div>
+                <div class="impoclick-breakdown-row">
+                    <span>CTR · CPC médio</span><strong>${d.ctr.toFixed(2)}% · ${formatBRL(d.cpc)}</strong>
+                </div>
+                <div class="impoclick-breakdown-row">
+                    <span>Conversão dos cliques</span><strong>${d.conversao.toFixed(2)}%</strong>
+                </div>
+                <div class="impoclick-breakdown-row impoclick-breakdown-total">
+                    <span>Vendas: Ads / orgânicas</span>
+                    <strong>${d.vendasAds} / ${d.vendasOrganicas} (${pctAds.toFixed(0)}% por Ads)</strong>
+                </div>
+            </div>
+        `;
+    }
+
     function renderFullAnalysis(data) {
         const titleAnalysis = analyzeTitle(data.item.title);
         const attrAnalysis = analyzeAttributeSet(data.attributes, titleAnalysis.words);
         const audit = buildAudit(data, titleAnalysis, attrAnalysis);
 
+        const repetidas = collectRepeatedWords(titleAnalysis, attrAnalysis);
+        const sugestoes = suggestKeywords(data.trends, titleAnalysis, attrAnalysis);
+
         return `
             ${renderScoreBlock(audit)}
             ${renderChecklist(audit)}
             ${renderNumbersBlock(data)}
+            ${renderAdsBlock(data.ads)}
             ${renderVisitsBlock(data.visits)}
             <div class="impoclick-an-block-title">Título</div>
             ${renderTitleFindings(titleAnalysis)}
             ${renderAttributeAudit(attrAnalysis)}
+            ${renderKeywordsBlock(repetidas, sugestoes)}
             ${renderCategoryFields(data.categoryFields)}
             ${renderTagsBlock(audit.tags)}
             ${renderReviewsBlock(data.reviews)}

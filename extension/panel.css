@@ -646,3 +646,49 @@
     color: #d97706;
     letter-spacing: 0.05em;
 }
+
+/* --- Palavras-chave: repetidas x sugeridas --- */
+
+/* Palavra que aparece em mais de um dos campos Título/Marca/Modelo. */
+.impoclick-kw-old {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 7px;
+    margin: 0 3px 3px 0;
+    border-radius: 4px;
+    background: #fee2e2;
+    color: #b91c1c;
+    text-decoration: line-through;
+}
+
+.impoclick-kw-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+    padding: 4px 0;
+    border-bottom: 1px dashed #eee0c0;
+}
+
+.impoclick-kw-row:last-of-type {
+    border-bottom: none;
+}
+
+.impoclick-kw-term {
+    font-size: 12px;
+    color: #1f2937;
+    font-weight: 600;
+}
+
+/* As palavras que esse termo traria de novo pro anúncio. */
+.impoclick-kw-new {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #15803d;
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 45%;
+}
