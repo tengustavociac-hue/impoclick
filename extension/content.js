@@ -358,9 +358,14 @@
         }
         if (!avisos.length) avisos.push('<p>Tamanho, palavras e linguagem dentro do recomendado.</p>');
 
+        // Mostrar o texto medido, e não só o número: numa página /up/ o ML
+        // exibe o NOME DO PRODUTO no topo, enquanto o título do anúncio é
+        // outro — sem ver a string contada, um "73/60" parece erro de conta
+        // quando na verdade é outro texto.
         return `
             <div class="impoclick-an-item ${cls}">
                 <strong>Título: ${t.length}/${t.max} caracteres</strong>
+                <p class="impoclick-attr-value">${escapeHtml(t.text)}</p>
                 <div class="impoclick-bar"><span class="${barClass}" style="width:${barPct}%"></span></div>
                 ${avisos.join('')}
             </div>
@@ -1029,12 +1034,21 @@
             && palavrasItem.length > 0
             && (comuns / palavrasItem.length) < 0.5;
 
+        // Numa página /up/ o ML exibe o nome do PRODUTO no topo, que é
+        // compartilhado por todos os vendedores. O título do anúncio — o que
+        // esta análise mede — é outro texto, escrito pelo vendedor.
+        const ehPaginaDeProduto = /\/up\/|\/p\/ML/i.test(window.location.href);
+
         return `
             <div class="impoclick-analyzed ${divergente ? 'impoclick-analyzed-warn' : ''}">
                 <span class="impoclick-analyzed-label">Analisando</span>
                 <p class="impoclick-item-title">${escapeHtml(item.title)}</p>
                 <p class="impoclick-note">${escapeHtml(item.id)}${item.permalink ? ` · <a href="${escapeHtml(item.permalink)}" target="_blank" rel="noopener">abrir anúncio</a>` : ''}</p>
-                ${divergente ? '<p class="impoclick-note impoclick-error">Este não parece ser o anúncio da página que você está vendo. Abra o anúncio pelo link acima para conferir, ou entre por ele direto.</p>' : ''}
+                ${divergente
+                    ? '<p class="impoclick-note impoclick-error">Este não parece ser o anúncio da página que você está vendo. Abra o anúncio pelo link acima para conferir, ou entre por ele direto.</p>'
+                    : (ehPaginaDeProduto
+                        ? '<p class="impoclick-note">Esta é uma página de produto: o nome grande no topo é do produto, comum a todos os vendedores. O título acima é o do seu anúncio, que é o que conta na busca — por isso os dois podem ser diferentes.</p>'
+                        : '')}
             </div>
         `;
     }
