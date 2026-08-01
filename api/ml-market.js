@@ -384,6 +384,61 @@ const VARIATION_ATTR_IDS = new Set([
     'GENDER', 'FLAVOR', 'VOLTAGE', 'CAPACITY', 'FORMAT', 'PACKAGE_QUANTITY',
 ]);
 
+// Tira do fim do título os valores da variação, pra busca de concorrentes
+// não sair com "Branco Liso Único" no meio da consulta.
+function titleWithoutVariation(title, values) {
+    let text = String(title || '').normalize('NFC').trim();
+    const fold = (s) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+    let cortou = true;
+    while (cortou) {
+        cortou = false;
+        for (const raw of values) {
+            const valor = String(raw || '').normalize('NFC').trim();
+            if (!valor || text.length <= valor.length) continue;
+            if (fold(text.slice(-(valor.length + 1))) === fold(` ${valor}`)) {
+                text = text.slice(0, -(valor.length + 1)).trim();
+                cortou = true;
+                break;
+            }
+        }
+    }
+    return text;
+}
+
+// Concorrentes do MESMO produto que aparecem na primeira página da busca.
+// A ordenação padrão do /sites/{site}/search é a de relevância — a mesma que
+// o comprador vê —, então o que vem aqui são os anúncios que o ML já está
+// premiando. É de onde saem as sugestões de palavra-chave: o que a
+// concorrência que vende usa no título e o seu anúncio não usa.
+//
+// Isto substituiu as tendências da categoria, que devolviam termos genéricos
+// do site (numa balaclava vinha "capa jbl flip 7").
+const COMPETITOR_SEARCH_LIMIT = 50;
+
+async function fetchCompetitors(userId, mlUserId, title, categoryId) {
+    if (!title) return null;
+
+    const qs = new URLSearchParams({ q: title, limit: String(COMPETITOR_SEARCH_LIMIT) });
+    if (categoryId) qs.set('category', categoryId);
+
+    const data = await fetchJsonOrNull(userId, `/sites/${SITE_ID}/search?${qs.toString()}`);
+    if (!data || !Array.isArray(data.results)) return null;
+
+    const items = data.results
+        .map((r) => ({
+            id: r.id,
+            title: r.title || '',
+            sellerId: (r.seller && r.seller.id) || r.seller_id || null,
+            soldQuantity: typeof r.sold_quantity === 'number' ? r.sold_quantity : null,
+            price: r.price != null ? r.price : null,
+        }))
+        // Os seus próprios anúncios não são referência de concorrente.
+        .filter((r) => r.title && String(r.sellerId) !== String(mlUserId));
+
+    return { total: items.length, items };
+}
+
 function collectVariationValues(item) {
     const values = new Set();
 
@@ -443,12 +498,13 @@ async function handleAnalise(req, res, userId) {
         fetchJsonOrNull(userId, `/reviews/item/${encodeURIComponent(itemId)}`),
     ]);
 
-    // /trends devolve os termos que os compradores realmente buscaram na
-    // categoria na última semana — é a fonte das sugestões de palavra-chave.
-    const [categorySpecs, sales, trends, ads] = await Promise.all([
+    const variationValues = collectVariationValues(item);
+    const tituloParaBusca = titleWithoutVariation(item.title, variationValues);
+
+    const [categorySpecs, sales, competitors, ads] = await Promise.all([
         item.category_id ? fetchJsonOrNull(userId, `/categories/${encodeURIComponent(item.category_id)}/technical_specs/input`) : Promise.resolve(null),
         fetchItemSales(userId, mlUserId, itemId, 30),
-        item.category_id ? fetchJsonOrNull(userId, `/trends/${SITE_ID}/${encodeURIComponent(item.category_id)}`) : Promise.resolve(null),
+        fetchCompetitors(userId, mlUserId, tituloParaBusca, item.category_id),
         fetchAdsMetrics(userId, itemId, 30),
     ]);
 
@@ -521,7 +577,7 @@ async function handleAnalise(req, res, userId) {
             freeShipping: !!(item.shipping && item.shipping.free_shipping),
             catalogListing: !!item.catalog_listing,
             tags: item.tags || [],
-            variationValues: collectVariationValues(item),
+            variationValues,
         },
         description: { present: descriptionText.trim().length > 0, length: descriptionText.trim().length },
         attributes: itemAttributes,
@@ -529,9 +585,7 @@ async function handleAnalise(req, res, userId) {
         visits,
         reviews,
         sales,
-        trends: Array.isArray(trends)
-            ? trends.filter((t) => t && t.keyword).map((t) => ({ keyword: t.keyword, url: t.url || null }))
-            : null,
+        competitors,
         ads,
     });
 }

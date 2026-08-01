@@ -521,37 +521,52 @@
         return [...palavras];
     }
 
-    // Sugere termos de busca reais da categoria (recurso /trends do ML, que
-    // devolve o que os compradores digitaram na última semana) que o anúncio
-    // ainda não cobre. Prioriza os que já têm relação com o produto — um
-    // termo da categoria que não conversa com o título não serve de troca.
-    function suggestKeywords(trends, titleAnalysis, attrAnalysis) {
-        if (!trends || !trends.length) return null;
+    // Sugere palavras a partir dos anúncios CONCORRENTES do mesmo produto que
+    // aparecem na primeira página da busca e que vendem. A lógica: se uma
+    // palavra se repete no título de quem está ranqueando e vendendo, e o seu
+    // anúncio não usa, é uma busca em que você não aparece e eles aparecem.
+    //
+    // A versão anterior usava as tendências da categoria e sugeria bobagem
+    // (numa balaclava, "capa jbl flip 7"): o termo mais buscado de uma
+    // categoria ampla não tem relação com o seu produto.
+    const KEYWORD_MIN_COMPETITORS = 2;
+
+    function suggestKeywordsFromCompetitors(competitors, titleAnalysis, attrAnalysis) {
+        if (!competitors || !competitors.items || !competitors.items.length) return null;
 
         // Tudo que o anúncio já diz, somando título, marca e modelo.
         const jaUsadas = new Set(titleAnalysis.words);
-        attrAnalysis.forEach((a) => a.words && a.words.forEach((w) => jaUsadas.add(w)));
         attrAnalysis.forEach((a) => toWordSet(a.value).forEach((w) => jaUsadas.add(w)));
 
-        const candidatos = trends
-            .map((t) => {
-                const palavras = toWordSet(t.keyword);
-                const novas = palavras.filter((w) => !jaUsadas.has(w));
-                const emComum = palavras.filter((w) => jaUsadas.has(w)).length;
-                return { keyword: t.keyword, url: t.url || null, novas, emComum };
-            })
-            // Só interessa termo que acrescenta alguma palavra nova.
-            .filter((c) => c.novas.length > 0);
+        // Só os que comprovadamente vendem. Quando o ML não expõe a
+        // quantidade vendida, o critério vira estar na primeira página —
+        // que já é ordenada por relevância, não por acaso.
+        const comVenda = competitors.items.filter((c) => c.soldQuantity > 0);
+        const base = comVenda.length >= KEYWORD_MIN_COMPETITORS ? comVenda : competitors.items;
+        const criterioVendas = base === comVenda;
 
-        // Relacionados primeiro (compartilham ao menos uma palavra com o
-        // anúncio); se a categoria for muito ampla e nada se relacionar,
-        // ainda mostramos os mais buscados dela.
-        const relacionados = candidatos.filter((c) => c.emComum > 0);
-        const lista = relacionados.length >= 3 ? relacionados : candidatos;
+        // Conta em quantos ANÚNCIOS cada palavra aparece, não quantas vezes no
+        // total — repetir a palavra cinco vezes num título só não a torna
+        // mais relevante.
+        const contagem = new Map();
+        base.forEach((c) => {
+            new Set(toWordSet(c.title)).forEach((palavra) => {
+                if (jaUsadas.has(palavra)) return;
+                contagem.set(palavra, (contagem.get(palavra) || 0) + 1);
+            });
+        });
 
-        return lista
-            .sort((a, b) => b.emComum - a.emComum || a.novas.length - b.novas.length)
-            .slice(0, 6);
+        const sugestoes = [...contagem.entries()]
+            .map(([palavra, anuncios]) => ({ palavra, anuncios }))
+            // Palavra que aparece num anúncio só é escolha daquele vendedor,
+            // não um padrão do mercado.
+            .filter((s) => s.anuncios >= KEYWORD_MIN_COMPETITORS)
+            .sort((a, b) => b.anuncios - a.anuncios || a.palavra.localeCompare(b.palavra))
+            .slice(0, 8);
+
+        if (!sugestoes.length) return null;
+
+        return { sugestoes, analisados: base.length, criterioVendas };
     }
 
     function pctChange(current, previous) {
@@ -941,7 +956,7 @@
     }
 
     function renderKeywordsBlock(repetidas, sugestoes) {
-        if (!repetidas.length && (!sugestoes || !sugestoes.length)) return '';
+        if (!repetidas.length && !sugestoes) return '';
 
         const repetidasHtml = repetidas.length
             ? `
@@ -953,17 +968,19 @@
             `
             : '';
 
-        const sugestoesHtml = (sugestoes && sugestoes.length)
+        const sugestoesHtml = sugestoes
             ? `
                 <div class="impoclick-an-item impoclick-an-opp">
-                    <strong>Termos buscados na categoria que faltam no anúncio</strong>
-                    ${sugestoes.map((s) => `
+                    <strong>Palavras que a concorrência usa e você não</strong>
+                    ${sugestoes.sugestoes.map((s) => `
                         <div class="impoclick-kw-row">
-                            <span class="impoclick-kw-term">${escapeHtml(s.keyword)}</span>
-                            <span class="impoclick-kw-new">${s.novas.map(escapeHtml).join(' · ')}</span>
+                            <span class="impoclick-kw-term">${escapeHtml(s.palavra)}</span>
+                            <span class="impoclick-kw-new">${s.anuncios} de ${sugestoes.analisados}</span>
                         </div>
                     `).join('')}
-                    <p class="impoclick-note">Buscas reais dos compradores na última semana, do recurso /trends do Mercado Livre. À direita, as palavras de cada termo que o seu anúncio ainda não usa.</p>
+                    <p class="impoclick-note">${sugestoes.criterioVendas
+                        ? `Contado nos ${sugestoes.analisados} anúncios do mesmo produto que estão na primeira página da busca e têm venda registrada.`
+                        : `Contado nos ${sugestoes.analisados} anúncios do mesmo produto na primeira página da busca. O Mercado Livre não expôs a quantidade vendida deles, então o critério aqui é o ranqueamento, que já é por relevância.`}</p>
                 </div>
             `
             : '';
@@ -1113,7 +1130,7 @@
         const audit = buildAudit(data, titleAnalysis, attrAnalysis);
 
         const repetidas = collectRepeatedWords(titleAnalysis, attrAnalysis);
-        const sugestoes = suggestKeywords(data.trends, titleAnalysis, attrAnalysis);
+        const sugestoes = suggestKeywordsFromCompetitors(data.competitors, titleAnalysis, attrAnalysis);
 
         return `
             ${renderAnalyzedItem(data.item, tituloDaPagina)}
