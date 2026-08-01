@@ -123,6 +123,27 @@ async function handleBestSeller(req, res, userId) {
 // desenho. Não dá para auditar anúncio de concorrente por aqui.
 //
 // Substitui a antiga /health, descontinuada pelo ML em 07/02/2025.
+// A API de qualidade devolve o nível em espanhol mesmo no site brasileiro
+// ("Profesional"), e às vezes como identificador ("professional"). Traduzimos
+// para não exibir palavra errada na tela do vendedor.
+const NIVEIS_QUALIDADE = {
+    profesional: 'Profissional',
+    professional: 'Profissional',
+    satisfactoria: 'Satisfatória',
+    satisfactory: 'Satisfatória',
+    standard: 'Satisfatória',
+    basica: 'Básica',
+    basic: 'Básica',
+    incompleta: 'Incompleta',
+    incomplete: 'Incompleta',
+};
+
+function nivelEmPortugues(level) {
+    if (!level) return null;
+    const chave = String(level).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+    return NIVEIS_QUALIDADE[chave] || level;
+}
+
 async function handlePerformance(req, res, userId) {
     const itemId = req.query.itemId;
     if (!itemId) return res.status(400).json({ error: 'Parâmetro itemId é obrigatório.' });
@@ -184,7 +205,7 @@ async function handlePerformance(req, res, userId) {
         itemId: data.entity_id || itemId,
         entityType: data.entity_type || null,
         score: typeof data.score === 'number' ? data.score : null,
-        level: data.level_wording || data.level || null,
+        level: nivelEmPortugues(data.level_wording || data.level),
         calculatedAt: data.calculated_at || null,
         totals: {
             actions: actions.length,
