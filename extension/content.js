@@ -192,6 +192,44 @@
         return [...text].slice(0, count).join('');
     }
 
+    // Compara ignorando maiúsculas e acentos, sem mudar o tamanho da string
+    // (o corte é feito por posição no texto original).
+    function foldCase(text) {
+        return String(text).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    }
+
+    // Em anúncio com variação, a API cola os valores no fim do título:
+    // "...Ciclismo Moto Branco Liso Único". Cor, tamanho e desenho do tecido
+    // não são texto que o vendedor escreveu e não ocupam o limite de 60
+    // caracteres — contá-los fazia um título de 55 aparecer como 73.
+    //
+    // Só cortamos do FIM e só quando o valor bate inteiro, pra nunca comer
+    // uma palavra que o vendedor pôs de propósito.
+    function stripVariationSuffix(title, variationValues) {
+        let text = normalizeText(title);
+        const removed = [];
+        if (!variationValues || !variationValues.length) return { text, removed };
+
+        let cortou = true;
+        while (cortou) {
+            cortou = false;
+            for (const raw of variationValues) {
+                const valor = normalizeText(raw);
+                if (!valor || text.length <= valor.length) continue;
+
+                const sufixo = text.slice(-(valor.length + 1));
+                if (foldCase(sufixo) === foldCase(` ${valor}`)) {
+                    text = text.slice(0, -(valor.length + 1)).trim();
+                    removed.unshift(valor);
+                    cortou = true;
+                    break;
+                }
+            }
+        }
+
+        return { text, removed };
+    }
+
     function analyzeTitle(title) {
         const text = normalizeText(title);
         const length = charCount(text);
@@ -362,11 +400,16 @@
         // exibe o NOME DO PRODUTO no topo, enquanto o título do anúncio é
         // outro — sem ver a string contada, um "73/60" parece erro de conta
         // quando na verdade é outro texto.
+        const variacaoHtml = (t.variationRemoved && t.variationRemoved.length)
+            ? `<p class="impoclick-note">Sem contar a variação (${t.variationRemoved.map(escapeHtml).join(' · ')}), que a API cola no fim do título mas não é texto que você escreveu.</p>`
+            : '';
+
         return `
             <div class="impoclick-an-item ${cls}">
                 <strong>Título: ${t.length}/${t.max} caracteres</strong>
                 <p class="impoclick-attr-value">${escapeHtml(t.text)}</p>
                 <div class="impoclick-bar"><span class="${barClass}" style="width:${barPct}%"></span></div>
+                ${variacaoHtml}
                 ${avisos.join('')}
             </div>
         `;
@@ -1054,7 +1097,9 @@
     }
 
     function renderFullAnalysis(data, tituloDaPagina) {
-        const titleAnalysis = analyzeTitle(data.item.title);
+        const semVariacao = stripVariationSuffix(data.item.title, data.item.variationValues);
+        const titleAnalysis = analyzeTitle(semVariacao.text);
+        titleAnalysis.variationRemoved = semVariacao.removed;
         const attrAnalysis = analyzeAttributeSet(data.attributes, titleAnalysis.words);
         const audit = buildAudit(data, titleAnalysis, attrAnalysis);
 

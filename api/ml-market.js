@@ -367,6 +367,38 @@ async function fetchAdsMetrics(userId, itemId, days) {
     }
 }
 
+// Em anúncio com variação, o título que a API devolve vem com os valores da
+// variação colados no fim ("...Ciclismo Moto Branco Liso Único"). Isso não é
+// texto que o vendedor escreveu — é Cor, Tamanho e afins — e não deveria
+// contar contra o limite de 60 caracteres do título. Devolvemos os valores
+// para o painel poder descontá-los.
+const VARIATION_ATTR_IDS = new Set([
+    'COLOR', 'MAIN_COLOR', 'SECONDARY_COLOR', 'SIZE', 'FABRIC_DESIGN',
+    'GENDER', 'FLAVOR', 'VOLTAGE', 'CAPACITY', 'FORMAT', 'PACKAGE_QUANTITY',
+]);
+
+function collectVariationValues(item) {
+    const values = new Set();
+
+    (item.variations || []).forEach((variation) => {
+        (variation.attribute_combinations || []).forEach((combo) => {
+            if (combo.value_name) values.add(combo.value_name);
+        });
+    });
+
+    // Anúncio sem array de variações (caso dos user products) ainda traz os
+    // mesmos dados como atributos comuns — mas aí só aceitamos os ids que
+    // sabemos ser de variação, pra não descontar do título uma palavra que o
+    // vendedor escreveu de propósito.
+    if (values.size === 0) {
+        (item.attributes || []).forEach((attr) => {
+            if (VARIATION_ATTR_IDS.has(attr.id) && attr.value_name) values.add(attr.value_name);
+        });
+    }
+
+    return [...values];
+}
+
 // Soma as visitas de uma fatia do fim da série (os N dias mais recentes),
 // pra comparar período contra período — é isso que diz se o anúncio está
 // ganhando ou perdendo tração, coisa que o total sozinho não mostra.
@@ -482,6 +514,7 @@ async function handleAnalise(req, res, userId) {
             freeShipping: !!(item.shipping && item.shipping.free_shipping),
             catalogListing: !!item.catalog_listing,
             tags: item.tags || [],
+            variationValues: collectVariationValues(item),
         },
         description: { present: descriptionText.trim().length > 0, length: descriptionText.trim().length },
         attributes: itemAttributes,
