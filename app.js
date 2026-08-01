@@ -3663,6 +3663,129 @@ function buildLightningCandidateCard(item) {
     return card;
 }
 
+// ==========================================
+// PATROCINADOS DESLIGADOS
+//
+// Ao contrário das outras abas do monitoramento, esta não vem do cron: é o
+// estado de agora, consultado direto na API de publicidade quando a aba é
+// aberta. Por isso tem botão de atualizar em vez de "última verificação".
+// ==========================================
+
+function buildAdOffCard(item) {
+    const card = document.createElement('section');
+    card.className = 'card';
+    card.style.marginBottom = '0.75rem';
+
+    const titleGroup = document.createElement('div');
+    titleGroup.className = 'item-card-title-group';
+    titleGroup.appendChild(buildThumbnailImg(item.thumbnail));
+
+    const title = document.createElement('strong');
+    title.textContent = item.title || item.itemId;
+    titleGroup.appendChild(title);
+    card.appendChild(titleGroup);
+
+    const tags = document.createElement('div');
+    tags.style.display = 'flex';
+    tags.style.flexWrap = 'wrap';
+    tags.style.gap = '0.35rem';
+    tags.style.marginTop = '0.5rem';
+
+    const addTag = (texto, cor, fundo) => {
+        const tag = document.createElement('span');
+        tag.className = 'small';
+        tag.textContent = texto;
+        tag.style.fontWeight = '700';
+        tag.style.padding = '0.15rem 0.5rem';
+        tag.style.borderRadius = '999px';
+        tag.style.color = cor;
+        tag.style.background = fundo;
+        tags.appendChild(tag);
+    };
+
+    if (item.catalogListing) {
+        addTag(item.buyBoxWinner ? 'CATÁLOGO · ganhando' : 'CATÁLOGO', '#1d4ed8', '#dbeafe');
+    }
+    if (item.recommended) {
+        addTag('RECOMENDADO PELO ML', '#15803d', '#dcfce7');
+    }
+    addTag(item.status === 'paused' ? 'Pausado na campanha' : 'Fora de campanha', '#b45309', '#fef3c7');
+
+    card.appendChild(tags);
+
+    const detail = document.createElement('p');
+    detail.className = 'small';
+    detail.style.color = 'var(--text-muted)';
+    detail.style.marginTop = '0.5rem';
+    detail.textContent = item.status === 'paused'
+        ? 'Está numa campanha, mas pausado — não recebe impressão nenhuma.'
+        : 'Disponível para publicidade e sem campanha nenhuma.';
+    card.appendChild(detail);
+
+    if (item.permalink) {
+        const link = document.createElement('a');
+        link.href = item.permalink;
+        link.target = '_blank';
+        link.rel = 'noopener';
+        link.className = 'small';
+        link.style.display = 'inline-block';
+        link.style.marginTop = '0.4rem';
+        link.style.fontWeight = '700';
+        link.textContent = 'Abrir anúncio →';
+        card.appendChild(link);
+    }
+
+    return card;
+}
+
+async function loadAdsOff() {
+    const statusEl = document.getElementById('ads-check-status');
+    if (!state.currentUser) {
+        renderIntoList('ads-list', 'ads-empty', [], buildAdOffCard);
+        updateAdsBadge(0);
+        return;
+    }
+
+    if (statusEl) statusEl.textContent = 'Consultando a API de publicidade do Mercado Livre...';
+
+    const data = await mlApiFetch('/api/ml-reviews?resource=ads');
+
+    if (!data) {
+        if (statusEl) statusEl.textContent = 'Não foi possível consultar os Patrocinados agora.';
+        return;
+    }
+
+    if (!data.enabled) {
+        renderIntoList('ads-list', 'ads-empty', [], buildAdOffCard);
+        updateAdsBadge(0);
+        if (statusEl) statusEl.textContent = data.message || 'Publicidade não habilitada nesta conta.';
+        return;
+    }
+
+    const items = data.items || [];
+    renderIntoList('ads-list', 'ads-empty', items, buildAdOffCard);
+    updateAdsBadge(items.length);
+
+    if (statusEl) {
+        const catalogo = items.filter(i => i.catalogListing).length;
+        const partes = [`${items.length} anúncio(s) com Patrocinados desligado`];
+        if (catalogo) partes.push(`${catalogo} de catálogo`);
+        if (data.truncated) partes.push('lista parcial — há mais anúncios do que coube nesta consulta');
+        statusEl.textContent = partes.join(' · ');
+    }
+}
+
+function updateAdsBadge(count) {
+    const badge = document.getElementById('nav-badge-ads');
+    if (!badge) return;
+    if (count > 0) {
+        badge.textContent = count > 99 ? '99+' : String(count);
+        badge.classList.remove('hidden');
+    } else {
+        badge.classList.add('hidden');
+    }
+}
+
 const TEN_DAYS_MS = 10 * 86400000;
 
 // As 4 abas são mutuamente exclusivas: "Vencem em 10 dias" é tirada de dentro de
@@ -3717,7 +3840,14 @@ async function markPromotionsRead(payload) {
     await loadPromotionsStatus();
 }
 
+function initAdsModule() {
+    const btnRefresh = document.getElementById('btn-refresh-ads');
+    if (btnRefresh) btnRefresh.addEventListener('click', () => loadAdsOff());
+}
+
 function initPromotionsModule() {
+    initAdsModule();
+
     const btnMarkAll = document.getElementById('btn-mark-all-promotions-read');
     if (btnMarkAll) {
         btnMarkAll.addEventListener('click', () => markPromotionsRead({ all: true }));
@@ -3821,6 +3951,11 @@ const VIEW_HEADER_META = {
         title: 'Promoções',
         subtitle: 'Prazo de término e oportunidades de Oferta Relâmpago',
         icon: '<path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>'
+    },
+    'view-ads': {
+        title: 'Patrocinados',
+        subtitle: 'Anúncios que não estão rodando em Product Ads',
+        icon: '<path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>'
     }
 };
 
@@ -3954,6 +4089,11 @@ function initDashboardNavigation() {
             if (viewId === 'view-promotions') {
                 loadPromotionsStatus();
                 loadCheckStatus();
+            }
+            // Patrocinados consulta o ML na hora, então só carrega quando a
+            // aba é aberta — não entra no ciclo de 5 min das outras.
+            if (viewId === 'view-ads') {
+                loadAdsOff();
             }
         });
     });

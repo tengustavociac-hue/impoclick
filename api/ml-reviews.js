@@ -423,7 +423,104 @@ async function runCheck(res) {
     });
 }
 
+// Anúncios sem Patrocinados ligado.
+//
+// Diferente das outras abas do monitoramento, esta não lê tabela do Supabase
+// nem depende do cron: é uma pergunta sobre o estado de AGORA ("quais dos
+// meus anúncios estão fora de campanha"), não um alerta de mudança. Então
+// consulta a API de publicidade na hora.
+//
+// Os status que interessam:
+//   idle   — o anúncio pode ser patrocinado, mas não está em campanha nenhuma
+//   paused — está numa campanha, porém pausado
+// Ambos significam "não está rodando". O status hold fica de fora: ali o
+// anúncio está sem estoque ou pausado no marketplace, não é uma decisão de
+// publicidade.
+const ADS_OFF_STATUSES = 'idle,paused';
+const ADS_PAGE_SIZE = 50;
+const ADS_MAX_PAGES = 10;
+
+async function handleAdsOff(req, res, userId) {
+    const advResp = await mlFetch(userId, '/advertising/advertisers?product_id=PADS', {
+        headers: { 'Api-Version': '1' },
+    });
+
+    if (advResp.status === 404) {
+        return res.json({
+            enabled: false,
+            reason: 'sem_publicidade',
+            message: 'Esta conta não tem Publicidade habilitada no Mercado Livre. O ML exige reputação amarela ou melhor, 15 dias de cadastro e um mínimo de vendas.',
+            items: [],
+        });
+    }
+    if (!advResp.ok) {
+        return res.status(advResp.status).json({ error: 'Não foi possível consultar a conta de publicidade.' });
+    }
+
+    const advData = await advResp.json();
+    const advertiser = (advData.advertisers || []).find((a) => a.site_id === 'MLB') || (advData.advertisers || [])[0];
+    if (!advertiser) {
+        return res.json({ enabled: false, reason: 'sem_anunciante', message: 'Nenhuma conta de anunciante encontrada.', items: [] });
+    }
+
+    const items = [];
+    let offset = 0;
+    let total = 0;
+
+    for (let page = 0; page < ADS_MAX_PAGES; page += 1) {
+        const qs = new URLSearchParams({ limit: String(ADS_PAGE_SIZE), offset: String(offset) });
+        qs.set('filters[statuses]', ADS_OFF_STATUSES);
+
+        const resp = await mlFetch(
+            userId,
+            `/advertising/MLB/advertisers/${advertiser.advertiser_id}/product_ads/ads/search?${qs.toString()}`,
+            { headers: { 'api-version': '2' } }
+        );
+        if (!resp.ok) break;
+
+        const data = await resp.json();
+        (data.results || []).forEach((ad) => {
+            items.push({
+                itemId: ad.item_id,
+                title: ad.title || ad.item_id,
+                thumbnail: ad.thumbnail || null,
+                permalink: ad.permalink || null,
+                price: ad.price != null ? ad.price : null,
+                status: ad.status || null,
+                // Anúncio de catálogo disputa a mesma página com outros
+                // vendedores, então ligar Patrocinados ali tem peso diferente
+                // — por isso a tela marca esses separadamente.
+                catalogListing: !!ad.catalog_listing,
+                buyBoxWinner: !!ad.buy_box_winner,
+                // O próprio ML sinaliza quais anúncios responderiam bem ao
+                // investimento, segundo o modelo deles.
+                recommended: !!ad.recommended,
+            });
+        });
+
+        total = (data.paging && data.paging.total) || items.length;
+        offset += ADS_PAGE_SIZE;
+        if (offset >= total) break;
+    }
+
+    // Recomendados pelo ML primeiro, depois catálogo — é a ordem em que
+    // ligar o patrocinado tende a render mais.
+    items.sort((a, b) => (b.recommended - a.recommended) || (b.catalogListing - a.catalogListing));
+
+    return res.json({
+        enabled: true,
+        advertiserId: advertiser.advertiser_id,
+        total,
+        truncated: total > items.length,
+        items,
+    });
+}
+
 async function handleUserGet(req, res, userId) {
+    if (req.query.resource === 'ads') {
+        return await handleAdsOff(req, res, userId);
+    }
+
     if (req.query.resource === 'status') {
         const { data, error } = await supabaseAdmin
             .from('ml_check_status')
