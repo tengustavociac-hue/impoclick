@@ -411,14 +411,18 @@ function titleWithoutVariation(title, values) {
     let text = String(title || '').normalize('NFC').trim();
     const fold = (s) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
+    // Cada valor é colado uma vez só — ver a mesma regra no content.js.
+    const disponiveis = (values || []).map((v) => String(v || '').normalize('NFC').trim()).filter(Boolean);
+
     let cortou = true;
     while (cortou) {
         cortou = false;
-        for (const raw of values) {
-            const valor = String(raw || '').normalize('NFC').trim();
-            if (!valor || text.length <= valor.length) continue;
+        for (let i = 0; i < disponiveis.length; i += 1) {
+            const valor = disponiveis[i];
+            if (text.length <= valor.length) continue;
             if (fold(text.slice(-(valor.length + 1))) === fold(` ${valor}`)) {
                 text = text.slice(0, -(valor.length + 1)).trim();
+                disponiveis.splice(i, 1);
                 cortou = true;
                 break;
             }

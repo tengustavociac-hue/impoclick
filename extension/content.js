@@ -210,17 +210,25 @@
         const removed = [];
         if (!variationValues || !variationValues.length) return { text, removed };
 
+        // Cada valor da variação é colado UMA vez no fim do título, então
+        // cada um só pode ser cortado uma vez. Em "...Corta Roupas Aph
+        // Pequena Pequena", a última "Pequena" é o tamanho e a outra é
+        // palavra que o vendedor escreveu — cortar as duas roubava 8
+        // caracteres do título dele.
+        const disponiveis = variationValues.map((v) => normalizeText(v)).filter(Boolean);
+
         let cortou = true;
         while (cortou) {
             cortou = false;
-            for (const raw of variationValues) {
-                const valor = normalizeText(raw);
-                if (!valor || text.length <= valor.length) continue;
+            for (let i = 0; i < disponiveis.length; i += 1) {
+                const valor = disponiveis[i];
+                if (text.length <= valor.length) continue;
 
                 const sufixo = text.slice(-(valor.length + 1));
                 if (foldCase(sufixo) === foldCase(` ${valor}`)) {
                     text = text.slice(0, -(valor.length + 1)).trim();
                     removed.unshift(valor);
+                    disponiveis.splice(i, 1);
                     cortou = true;
                     break;
                 }
