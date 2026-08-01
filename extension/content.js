@@ -173,8 +173,28 @@
             .filter((w) => w.length > 3 && w === w.toUpperCase() && /[A-ZÀ-Ý]/.test(w));
     }
 
+    // Conta caracteres como o vendedor vê, não como o JavaScript guarda.
+    // `.length` devolve unidades UTF-16: um "ô" que venha decomposto (a letra
+    // + o acento como caracteres separados) conta 2, e emoji conta 2. Sem
+    // isso, um título de 60 caracteres com 6 acentos aparecia como 66/60 e o
+    // painel acusava estouro que não existia.
+    function normalizeText(text) {
+        return String(text || '').normalize('NFC').trim();
+    }
+
+    function charCount(text) {
+        return [...text].length;
+    }
+
+    // Corta pelos N primeiros caracteres visíveis, e não por code units — em
+    // texto acentuado o slice normal partiria a letra do acento.
+    function sliceChars(text, count) {
+        return [...text].slice(0, count).join('');
+    }
+
     function analyzeTitle(title) {
-        const text = String(title || '');
+        const text = normalizeText(title);
+        const length = charCount(text);
         const titleWords = toWordSet(text);
 
         // Palavras repetidas dentro do próprio título desperdiçam espaço dos
@@ -192,16 +212,16 @@
         return {
             text,
             words: titleWords,
-            length: text.length,
+            length,
             max: TITLE_MAX_CHARS,
             min: TITLE_MIN_RECOMMENDED,
-            tooLong: text.length > TITLE_MAX_CHARS,
-            tooShort: text.length > 0 && text.length < TITLE_MIN_RECOMMENDED,
+            tooLong: length > TITLE_MAX_CHARS,
+            tooShort: length > 0 && length < TITLE_MIN_RECOMMENDED,
             duplicates,
             promoTerms,
             shouting: shouting.length >= 3 ? shouting : [],
-            clean: text.length <= TITLE_MAX_CHARS
-                && text.length >= TITLE_MIN_RECOMMENDED
+            clean: length <= TITLE_MAX_CHARS
+                && length >= TITLE_MIN_RECOMMENDED
                 && duplicates.length === 0
                 && promoTerms.length === 0,
         };
@@ -393,12 +413,16 @@
 
         const enriched = (attributes || [])
             .filter((a) => IDENTITY_ATTRS.includes(a.id))
-            .map((a) => ({
-                id: a.id,
-                name: a.name,
-                value: String(a.value || ''),
-                words: toWordSet(String(a.value || '').slice(0, ATTR_INDEXED_CHARS)),
-            }));
+            .map((a) => {
+                const value = normalizeText(a.value);
+                return {
+                    id: a.id,
+                    name: a.name,
+                    value,
+                    length: charCount(value),
+                    words: toWordSet(sliceChars(value, ATTR_INDEXED_CHARS)),
+                };
+            });
 
         return enriched.map((a) => {
             const repeated = [...new Set(a.words.filter((w) => titleSet.has(w)))];
@@ -413,12 +437,13 @@
                 if (shared.length) duplicates.push({ name: other.name, words: shared });
             });
 
-            const truncated = a.value.length > ATTR_INDEXED_CHARS;
+            const truncated = a.length > ATTR_INDEXED_CHARS;
 
             return {
                 id: a.id,
                 name: a.name,
                 value: a.value,
+                length: a.length,
                 truncated,
                 repeated,
                 wastedChars: repeated.reduce((sum, w) => sum + w.length, 0),
@@ -655,7 +680,7 @@
         const blocos = problemas.map((a) => {
             const linhas = [];
             if (a.truncated) {
-                linhas.push(`<p>Tem ${a.value.length} caracteres, mas o ML indexa só os primeiros ${ATTR_INDEXED_CHARS} — o resto não entra na busca.</p>`);
+                linhas.push(`<p>Tem ${a.length} caracteres, mas o ML indexa só os primeiros ${ATTR_INDEXED_CHARS} — o resto não entra na busca.</p>`);
             }
             if (a.repeated.length) {
                 linhas.push(`<p>Repete o título em: <strong>${a.repeated.map(escapeHtml).join(', ')}</strong> — cerca de ${a.wastedChars} caracteres desperdiçados.</p>`);
