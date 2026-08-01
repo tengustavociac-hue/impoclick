@@ -234,6 +234,15 @@
     function extractItemId() {
         const url = window.location.href;
 
+        // Nas páginas /up/ (produto unificado) o MLBU... do caminho é o id do
+        // PRODUTO, não do anúncio — vários vendedores dividem a mesma página.
+        // O anúncio que está sendo exibido vem no parâmetro wid. Sem ler isso
+        // primeiro, a busca caía na varredura do HTML lá embaixo e pegava o
+        // primeiro MLB que aparecesse, que numa página com carrossel de
+        // recomendados costuma ser um anúncio completamente diferente.
+        const fromWid = url.match(/[?&#]wid=(MLB\d+)/i);
+        if (fromWid) return fromWid[1].toUpperCase();
+
         const fromParam = url.match(/item_id[=:](MLB\d+)/i);
         if (fromParam) return fromParam[1].toUpperCase();
 
@@ -1007,7 +1016,30 @@
         `;
     }
 
-    function renderFullAnalysis(data) {
+    // Cabeçalho dizendo QUAL anúncio foi analisado. Numa página /up/ vários
+    // vendedores dividem a mesma tela e ainda há carrossel de recomendados,
+    // então é fácil o id extraído não ser o do anúncio que está na frente do
+    // usuário. Mostrar título e código deixa isso na cara em vez de entregar
+    // números de outro anúncio como se fossem deste.
+    function renderAnalyzedItem(item, tituloDaPagina) {
+        const palavrasItem = toWordSet(item.title);
+        const palavrasPagina = new Set(toWordSet(tituloDaPagina || ''));
+        const comuns = palavrasItem.filter((w) => palavrasPagina.has(w)).length;
+        const divergente = !!tituloDaPagina
+            && palavrasItem.length > 0
+            && (comuns / palavrasItem.length) < 0.5;
+
+        return `
+            <div class="impoclick-analyzed ${divergente ? 'impoclick-analyzed-warn' : ''}">
+                <span class="impoclick-analyzed-label">Analisando</span>
+                <p class="impoclick-item-title">${escapeHtml(item.title)}</p>
+                <p class="impoclick-note">${escapeHtml(item.id)}${item.permalink ? ` · <a href="${escapeHtml(item.permalink)}" target="_blank" rel="noopener">abrir anúncio</a>` : ''}</p>
+                ${divergente ? '<p class="impoclick-note impoclick-error">Este não parece ser o anúncio da página que você está vendo. Abra o anúncio pelo link acima para conferir, ou entre por ele direto.</p>' : ''}
+            </div>
+        `;
+    }
+
+    function renderFullAnalysis(data, tituloDaPagina) {
         const titleAnalysis = analyzeTitle(data.item.title);
         const attrAnalysis = analyzeAttributeSet(data.attributes, titleAnalysis.words);
         const audit = buildAudit(data, titleAnalysis, attrAnalysis);
@@ -1016,6 +1048,7 @@
         const sugestoes = suggestKeywords(data.trends, titleAnalysis, attrAnalysis);
 
         return `
+            ${renderAnalyzedItem(data.item, tituloDaPagina)}
             ${renderScoreBlock(audit)}
             ${renderChecklist(audit)}
             ${renderNumbersBlock(data)}
@@ -1119,7 +1152,7 @@
                 return;
             }
 
-            let html = renderFullAnalysis(analiseResp.analise);
+            let html = renderFullAnalysis(analiseResp.analise, pageData.title);
             if (perfResp.performance) html += renderPerformance(perfResp.performance);
             el.innerHTML = html;
         });

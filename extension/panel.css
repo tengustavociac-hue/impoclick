@@ -647,6 +647,42 @@
     letter-spacing: 0.05em;
 }
 
+/* Cabeçalho "Analisando X" — deixa visível qual anúncio a análise pegou,
+   já que uma página /up/ mostra vários vendedores e recomendados. */
+.impoclick-analyzed {
+    border: 1px solid #f0e0b0;
+    border-left: 3px solid #b8860b;
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin-bottom: 10px;
+    background: #fffdf7;
+}
+
+.impoclick-analyzed.impoclick-analyzed-warn {
+    border-left-color: #b91c1c;
+    background: #fef4f4;
+}
+
+.impoclick-analyzed-label {
+    display: block;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #9a8a63;
+    margin-bottom: 3px;
+}
+
+.impoclick-analyzed .impoclick-item-title {
+    margin-bottom: 3px;
+}
+
+.impoclick-analyzed a {
+    color: #b8860b;
+    font-weight: 700;
+    text-decoration: none;
+}
+
 /* --- Palavras-chave: repetidas x sugeridas --- */
 
 /* Palavra que aparece em mais de um dos campos Título/Marca/Modelo. */
