@@ -260,14 +260,18 @@ function flattenCategoryFields(specs) {
     return fields;
 }
 
-// Quantas unidades DESTE anúncio saíram na janela. O ML não tem endpoint de
-// "vendas por item por período" — a única forma é varrer os pedidos do
-// vendedor e somar os order_items do anúncio, que é o mesmo caminho usado
-// no alerta de estoque. Paramos em MAX_PAGES pra não estourar o tempo
-// limite da função serverless em conta com muito pedido; quando isso
-// acontece a resposta vem marcada como parcial, pra tela não afirmar um
-// número que está incompleto.
-const ORDERS_MAX_PAGES = 8;
+// Quantas unidades DESTE anúncio saíram na janela.
+//
+// O /orders/search aceita filtro por item, então a busca já vem restrita aos
+// pedidos deste anúncio em vez de varrer todos os pedidos do vendedor — o
+// que antes obrigava a parar no meio do caminho e devolver um número
+// parcial. Com o filtro, o conjunto é pequeno e dá pra somar tudo.
+//
+// Se mesmo assim não der pra percorrer todas as páginas, devolvemos null: um
+// número de vendas incompleto não serve pra decidir nada, e a partir dele
+// saem a projeção de estoque e a conversão. Melhor não mostrar do que
+// mostrar errado.
+const ORDERS_MAX_PAGES = 20;
 const ORDERS_PAGE_SIZE = 50;
 
 async function fetchItemSales(userId, mlUserId, itemId, days) {
@@ -280,13 +284,13 @@ async function fetchItemSales(userId, mlUserId, itemId, days) {
 
     let sold = 0;
     let soldRecentHalf = 0;
+    let orders = 0;
     let offset = 0;
-    let pages = 0;
-    let partial = false;
 
-    while (pages < ORDERS_MAX_PAGES) {
+    for (let page = 0; page < ORDERS_MAX_PAGES; page += 1) {
         const qs = new URLSearchParams({
             seller: mlUserId,
+            item: itemId,
             'order.date_created.from': fmt(from),
             'order.date_created.to': fmt(to),
             limit: String(ORDERS_PAGE_SIZE),
@@ -297,25 +301,28 @@ async function fetchItemSales(userId, mlUserId, itemId, days) {
         if (!data || !Array.isArray(data.results)) return null;
 
         data.results.forEach((order) => {
-            if (order.status === 'cancelled') return;
+            if (order.status === 'cancelled' || order.status === 'invalid') return;
             const createdAt = new Date(order.date_created);
+            // O filtro item também casa por título, então conferimos o id
+            // linha a linha antes de somar.
             (order.order_items || []).forEach((line) => {
                 if (!line.item || line.item.id !== itemId) return;
                 const qty = line.quantity || 0;
                 sold += qty;
+                orders += 1;
                 if (createdAt >= halfway) soldRecentHalf += qty;
             });
         });
 
         const total = (data.paging && data.paging.total) || 0;
         offset += ORDERS_PAGE_SIZE;
-        pages += 1;
 
-        if (offset >= total) break;
-        if (pages >= ORDERS_MAX_PAGES) partial = true;
+        if (offset >= total) {
+            return { days, sold, soldRecentHalf, halfDays: days / 2, orders };
+        }
     }
 
-    return { days, sold, soldRecentHalf, halfDays: days / 2, partial };
+    return null;
 }
 
 // Métricas de Product Ads do anúncio. Os endpoints antigos de Product Ads

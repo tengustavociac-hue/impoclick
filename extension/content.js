@@ -859,7 +859,7 @@
             linhas.push(`
                 <div class="impoclick-breakdown-row">
                     <span>Vendas em ${sales.days} dias</span>
-                    <strong>${sales.sold} un.${sales.partial ? ' *' : ''}</strong>
+                    <strong>${sales.sold} un.</strong>
                 </div>
             `);
 
@@ -882,6 +882,15 @@
                     `);
                 }
             }
+        } else if (item.availableQuantity != null) {
+            // Sem o número exato de vendas não dá pra projetar estoque nem
+            // calcular conversão — mostramos só o que é fato.
+            linhas.push(`
+                <div class="impoclick-breakdown-row">
+                    <span>Estoque</span>
+                    <strong>${item.availableQuantity} un.</strong>
+                </div>
+            `);
         }
 
         if (visits && visits.total30 > 0 && sales) {
@@ -907,7 +916,7 @@
         return `
             <div class="impoclick-an-block-title">Números do anúncio</div>
             <div class="impoclick-breakdown">${linhas.join('')}</div>
-            ${sales && sales.partial ? '<p class="impoclick-note">* A conta parou nos primeiros pedidos do período para não estourar o tempo da consulta — o total real pode ser maior.</p>' : ''}
+            ${!sales ? '<p class="impoclick-note">Não foi possível confirmar as vendas do período, então projeção de estoque e conversão ficam de fora — um número aproximado aqui não serviria para decidir nada.</p>' : ''}
         `;
     }
 
