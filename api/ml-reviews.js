@@ -451,31 +451,54 @@ const ADS_PAGE_SIZE = 50;
 const ADS_MAX_PAGES = 10;
 
 // Lista os anúncios que estão fora de publicidade agora, direto na API do ML.
-// Devolve null quando a conta não tem Publicidade habilitada — diferente de
-// devolver lista vazia, que significaria "está tudo rodando".
+//
+// Devolve sempre o motivo em caso de falha, em vez de null: uma aba vazia
+// pode significar "está tudo rodando" ou "a consulta falhou", e sem
+// distinguir os dois o vendedor fica sem saber se pode confiar na tela.
 async function fetchAdsOff(userId) {
     const advResp = await mlFetch(userId, '/advertising/advertisers?product_id=PADS', {
         headers: { 'Api-Version': '1' },
     });
-    if (!advResp.ok) return null;
+
+    if (advResp.status === 404) {
+        return {
+            ok: false,
+            reason: 'sem_publicidade',
+            message: 'Esta conta do Mercado Livre não tem Publicidade habilitada (Meu perfil > Publicidade). O ML exige reputação amarela ou melhor, 15 dias de cadastro e um mínimo de vendas.',
+        };
+    }
+    if (!advResp.ok) {
+        return {
+            ok: false,
+            reason: 'erro_anunciante',
+            message: `Não foi possível consultar a conta de anunciante (HTTP ${advResp.status}): ${(await advResp.text()).slice(0, 200)}`,
+        };
+    }
 
     const advData = await advResp.json();
     const advertiser = (advData.advertisers || []).find((a) => a.site_id === 'MLB') || (advData.advertisers || [])[0];
-    if (!advertiser) return null;
+    if (!advertiser) {
+        return { ok: false, reason: 'sem_anunciante', message: 'A API de publicidade não retornou nenhuma conta de anunciante para este usuário.' };
+    }
 
     const items = [];
     let offset = 0;
 
     for (let page = 0; page < ADS_MAX_PAGES; page += 1) {
-        const qs = new URLSearchParams({ limit: String(ADS_PAGE_SIZE), offset: String(offset) });
-        qs.set('filters[statuses]', ADS_OFF_STATUSES);
+        // O ML espera filters[statuses]=idle,paused. URLSearchParams
+        // percent-encoda os colchetes e a vírgula, o que nem toda API aceita,
+        // então a query é montada à mão.
+        const path = `/advertising/MLB/advertisers/${advertiser.advertiser_id}/product_ads/ads/search`
+            + `?limit=${ADS_PAGE_SIZE}&offset=${offset}&filters[statuses]=${ADS_OFF_STATUSES}`;
 
-        const resp = await mlFetch(
-            userId,
-            `/advertising/MLB/advertisers/${advertiser.advertiser_id}/product_ads/ads/search?${qs.toString()}`,
-            { headers: { 'api-version': '2' } }
-        );
-        if (!resp.ok) break;
+        const resp = await mlFetch(userId, path, { headers: { 'api-version': '2' } });
+        if (!resp.ok) {
+            return {
+                ok: false,
+                reason: 'erro_ads',
+                message: `Falha ao listar os anúncios de publicidade (HTTP ${resp.status}): ${(await resp.text()).slice(0, 200)}`,
+            };
+        }
 
         const data = await resp.json();
         (data.results || []).forEach((ad) => {
@@ -495,7 +518,7 @@ async function fetchAdsOff(userId) {
         if (offset >= total) break;
     }
 
-    return items;
+    return { ok: true, items };
 }
 
 // Grava o estado de publicidade e detecta quem SAIU de campanha.
@@ -505,8 +528,12 @@ async function fetchAdsOff(userId) {
 // vira alerta. Na primeira rodada de um usuário nada alerta: os parados já
 // estavam parados antes de existir monitoramento, não é uma transição.
 async function checkAdsStatus(userId) {
-    const items = await fetchAdsOff(userId);
-    if (items === null) return { adsChecked: 0, adsJustOff: 0 };
+    const resultado = await fetchAdsOff(userId);
+    if (!resultado.ok) {
+        console.error(`Patrocinados (${userId}): ${resultado.reason} — ${resultado.message}`);
+        return { adsChecked: 0, adsJustOff: 0 };
+    }
+    const items = resultado.items;
 
     const { data: existingRows, error: existingError } = await supabaseAdmin
         .from('ml_ads_status')
@@ -556,7 +583,9 @@ async function checkAdsStatus(userId) {
     const aindaParados = items.map((ad) => ad.itemId);
     let deleteQuery = supabaseAdmin.from('ml_ads_status').delete().eq('user_id', userId);
     if (aindaParados.length > 0) {
-        deleteQuery = deleteQuery.not('ml_item_id', 'in', `(${aindaParados.join(',')})`);
+        // Valores entre aspas: sem isso o PostgREST pode interpretar errado a
+        // lista e apagar linhas que deveriam continuar.
+        deleteQuery = deleteQuery.not('ml_item_id', 'in', `(${aindaParados.map((id) => `"${id}"`).join(',')})`);
     }
     const { error: deleteError } = await deleteQuery;
     if (deleteError) throw new Error(deleteError.message);
@@ -585,7 +614,34 @@ async function handleUserGet(req, res, userId) {
         ]);
 
         if (listRes.error) return res.status(500).json({ error: listRes.error.message });
-        return res.json({ items: listRes.data || [], unreadCount: countRes.count || 0 });
+
+        const gravados = listRes.data || [];
+        if (gravados.length > 0) {
+            return res.json({ items: gravados, unreadCount: countRes.count || 0, source: 'monitoramento' });
+        }
+
+        // Banco vazio pode ser "está tudo rodando", "o cron ainda não passou"
+        // ou "a consulta à API de publicidade falhou". Consultamos ao vivo pra
+        // não deixar a tela em branco sem explicação — e, quando dá erro, o
+        // motivo aparece em vez de a aba fingir que não há nada.
+        const aoVivo = await fetchAdsOff(userId);
+        if (!aoVivo.ok) {
+            return res.json({ items: [], unreadCount: 0, source: 'ao_vivo', problema: aoVivo.reason, message: aoVivo.message });
+        }
+
+        const items = aoVivo.items.map((ad) => ({
+            id: ad.itemId,
+            ml_item_id: ad.itemId,
+            item_title: ad.title,
+            item_thumbnail: ad.thumbnail,
+            status: ad.status,
+            catalog_listing: ad.catalogListing,
+            buy_box_winner: ad.buyBoxWinner,
+            recommended: ad.recommended,
+            is_read: true, // ainda não passou pelo monitoramento: não é alerta
+        }));
+
+        return res.json({ items, unreadCount: 0, source: 'ao_vivo' });
     }
 
     if (req.query.resource === 'status') {

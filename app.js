@@ -3773,6 +3773,20 @@ async function loadAdsOff() {
     const data = await mlApiFetch('/api/ml-reviews?resource=ads');
     updateAdsBadge(data ? data.unreadCount : 0);
     renderIntoList('ads-list', 'ads-empty', data ? data.items : [], buildAdOffCard);
+
+    // Aba vazia tem várias causas possíveis. Quando a consulta ao vivo falha,
+    // mostra o motivo em vez de deixar parecendo que está tudo rodando.
+    // Elemento separado do "última verificação", que é escrito por outra
+    // função e sobrescreveria esta mensagem.
+    const problemEl = document.getElementById('ads-problem');
+    if (problemEl) {
+        if (data && data.problema) {
+            problemEl.textContent = data.message || 'Não foi possível consultar os Patrocinados.';
+            problemEl.classList.remove('hidden');
+        } else {
+            problemEl.classList.add('hidden');
+        }
+    }
 }
 
 async function markAdsRead(payload) {
