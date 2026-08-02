@@ -446,7 +446,12 @@ async function runCheck(res) {
 // Ambos significam "não está rodando". O status hold fica de fora: ali o
 // anúncio está sem estoque ou pausado no marketplace, não é uma decisão de
 // publicidade.
-const ADS_OFF_STATUSES = 'idle,paused';
+// idle   = pode ser patrocinado, mas não está em campanha nenhuma
+// paused = está numa campanha, porém pausado
+// Qualquer outro status (active, hold, delegated, revoked) não é "desligado
+// por decisão do vendedor" e não entra na aba.
+const ADS_OFF_STATUS_LIST = ['idle', 'paused'];
+const ADS_OFF_STATUSES = ADS_OFF_STATUS_LIST.join(',');
 const ADS_PAGE_SIZE = 50;
 const ADS_MAX_PAGES = 10;
 
@@ -502,6 +507,12 @@ async function fetchAdsOff(userId) {
 
         const data = await resp.json();
         (data.results || []).forEach((ad) => {
+            // O filtro filters[statuses] da URL não é confiável: o ML devolveu
+            // anúncios ativos mesmo pedindo só idle,paused, e eles entravam na
+            // lista como se estivessem fora de campanha. A conferência do
+            // status é feita aqui, sobre o que a resposta realmente trouxe.
+            if (!ADS_OFF_STATUS_LIST.includes(ad.status)) return;
+
             // Anúncio de catálogo fica de fora: a aba trata dos anúncios
             // próprios da conta, onde ligar o Patrocinados é decisão só do
             // vendedor. No catálogo a página é compartilhada e a dinâmica é
@@ -644,6 +655,10 @@ async function handleUserGet(req, res, userId) {
                 .select('id, ml_item_id, item_title, item_thumbnail, status, catalog_listing, buy_box_winner, recommended, is_read, updated_at')
                 .eq('user_id', userId)
                 .eq('catalog_listing', false)
+                // Filtra o status também na leitura: linhas gravadas antes,
+                // quando anúncios ativos entravam por engano, somem da tela na
+                // hora em vez de esperar o cron apagá-las.
+                .in('status', ADS_OFF_STATUS_LIST)
                 // Recomendados pelo ML primeiro — a ordem em que ligar o
                 // patrocinado tende a render mais.
                 .order('recommended', { ascending: false })
@@ -654,6 +669,7 @@ async function handleUserGet(req, res, userId) {
                 .select('id', { count: 'exact', head: true })
                 .eq('user_id', userId)
                 .eq('catalog_listing', false)
+                .in('status', ADS_OFF_STATUS_LIST)
                 .eq('is_read', false),
         ]);
 

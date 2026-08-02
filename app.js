@@ -3710,12 +3710,32 @@ function buildAdOffCard(item) {
     titleGroup.appendChild(title);
     card.appendChild(titleGroup);
 
+    // Rótulos explícitos por status. Antes era "paused ou senão fora de
+    // campanha", e isso escondeu um problema: anúncio ativo que entrava na
+    // lista por engano aparecia como "Fora de campanha". Status desconhecido
+    // agora se mostra em vez de virar afirmação errada.
+    const ADS_STATUS = {
+        idle: {
+            etiqueta: 'Fora de campanha',
+            alerta: 'Este anúncio saiu de campanha',
+            detalhe: 'Disponível para publicidade e sem campanha nenhuma.',
+        },
+        paused: {
+            etiqueta: 'Pausado na campanha',
+            alerta: 'Este anúncio foi pausado na campanha',
+            detalhe: 'Está numa campanha, mas pausado — não recebe impressão nenhuma.',
+        },
+    };
+    const info = ADS_STATUS[item.status] || {
+        etiqueta: `Status: ${item.status || 'desconhecido'}`,
+        alerta: 'Este anúncio mudou de situação na publicidade',
+        detalhe: 'O Mercado Livre retornou um status que a tela ainda não conhece.',
+    };
+
     // Alerta só pra quem saiu de campanha depois que o monitoramento começou:
     // anúncio que já estava parado desde sempre não é novidade.
     if (!item.is_read) {
-        card.appendChild(buildAlertBanner(item.status === 'paused'
-            ? 'Este anúncio foi pausado na campanha'
-            : 'Este anúncio saiu de campanha'));
+        card.appendChild(buildAlertBanner(info.alerta));
     }
 
     const tags = document.createElement('div');
@@ -3739,7 +3759,7 @@ function buildAdOffCard(item) {
     if (item.recommended) {
         addTag('RECOMENDADO PELO ML', '#15803d', '#dcfce7');
     }
-    addTag(item.status === 'paused' ? 'Pausado na campanha' : 'Fora de campanha', '#b45309', '#fef3c7');
+    addTag(info.etiqueta, '#b45309', '#fef3c7');
 
     card.appendChild(tags);
 
@@ -3747,9 +3767,7 @@ function buildAdOffCard(item) {
     detail.className = 'small';
     detail.style.color = 'var(--text-muted)';
     detail.style.marginTop = '0.5rem';
-    detail.textContent = item.status === 'paused'
-        ? 'Está numa campanha, mas pausado — não recebe impressão nenhuma.'
-        : 'Disponível para publicidade e sem campanha nenhuma.';
+    detail.textContent = info.detalhe;
     card.appendChild(detail);
 
     card.appendChild(buildAdsPageLink(item));
