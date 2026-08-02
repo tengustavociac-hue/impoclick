@@ -3737,18 +3737,10 @@ function buildAdOffCard(item) {
         : 'Disponível para publicidade e sem campanha nenhuma.';
     card.appendChild(detail);
 
-    if (item.permalink) {
-        const link = document.createElement('a');
-        link.href = item.permalink;
-        link.target = '_blank';
-        link.rel = 'noopener';
-        link.className = 'small';
-        link.style.display = 'inline-block';
-        link.style.marginTop = '0.4rem';
-        link.style.fontWeight = '700';
-        link.textContent = 'Abrir anúncio →';
-        card.appendChild(link);
-    }
+    // Leva para a lista de anúncios do vendedor no ML, e não para a página
+    // pública do produto: dali dá pra agir sobre o anúncio, que é o motivo de
+    // ele estar nesta aba. Mesmo destino usado pelos cards de promoções.
+    card.appendChild(buildPromotionPageLink(item.itemId));
 
     return card;
 }
