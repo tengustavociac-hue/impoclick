@@ -3755,7 +3755,7 @@ function buildAdOffCard(item) {
         : 'Disponível para publicidade e sem campanha nenhuma.';
     card.appendChild(detail);
 
-    card.appendChild(buildAdsPageLink(item.ml_item_id));
+    card.appendChild(buildAdsPageLink(item));
 
     return card;
 }
@@ -3763,12 +3763,18 @@ function buildAdOffCard(item) {
 // Leva direto para o painel de Publicidade do Mercado Livre, filtrado neste
 // anúncio — é lá que se liga o Patrocinados. A página de promoções, usada
 // pelos cards das outras abas, não serve aqui: são áreas diferentes do ML.
-function buildAdsPageLink(itemId) {
+//
+// A busca vai pelo TÍTULO, não pelo MLB: o campo de busca desse painel não
+// encontra pelo id do anúncio. O título aqui vem da própria API de
+// publicidade, então é o mesmo texto que esse painel conhece.
+function buildAdsPageLink(item) {
+    const termo = item.item_title || item.ml_item_id;
+
     const link = document.createElement('a');
     link.className = 'btn btn-secondary btn-sm';
     link.style.marginTop = '0.5rem';
     link.style.display = 'inline-block';
-    link.href = `https://www.mercadolivre.com.br/publicidade/product-ads/admin/ads?search=${encodeURIComponent(itemId)}`;
+    link.href = `https://www.mercadolivre.com.br/publicidade/product-ads/admin/ads?search=${encodeURIComponent(termo)}`;
     link.target = '_blank';
     link.rel = 'noopener';
     link.textContent = 'Ver nos Patrocinados';
