@@ -165,9 +165,21 @@ async function getPromotionsStatus() {
     return { promotions: data };
 }
 
+// Anúncios que saíram de campanha de publicidade — mesmo endpoint das outras
+// abas do monitoramento, resource=ads.
+async function getAdsStatus() {
+    const headers = await getAuthHeaders();
+    if (!headers) return { error: 'not_logged_in' };
+
+    const resp = await fetch(`${IMPOCLICK_API}/ml-reviews?resource=ads`, { headers });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) return { error: data.error || 'Não foi possível consultar os Patrocinados.' };
+    return { ads: data };
+}
+
 // O badge do ícone soma avaliações não lidas + itens de catálogo que acabaram
-// de perder a competição + promoções terminando/terminadas — o popup detalha
-// cada um separadamente.
+// de perder a competição + promoções terminando/terminadas + anúncios que
+// saíram de campanha — o popup detalha cada um separadamente.
 async function refreshReviewsBadge() {
     const session = await getSession();
     if (!session) {
@@ -175,11 +187,14 @@ async function refreshReviewsBadge() {
         return;
     }
 
-    const [reviewsResult, catalogResult, promotionsResult] = await Promise.all([getReviews(), getCatalogStatus(), getPromotionsStatus()]);
+    const [reviewsResult, catalogResult, promotionsResult, adsResult] = await Promise.all([
+        getReviews(), getCatalogStatus(), getPromotionsStatus(), getAdsStatus(),
+    ]);
     const reviewsUnread = (reviewsResult.reviews && reviewsResult.reviews.unreadCount) || 0;
     const catalogUnread = (catalogResult.catalog && catalogResult.catalog.unreadCount) || 0;
     const promotionsUnread = (promotionsResult.promotions && promotionsResult.promotions.unreadCount) || 0;
-    const totalUnread = reviewsUnread + catalogUnread + promotionsUnread;
+    const adsUnread = (adsResult.ads && adsResult.ads.unreadCount) || 0;
+    const totalUnread = reviewsUnread + catalogUnread + promotionsUnread + adsUnread;
 
     if (totalUnread > 0) {
         chrome.action.setBadgeBackgroundColor({ color: '#ef4444' });
@@ -189,9 +204,10 @@ async function refreshReviewsBadge() {
     }
 }
 
-// O popup só mostra a contagem (o conteúdo detalhado fica no site), então abrir
-// o popup já vale como "vi o aviso" — marca tudo como lido e zera o badge na hora,
-// em vez de esperar os até 15 min do próximo alarme pra refletir o que já foi visto.
+// O popup só mostra a contagem (o conteúdo detalhado fica no site), então ver o
+// popup vale como "vi o aviso". Mas a marcação acontece quando ele FECHA, não
+// quando abre: assim ele exibe o que estava pendente enquanto está na tela, e
+// os avisos só somem depois — o detalhe continua no site.
 async function markAllAsRead() {
     const authHeaders = await getAuthHeaders();
     if (!authHeaders) return { error: 'not_logged_in' };
@@ -202,10 +218,20 @@ async function markAllAsRead() {
         fetch(`${IMPOCLICK_API}/ml-reviews`, { method: 'PATCH', headers, body }).catch(() => {}),
         fetch(`${IMPOCLICK_API}/ml-reviews?resource=catalog`, { method: 'PATCH', headers, body }).catch(() => {}),
         fetch(`${IMPOCLICK_API}/ml-reviews?resource=promotions`, { method: 'PATCH', headers, body }).catch(() => {}),
+        fetch(`${IMPOCLICK_API}/ml-reviews?resource=ads`, { method: 'PATCH', headers, body }).catch(() => {}),
     ]);
     chrome.action.setBadgeText({ text: '' });
     return { ok: true };
 }
+
+// O popup abre uma porta ao carregar e ela se desconecta sozinha quando a
+// janelinha fecha. É o sinal de fechamento confiável no Manifest V3 — evento
+// de unload na página do popup não é garantido, e a porta ainda mantém o
+// service worker vivo o suficiente pra concluir a marcação.
+chrome.runtime.onConnect.addListener((port) => {
+    if (port.name !== 'popup') return;
+    port.onDisconnect.addListener(() => { markAllAsRead(); });
+});
 
 chrome.alarms.create('checkReviews', { periodInMinutes: 15 });
 chrome.alarms.onAlarm.addListener((alarm) => {
@@ -300,8 +326,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             case 'GET_PROMOTIONS_STATUS':
                 sendResponse(await getPromotionsStatus());
                 break;
-            case 'MARK_ALL_READ':
-                sendResponse(await markAllAsRead());
+            case 'GET_ADS_STATUS':
+                sendResponse(await getAdsStatus());
                 break;
             default:
                 sendResponse({ error: 'unknown_message_type' });

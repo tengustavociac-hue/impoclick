@@ -366,6 +366,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (btnReviews) btnReviews.click();
         }, 500);
     }
+    // Link do popup da extensão para a aba de Patrocinados.
+    if (window.location.hash === '#view-ads') {
+        setTimeout(() => {
+            const btnAds = document.querySelector('[data-view="view-ads"]');
+            if (btnAds) btnAds.click();
+        }, 500);
+    }
     // Aceita link direto pra uma sub-aba específica: #view-catalog/winning ou
     // #view-catalog/losing (senão abre em "winning").
     if (window.location.hash.indexOf('#view-catalog') === 0) {

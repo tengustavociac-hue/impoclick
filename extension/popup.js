@@ -49,20 +49,42 @@ async function refreshPromotionsSummary() {
         : 'Nenhuma promoção terminando.';
 }
 
+async function refreshAdsSummary() {
+    const countEl = document.getElementById('ads-count');
+    if (!countEl) return;
+    const result = await sendMessage({ type: 'GET_ADS_STATUS' });
+    if (result.error || !result.ads) {
+        countEl.textContent = 'Não foi possível verificar os Patrocinados agora.';
+        return;
+    }
+    const unread = result.ads.unreadCount || 0;
+    countEl.textContent = unread > 0
+        ? `${unread} anúncio${unread > 1 ? 's saíram' : ' saiu'} de campanha`
+        : 'Nenhum anúncio saiu de campanha.';
+}
+
 async function refresh() {
     const { session } = await sendMessage({ type: 'GET_SESSION' });
     if (session) {
         document.getElementById('user-name').textContent = session.name;
         showView('view-session');
-        // Mostra o que estava pendente primeiro, e só depois marca como lido —
-        // assim o popup continua avisando "1 avaliação nova" desta vez, mas o
-        // badge do ícone já zera pra não continuar "pendente" depois de aberto.
-        await Promise.all([refreshReviewsSummary(), refreshCatalogSummary(), refreshPromotionsSummary()]);
-        await sendMessage({ type: 'MARK_ALL_READ' });
+        await Promise.all([
+            refreshReviewsSummary(),
+            refreshCatalogSummary(),
+            refreshPromotionsSummary(),
+            refreshAdsSummary(),
+        ]);
     } else {
         showView('view-login');
     }
 }
+
+// Enquanto esta porta existir, o popup está aberto. Ao fechar, ela se
+// desconecta e o service worker marca os avisos como lidos — por isso os
+// números continuam visíveis o tempo todo em que a janelinha está na tela, e
+// só depois disso o detalhe passa a viver só no site.
+const portaDoPopup = chrome.runtime.connect({ name: 'popup' });
+window.addEventListener('pagehide', () => portaDoPopup.disconnect());
 
 document.getElementById('form-login').addEventListener('submit', async (e) => {
     e.preventDefault();
