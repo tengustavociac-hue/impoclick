@@ -3800,7 +3800,16 @@ function renderPromotionsTabs(items) {
     const soon = promotions.filter(i => i.status === 'active' && i.finish_date && (new Date(i.finish_date).getTime() - Date.now()) <= TEN_DAYS_MS);
     const soonIds = new Set(soon.map(i => i.id));
     const active = promotions.filter(i => i.status === 'active' && !soonIds.has(i.id));
-    const ended = promotions.filter(i => i.status === 'ended');
+
+    // Cada linha é um par anúncio × promoção, então o mesmo anúncio pode ter
+    // uma promoção encerrada e outra rodando. Nesse caso ele não é um anúncio
+    // "inativo": está em promoção agora, só que em outra. Listá-lo aqui fazia
+    // parecer que tinha saído de promoção, que é o oposto do que a aba
+    // deveria mostrar — ela existe pra achar quem ficou sem nenhuma.
+    const itensComPromocaoAtiva = new Set(
+        promotions.filter(i => i.status === 'active').map(i => i.ml_item_id)
+    );
+    const ended = promotions.filter(i => i.status === 'ended' && !itensComPromocaoAtiva.has(i.ml_item_id));
 
     // Ativas/Vencem em 10 dias: mais urgente (menos dias restantes) primeiro.
     // Inativas: a que terminou por último primeiro (mais relevante que uma de meses atrás).
