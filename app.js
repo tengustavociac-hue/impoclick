@@ -3736,9 +3736,6 @@ function buildAdOffCard(item) {
         tags.appendChild(tag);
     };
 
-    if (item.catalog_listing) {
-        addTag(item.buy_box_winner ? 'CATÁLOGO · ganhando' : 'CATÁLOGO', '#1d4ed8', '#dbeafe');
-    }
     if (item.recommended) {
         addTag('RECOMENDADO PELO ML', '#15803d', '#dcfce7');
     }

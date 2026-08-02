@@ -502,12 +502,18 @@ async function fetchAdsOff(userId) {
 
         const data = await resp.json();
         (data.results || []).forEach((ad) => {
+            // Anúncio de catálogo fica de fora: a aba trata dos anúncios
+            // próprios da conta, onde ligar o Patrocinados é decisão só do
+            // vendedor. No catálogo a página é compartilhada e a dinâmica é
+            // outra.
+            if (ad.catalog_listing) return;
+
             items.push({
                 itemId: ad.item_id,
                 title: ad.title || ad.item_id,
                 thumbnail: ad.thumbnail || null,
                 status: ad.status || null,
-                catalogListing: !!ad.catalog_listing,
+                catalogListing: false,
                 buyBoxWinner: !!ad.buy_box_winner,
                 recommended: !!ad.recommended,
             });
@@ -630,20 +636,24 @@ async function checkAdsStatus(userId) {
 async function handleUserGet(req, res, userId) {
     if (req.query.resource === 'ads') {
         const [listRes, countRes] = await Promise.all([
+            // catalog_listing = false também na leitura: linhas de catálogo
+            // gravadas antes desta regra somem da tela na hora, sem esperar o
+            // cron apagá-las na próxima rodada.
             supabaseAdmin
                 .from('ml_ads_status')
                 .select('id, ml_item_id, item_title, item_thumbnail, status, catalog_listing, buy_box_winner, recommended, is_read, updated_at')
                 .eq('user_id', userId)
-                // Recomendados pelo ML primeiro, depois catálogo — a ordem em
-                // que ligar o patrocinado tende a render mais.
+                .eq('catalog_listing', false)
+                // Recomendados pelo ML primeiro — a ordem em que ligar o
+                // patrocinado tende a render mais.
                 .order('recommended', { ascending: false })
-                .order('catalog_listing', { ascending: false })
                 .order('updated_at', { ascending: false })
                 .limit(200),
             supabaseAdmin
                 .from('ml_ads_status')
                 .select('id', { count: 'exact', head: true })
                 .eq('user_id', userId)
+                .eq('catalog_listing', false)
                 .eq('is_read', false),
         ]);
 
