@@ -3760,13 +3760,16 @@ function buildAdOffCard(item) {
     return card;
 }
 
-// Leva direto para o painel de Publicidade do Mercado Livre, filtrado neste
-// anúncio — é lá que se liga o Patrocinados. A página de promoções, usada
-// pelos cards das outras abas, não serve aqui: são áreas diferentes do ML.
+const ML_ADS_ADMIN_URL = 'https://www.mercadolivre.com.br/publicidade/product-ads/admin/ads';
+
+// Abre o painel de Product Ads — é lá que se liga o Patrocinados, e não na
+// Central de Promoções usada pelas outras abas.
 //
-// A busca vai pelo TÍTULO, não pelo MLB: o campo de busca desse painel não
-// encontra pelo id do anúncio. O título aqui vem da própria API de
-// publicidade, então é o mesmo texto que esse painel conhece.
+// O painel não aceita filtro por URL: nem o id do anúncio nem o título como
+// parâmetro de busca são reconhecidos, a página abre sempre na listagem
+// completa. Em vez de insistir num parâmetro que não existe, o botão copia o
+// título para a área de transferência e abre a página — daí é só colar na
+// busca dela. Uma colagem resolve o que o link não consegue fazer sozinho.
 function buildAdsPageLink(item) {
     const termo = item.item_title || item.ml_item_id;
 
@@ -3774,10 +3777,22 @@ function buildAdsPageLink(item) {
     link.className = 'btn btn-secondary btn-sm';
     link.style.marginTop = '0.5rem';
     link.style.display = 'inline-block';
-    link.href = `https://www.mercadolivre.com.br/publicidade/product-ads/admin/ads?search=${encodeURIComponent(termo)}`;
+    link.href = ML_ADS_ADMIN_URL;
     link.target = '_blank';
     link.rel = 'noopener';
-    link.textContent = 'Ver nos Patrocinados';
+    link.textContent = 'Copiar nome e abrir Patrocinados';
+
+    link.addEventListener('click', async () => {
+        try {
+            await navigator.clipboard.writeText(termo);
+            showToast('Nome copiado — cole na busca do painel de Patrocinados.', 'success');
+        } catch (err) {
+            // Sem permissão de área de transferência a navegação segue: o
+            // usuário abre o painel e busca na mão.
+            console.error('Não foi possível copiar o nome do anúncio:', err);
+        }
+    });
+
     return link;
 }
 
