@@ -3571,11 +3571,19 @@ function buildPromotionCard(item) {
     titleGroup.appendChild(title);
 
     const daysLeft = item.finish_date ? Math.ceil((new Date(item.finish_date).getTime() - Date.now()) / 86400000) : null;
+    // O cron marca a promoção como encerrada quando ela some da resposta da
+    // API do ML, guardando o prazo que estava previsto. Então "encerrada" com
+    // prazo ainda no futuro não quer dizer que o prazo acabou: quer dizer que
+    // o anúncio saiu da promoção antes da hora — por preço, estoque ou porque
+    // o ML tirou. São coisas diferentes e a tela precisa dizer qual foi, senão
+    // aparece "Terminou em 10/08" numa data que ainda nem chegou.
+    const saiuAntesDoPrazo = item.status === 'ended' && daysLeft != null && daysLeft > 0;
+
     const statusSpan = document.createElement('span');
     statusSpan.className = 'item-card-status';
     if (item.status === 'ended') {
-        statusSpan.style.color = 'var(--text-muted)';
-        statusSpan.textContent = 'Terminou';
+        statusSpan.style.color = saiuAntesDoPrazo ? 'var(--danger, #ef4444)' : 'var(--text-muted)';
+        statusSpan.textContent = saiuAntesDoPrazo ? 'Saiu antes do prazo' : 'Terminou';
     } else if (daysLeft != null && daysLeft <= 3) {
         statusSpan.style.color = 'var(--danger, #ef4444)';
         statusSpan.textContent = daysLeft <= 0 ? 'Termina hoje' : `Termina em ${daysLeft} dia${daysLeft > 1 ? 's' : ''}`;
@@ -3590,7 +3598,9 @@ function buildPromotionCard(item) {
 
     if (!item.is_read) {
         if (item.status === 'ended') {
-            card.appendChild(buildAlertBanner('Esta promoção terminou agora'));
+            card.appendChild(buildAlertBanner(saiuAntesDoPrazo
+                ? 'O anúncio saiu desta promoção antes do prazo'
+                : 'Esta promoção terminou agora'));
         } else if (daysLeft != null && daysLeft <= 3) {
             card.appendChild(buildAlertBanner(daysLeft <= 0 ? 'Está terminando hoje' : `Está terminando em ${daysLeft} dia${daysLeft > 1 ? 's' : ''}`));
         }
@@ -3608,7 +3618,12 @@ function buildPromotionCard(item) {
         const dateP = document.createElement('p');
         dateP.className = 'small';
         dateP.style.color = 'var(--text-muted)';
-        dateP.textContent = `${item.status === 'ended' ? 'Terminou em' : 'Termina em'} ${new Date(item.finish_date).toLocaleString('pt-BR')}`;
+        const quando = new Date(item.finish_date).toLocaleString('pt-BR');
+        if (saiuAntesDoPrazo) {
+            dateP.textContent = `Saiu da promoção — o prazo dela ia até ${quando}`;
+        } else {
+            dateP.textContent = `${item.status === 'ended' ? 'Terminou em' : 'Termina em'} ${quando}`;
+        }
         card.appendChild(dateP);
     }
 
