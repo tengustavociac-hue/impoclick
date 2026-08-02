@@ -518,7 +518,41 @@ async function fetchAdsOff(userId) {
         if (offset >= total) break;
     }
 
-    return { ok: true, items };
+    return { ok: true, items: await keepActiveWithStock(userId, items) };
+}
+
+// Mantém só os anúncios que estão ativos e com estoque.
+//
+// Não dá pra confiar só no status do lado da publicidade: o "hold" da API de
+// ads cobre pausado/sem estoque, mas nem todo anúncio parado cai nele. E
+// sugerir ligar Patrocinados num anúncio pausado ou zerado é gastar a atenção
+// do vendedor com o que ele não pode fazer agora.
+async function keepActiveWithStock(userId, ads) {
+    if (ads.length === 0) return ads;
+
+    const situacao = {};
+    for (let i = 0; i < ads.length; i += 20) {
+        const batch = ads.slice(i, i + 20).map((ad) => ad.itemId);
+        const resp = await mlFetch(userId, `/items?ids=${batch.join(',')}&attributes=id,status,available_quantity`);
+        if (!resp.ok) continue;
+
+        const data = await resp.json();
+        for (const entry of data) {
+            if (entry.code === 200 && entry.body) {
+                situacao[entry.body.id] = {
+                    status: entry.body.status,
+                    available: entry.body.available_quantity,
+                };
+            }
+        }
+    }
+
+    // Item que o multiget não devolveu fica de fora: sem confirmação de que
+    // está ativo e com estoque, não entra na lista.
+    return ads.filter((ad) => {
+        const info = situacao[ad.itemId];
+        return info && info.status === 'active' && (info.available || 0) > 0;
+    });
 }
 
 // Grava o estado de publicidade e detecta quem SAIU de campanha.

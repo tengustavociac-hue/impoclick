@@ -3755,12 +3755,24 @@ function buildAdOffCard(item) {
         : 'Disponível para publicidade e sem campanha nenhuma.';
     card.appendChild(detail);
 
-    // Leva para a lista de anúncios do vendedor no ML, e não para a página
-    // pública do produto: dali dá pra agir sobre o anúncio, que é o motivo de
-    // ele estar nesta aba. Mesmo destino usado pelos cards de promoções.
-    card.appendChild(buildPromotionPageLink(item.ml_item_id));
+    card.appendChild(buildAdsPageLink(item.ml_item_id));
 
     return card;
+}
+
+// Leva direto para o painel de Publicidade do Mercado Livre, filtrado neste
+// anúncio — é lá que se liga o Patrocinados. A página de promoções, usada
+// pelos cards das outras abas, não serve aqui: são áreas diferentes do ML.
+function buildAdsPageLink(itemId) {
+    const link = document.createElement('a');
+    link.className = 'btn btn-secondary btn-sm';
+    link.style.marginTop = '0.5rem';
+    link.style.display = 'inline-block';
+    link.href = `https://www.mercadolivre.com.br/publicidade/product-ads/admin/ads?search=${encodeURIComponent(itemId)}`;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    link.textContent = 'Ver nos Patrocinados';
+    return link;
 }
 
 async function loadAdsOff() {
