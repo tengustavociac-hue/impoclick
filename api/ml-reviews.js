@@ -596,6 +596,10 @@ async function checkAdsStatus(userId) {
     (existingRows || []).forEach((row) => { oldByItemId[row.ml_item_id] = row; });
     const primeiraRodada = (existingRows || []).length === 0;
 
+    // Carimbo único da rodada: tudo que for gravado agora recebe este valor, e
+    // o que sobrar com carimbo anterior é o que saiu da lista.
+    const carimboDaRodada = new Date().toISOString();
+
     let adsJustOff = 0;
     const rows = items.map((ad) => {
         const old = oldByItemId[ad.itemId];
@@ -619,7 +623,7 @@ async function checkAdsStatus(userId) {
             buy_box_winner: ad.buyBoxWinner,
             recommended: ad.recommended,
             is_read: isRead,
-            updated_at: new Date().toISOString(),
+            updated_at: carimboDaRodada,
         };
     });
 
@@ -631,14 +635,19 @@ async function checkAdsStatus(userId) {
     }
 
     // Quem voltou a rodar sai da tabela — a aba lista só quem está parado.
-    const aindaParados = items.map((ad) => ad.itemId);
-    let deleteQuery = supabaseAdmin.from('ml_ads_status').delete().eq('user_id', userId);
-    if (aindaParados.length > 0) {
-        // Valores entre aspas: sem isso o PostgREST pode interpretar errado a
-        // lista e apagar linhas que deveriam continuar.
-        deleteQuery = deleteQuery.not('ml_item_id', 'in', `(${aindaParados.map((id) => `"${id}"`).join(',')})`);
-    }
-    const { error: deleteError } = await deleteQuery;
+    //
+    // A limpeza é por carimbo de tempo, e não por uma lista NOT IN com todos
+    // os ids: aquela forma dependia de o PostgREST interpretar a lista do
+    // jeito certo e, se falhasse, o erro subia, era engolido pelo try/catch da
+    // checagem e as linhas ficavam obsoletas para sempre — anúncio que voltou
+    // para campanha continuava aparecendo como desligado. Tudo que foi visto
+    // agora tem o carimbo desta rodada; o que ficou para trás não está mais na
+    // lista, seja qual for o tamanho dela.
+    const { error: deleteError } = await supabaseAdmin
+        .from('ml_ads_status')
+        .delete()
+        .eq('user_id', userId)
+        .lt('updated_at', carimboDaRodada);
     if (deleteError) throw new Error(deleteError.message);
 
     return { adsChecked: items.length, adsJustOff };

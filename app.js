@@ -3101,6 +3101,21 @@ function updateReviewsBadge(count) {
     }
 }
 
+// timeAgo tem granularidade de dias e devolve "hoje" pra qualquer coisa nas
+// últimas 24h — bom para avaliações e promoções, inútil para saber se uma
+// checagem de 15 em 15 minutos parou de rodar. Esta versão desce a minutos.
+function timeAgoPrecise(dateStr) {
+    if (!dateStr) return '';
+    const diffMin = Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000);
+    if (diffMin < 1) return 'agora';
+    if (diffMin === 1) return 'há 1 minuto';
+    if (diffMin < 60) return `há ${diffMin} minutos`;
+    const diffHoras = Math.floor(diffMin / 60);
+    if (diffHoras === 1) return 'há 1 hora';
+    if (diffHoras < 24) return `há ${diffHoras} horas`;
+    return timeAgo(dateStr);
+}
+
 function timeAgo(dateStr) {
     if (!dateStr) return '';
     const diffDays = Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
@@ -3770,6 +3785,18 @@ function buildAdOffCard(item) {
     detail.textContent = info.detalhe;
     card.appendChild(detail);
 
+    // Quando este status foi confirmado no Mercado Livre. Sem isso não dá pra
+    // saber, olhando a tela, se um anúncio que já voltou para campanha ainda
+    // está aqui porque o dado é antigo ou porque o ML está reportando errado.
+    if (item.updated_at) {
+        const quando = document.createElement('p');
+        quando.className = 'small';
+        quando.style.color = 'var(--text-muted)';
+        quando.style.marginTop = '0.2rem';
+        quando.textContent = `Confirmado no Mercado Livre ${timeAgoPrecise(item.updated_at)}`;
+        card.appendChild(quando);
+    }
+
     card.appendChild(buildAdsPageLink(item));
 
     return card;
@@ -3827,13 +3854,28 @@ async function loadAdsOff() {
     // Elemento separado do "última verificação", que é escrito por outra
     // função e sobrescreveria esta mensagem.
     const problemEl = document.getElementById('ads-problem');
-    if (problemEl) {
-        if (data && data.problema) {
-            problemEl.textContent = data.message || 'Não foi possível consultar os Patrocinados.';
-            problemEl.classList.remove('hidden');
-        } else {
-            problemEl.classList.add('hidden');
-        }
+    if (!problemEl) return;
+
+    if (data && data.problema) {
+        problemEl.textContent = data.message || 'Não foi possível consultar os Patrocinados.';
+        problemEl.classList.remove('hidden');
+        return;
+    }
+
+    // Dado velho significa que a checagem automática parou de atualizar esta
+    // aba — e aí o que está na tela pode não valer mais. Melhor avisar do que
+    // deixar o vendedor agir sobre informação vencida.
+    const itens = (data && data.items) || [];
+    const maisRecente = itens.reduce((maior, i) => {
+        const t = new Date(i.updated_at || 0).getTime();
+        return t > maior ? t : maior;
+    }, 0);
+
+    if (maisRecente > 0 && Date.now() - maisRecente > 60 * 60 * 1000) {
+        problemEl.textContent = `A verificação automática não atualiza esta aba desde ${timeAgoPrecise(new Date(maisRecente).toISOString())}. O que está listado pode estar desatualizado.`;
+        problemEl.classList.remove('hidden');
+    } else {
+        problemEl.classList.add('hidden');
     }
 }
 
