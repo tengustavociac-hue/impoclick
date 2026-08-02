@@ -344,7 +344,17 @@ async function checkUser(userId) {
     const catalogResult = await checkCatalogCompetition(userId, itemIds, meta);
     const promotionsResult = await checkPromotions(userId, itemIds, meta);
 
-    return { itemsChecked: itemIds.length, newReviews, ...catalogResult, ...promotionsResult, totalActiveItems };
+    // Publicidade não depende da lista de itens ativos: a própria API de ads
+    // devolve os anúncios do anunciante. Conta sem Publicidade habilitada
+    // volta zerada e não interrompe o resto da checagem.
+    let adsResult = { adsChecked: 0, adsJustOff: 0 };
+    try {
+        adsResult = await checkAdsStatus(userId);
+    } catch (err) {
+        console.error('Erro ao checar Patrocinados:', err.message);
+    }
+
+    return { itemsChecked: itemIds.length, newReviews, ...catalogResult, ...promotionsResult, ...adsResult, totalActiveItems };
 }
 
 const PROMOTION_RETENTION_DAYS = 180;
@@ -440,32 +450,21 @@ const ADS_OFF_STATUSES = 'idle,paused';
 const ADS_PAGE_SIZE = 50;
 const ADS_MAX_PAGES = 10;
 
-async function handleAdsOff(req, res, userId) {
+// Lista os anúncios que estão fora de publicidade agora, direto na API do ML.
+// Devolve null quando a conta não tem Publicidade habilitada — diferente de
+// devolver lista vazia, que significaria "está tudo rodando".
+async function fetchAdsOff(userId) {
     const advResp = await mlFetch(userId, '/advertising/advertisers?product_id=PADS', {
         headers: { 'Api-Version': '1' },
     });
-
-    if (advResp.status === 404) {
-        return res.json({
-            enabled: false,
-            reason: 'sem_publicidade',
-            message: 'Esta conta não tem Publicidade habilitada no Mercado Livre. O ML exige reputação amarela ou melhor, 15 dias de cadastro e um mínimo de vendas.',
-            items: [],
-        });
-    }
-    if (!advResp.ok) {
-        return res.status(advResp.status).json({ error: 'Não foi possível consultar a conta de publicidade.' });
-    }
+    if (!advResp.ok) return null;
 
     const advData = await advResp.json();
     const advertiser = (advData.advertisers || []).find((a) => a.site_id === 'MLB') || (advData.advertisers || [])[0];
-    if (!advertiser) {
-        return res.json({ enabled: false, reason: 'sem_anunciante', message: 'Nenhuma conta de anunciante encontrada.', items: [] });
-    }
+    if (!advertiser) return null;
 
     const items = [];
     let offset = 0;
-    let total = 0;
 
     for (let page = 0; page < ADS_MAX_PAGES; page += 1) {
         const qs = new URLSearchParams({ limit: String(ADS_PAGE_SIZE), offset: String(offset) });
@@ -484,41 +483,109 @@ async function handleAdsOff(req, res, userId) {
                 itemId: ad.item_id,
                 title: ad.title || ad.item_id,
                 thumbnail: ad.thumbnail || null,
-                permalink: ad.permalink || null,
-                price: ad.price != null ? ad.price : null,
                 status: ad.status || null,
-                // Anúncio de catálogo disputa a mesma página com outros
-                // vendedores, então ligar Patrocinados ali tem peso diferente
-                // — por isso a tela marca esses separadamente.
                 catalogListing: !!ad.catalog_listing,
                 buyBoxWinner: !!ad.buy_box_winner,
-                // O próprio ML sinaliza quais anúncios responderiam bem ao
-                // investimento, segundo o modelo deles.
                 recommended: !!ad.recommended,
             });
         });
 
-        total = (data.paging && data.paging.total) || items.length;
+        const total = (data.paging && data.paging.total) || items.length;
         offset += ADS_PAGE_SIZE;
         if (offset >= total) break;
     }
 
-    // Recomendados pelo ML primeiro, depois catálogo — é a ordem em que
-    // ligar o patrocinado tende a render mais.
-    items.sort((a, b) => (b.recommended - a.recommended) || (b.catalogListing - a.catalogListing));
+    return items;
+}
 
-    return res.json({
-        enabled: true,
-        advertiserId: advertiser.advertiser_id,
-        total,
-        truncated: total > items.length,
-        items,
+// Grava o estado de publicidade e detecta quem SAIU de campanha.
+//
+// A tabela guarda só os anúncios parados. Anúncio que volta a rodar tem a
+// linha apagada, então aparecer aqui de novo mais tarde é uma mudança real e
+// vira alerta. Na primeira rodada de um usuário nada alerta: os parados já
+// estavam parados antes de existir monitoramento, não é uma transição.
+async function checkAdsStatus(userId) {
+    const items = await fetchAdsOff(userId);
+    if (items === null) return { adsChecked: 0, adsJustOff: 0 };
+
+    const { data: existingRows, error: existingError } = await supabaseAdmin
+        .from('ml_ads_status')
+        .select('ml_item_id, is_read')
+        .eq('user_id', userId);
+    if (existingError) throw new Error(existingError.message);
+
+    const oldByItemId = {};
+    (existingRows || []).forEach((row) => { oldByItemId[row.ml_item_id] = row; });
+    const primeiraRodada = (existingRows || []).length === 0;
+
+    let adsJustOff = 0;
+    const rows = items.map((ad) => {
+        const old = oldByItemId[ad.itemId];
+        let isRead;
+        if (old) {
+            isRead = old.is_read; // já conhecíamos: preserva o que o vendedor já viu
+        } else if (primeiraRodada) {
+            isRead = true; // nunca monitoramos esta conta: não é uma transição
+        } else {
+            isRead = false; // saiu de campanha agora
+            adsJustOff += 1;
+        }
+
+        return {
+            user_id: userId,
+            ml_item_id: ad.itemId,
+            item_title: ad.title,
+            item_thumbnail: ad.thumbnail,
+            status: ad.status,
+            catalog_listing: ad.catalogListing,
+            buy_box_winner: ad.buyBoxWinner,
+            recommended: ad.recommended,
+            is_read: isRead,
+            updated_at: new Date().toISOString(),
+        };
     });
+
+    if (rows.length > 0) {
+        const { error } = await supabaseAdmin
+            .from('ml_ads_status')
+            .upsert(rows, { onConflict: 'user_id,ml_item_id' });
+        if (error) throw new Error(error.message);
+    }
+
+    // Quem voltou a rodar sai da tabela — a aba lista só quem está parado.
+    const aindaParados = items.map((ad) => ad.itemId);
+    let deleteQuery = supabaseAdmin.from('ml_ads_status').delete().eq('user_id', userId);
+    if (aindaParados.length > 0) {
+        deleteQuery = deleteQuery.not('ml_item_id', 'in', `(${aindaParados.join(',')})`);
+    }
+    const { error: deleteError } = await deleteQuery;
+    if (deleteError) throw new Error(deleteError.message);
+
+    return { adsChecked: items.length, adsJustOff };
 }
 
 async function handleUserGet(req, res, userId) {
     if (req.query.resource === 'ads') {
-        return await handleAdsOff(req, res, userId);
+        const [listRes, countRes] = await Promise.all([
+            supabaseAdmin
+                .from('ml_ads_status')
+                .select('id, ml_item_id, item_title, item_thumbnail, status, catalog_listing, buy_box_winner, recommended, is_read, updated_at')
+                .eq('user_id', userId)
+                // Recomendados pelo ML primeiro, depois catálogo — a ordem em
+                // que ligar o patrocinado tende a render mais.
+                .order('recommended', { ascending: false })
+                .order('catalog_listing', { ascending: false })
+                .order('updated_at', { ascending: false })
+                .limit(200),
+            supabaseAdmin
+                .from('ml_ads_status')
+                .select('id', { count: 'exact', head: true })
+                .eq('user_id', userId)
+                .eq('is_read', false),
+        ]);
+
+        if (listRes.error) return res.status(500).json({ error: listRes.error.message });
+        return res.json({ items: listRes.data || [], unreadCount: countRes.count || 0 });
     }
 
     if (req.query.resource === 'status') {
@@ -623,7 +690,7 @@ async function handleUserMarkRead(req, res, userId) {
     body = body || {};
 
     // ml_lightning_candidates não tem is_read (é só lista informativa, sem alerta)
-    const tableByResource = { catalog: 'ml_catalog_status', promotions: 'ml_promotions' };
+    const tableByResource = { catalog: 'ml_catalog_status', promotions: 'ml_promotions', ads: 'ml_ads_status' };
     const table = tableByResource[req.query.resource] || 'ml_reviews';
     let query = supabaseAdmin.from(table).update({ is_read: true }).eq('user_id', userId);
     if (!body.all) {

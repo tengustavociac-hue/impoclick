@@ -2480,6 +2480,7 @@ async function checkAuthSession() {
         if (state.currentUser && typeof loadReviews === 'function') loadReviews();
         if (state.currentUser && typeof loadCatalogStatus === 'function') loadCatalogStatus();
         if (state.currentUser && typeof loadPromotionsStatus === 'function') loadPromotionsStatus();
+        if (state.currentUser && typeof loadAdsOff === 'function') loadAdsOff();
         if (state.currentUser && typeof loadCheckStatus === 'function') loadCheckStatus();
     } catch (e) {
         console.error('Erro ao verificar sessão de login no Supabase:', e);
@@ -3484,6 +3485,7 @@ function startNotificationPolling() {
         loadReviews();
         loadCatalogStatus();
         loadPromotionsStatus();
+        loadAdsOff();
         loadCheckStatus();
     }, 5 * 60 * 1000);
 }
@@ -3491,7 +3493,7 @@ function startNotificationPolling() {
 // "Última verificação" — sem isso não tem como saber, olhando o site, se o
 // cron (GitHub Actions) parou de rodar. Mesma chamada alimenta as 3 abas.
 async function loadCheckStatus() {
-    const elIds = ['reviews-check-status', 'catalog-check-status', 'promotions-check-status'];
+    const elIds = ['reviews-check-status', 'catalog-check-status', 'promotions-check-status', 'ads-check-status'];
     if (!state.currentUser) {
         elIds.forEach(id => { const el = document.getElementById(id); if (el) el.textContent = ''; });
         return;
@@ -3690,15 +3692,24 @@ function buildAdOffCard(item) {
     const card = document.createElement('section');
     card.className = 'card';
     card.style.marginBottom = '0.75rem';
+    card.style.opacity = item.is_read ? '0.7' : '1';
 
     const titleGroup = document.createElement('div');
     titleGroup.className = 'item-card-title-group';
-    titleGroup.appendChild(buildThumbnailImg(item.thumbnail));
+    titleGroup.appendChild(buildThumbnailImg(item.item_thumbnail));
 
     const title = document.createElement('strong');
-    title.textContent = item.title || item.itemId;
+    title.textContent = item.item_title || item.ml_item_id;
     titleGroup.appendChild(title);
     card.appendChild(titleGroup);
+
+    // Alerta só pra quem saiu de campanha depois que o monitoramento começou:
+    // anúncio que já estava parado desde sempre não é novidade.
+    if (!item.is_read) {
+        card.appendChild(buildAlertBanner(item.status === 'paused'
+            ? 'Este anúncio foi pausado na campanha'
+            : 'Este anúncio saiu de campanha'));
+    }
 
     const tags = document.createElement('div');
     tags.style.display = 'flex';
@@ -3718,8 +3729,8 @@ function buildAdOffCard(item) {
         tags.appendChild(tag);
     };
 
-    if (item.catalogListing) {
-        addTag(item.buyBoxWinner ? 'CATÁLOGO · ganhando' : 'CATÁLOGO', '#1d4ed8', '#dbeafe');
+    if (item.catalog_listing) {
+        addTag(item.buy_box_winner ? 'CATÁLOGO · ganhando' : 'CATÁLOGO', '#1d4ed8', '#dbeafe');
     }
     if (item.recommended) {
         addTag('RECOMENDADO PELO ML', '#15803d', '#dcfce7');
@@ -3740,46 +3751,35 @@ function buildAdOffCard(item) {
     // Leva para a lista de anúncios do vendedor no ML, e não para a página
     // pública do produto: dali dá pra agir sobre o anúncio, que é o motivo de
     // ele estar nesta aba. Mesmo destino usado pelos cards de promoções.
-    card.appendChild(buildPromotionPageLink(item.itemId));
+    card.appendChild(buildPromotionPageLink(item.ml_item_id));
 
     return card;
 }
 
 async function loadAdsOff() {
-    const statusEl = document.getElementById('ads-check-status');
     if (!state.currentUser) {
         renderIntoList('ads-list', 'ads-empty', [], buildAdOffCard);
         updateAdsBadge(0);
         return;
     }
 
-    if (statusEl) statusEl.textContent = 'Consultando a API de publicidade do Mercado Livre...';
-
     const data = await mlApiFetch('/api/ml-reviews?resource=ads');
+    updateAdsBadge(data ? data.unreadCount : 0);
+    renderIntoList('ads-list', 'ads-empty', data ? data.items : [], buildAdOffCard);
+}
 
-    if (!data) {
-        if (statusEl) statusEl.textContent = 'Não foi possível consultar os Patrocinados agora.';
-        return;
+async function markAdsRead(payload) {
+    if (!state.currentUser) return;
+    try {
+        await fetch('/api/ml-reviews?resource=ads', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'user-token': state.currentUser.id, 'Authorization': `Bearer ${state.currentUser.access_token}` },
+            body: JSON.stringify(payload),
+        });
+    } catch (err) {
+        console.error('Erro ao marcar Patrocinados como lidos:', err);
     }
-
-    if (!data.enabled) {
-        renderIntoList('ads-list', 'ads-empty', [], buildAdOffCard);
-        updateAdsBadge(0);
-        if (statusEl) statusEl.textContent = data.message || 'Publicidade não habilitada nesta conta.';
-        return;
-    }
-
-    const items = data.items || [];
-    renderIntoList('ads-list', 'ads-empty', items, buildAdOffCard);
-    updateAdsBadge(items.length);
-
-    if (statusEl) {
-        const catalogo = items.filter(i => i.catalogListing).length;
-        const partes = [`${items.length} anúncio(s) com Patrocinados desligado`];
-        if (catalogo) partes.push(`${catalogo} de catálogo`);
-        if (data.truncated) partes.push('lista parcial — há mais anúncios do que coube nesta consulta');
-        statusEl.textContent = partes.join(' · ');
-    }
+    await loadAdsOff();
 }
 
 function updateAdsBadge(count) {
@@ -3857,8 +3857,8 @@ async function markPromotionsRead(payload) {
 }
 
 function initAdsModule() {
-    const btnRefresh = document.getElementById('btn-refresh-ads');
-    if (btnRefresh) btnRefresh.addEventListener('click', () => loadAdsOff());
+    const btnMarkAll = document.getElementById('btn-mark-all-ads-read');
+    if (btnMarkAll) btnMarkAll.addEventListener('click', () => markAdsRead({ all: true }));
 }
 
 function initPromotionsModule() {
@@ -4106,10 +4106,9 @@ function initDashboardNavigation() {
                 loadPromotionsStatus();
                 loadCheckStatus();
             }
-            // Patrocinados consulta o ML na hora, então só carrega quando a
-            // aba é aberta — não entra no ciclo de 5 min das outras.
             if (viewId === 'view-ads') {
                 loadAdsOff();
+                loadCheckStatus();
             }
         });
     });
