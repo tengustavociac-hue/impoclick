@@ -3,13 +3,13 @@ name: Checar avaliações do Mercado Livre
 on:
   schedule:
     - cron: '*/15 * * * *'
-  # A janela pode ser escolhida à mão. Sem isso, disparos manuais dentro dos
+  # A query pode ser escolhida à mão. Sem isso, disparos manuais dentro dos
   # mesmos 15 minutos repetem sempre a mesma fatia de anúncios — não dava para
   # forçar uma varredura completa quando algum dado precisava ser corrigido já.
   workflow_dispatch:
     inputs:
-      offset:
-        description: 'Janela de anúncios a varrer (0, 100, 200...). Vazio = rodízio normal.'
+      query:
+        description: 'Query extra, sem o "?" (ex.: offset=100). Vazio = rodízio normal.'
         required: false
         default: ''
 
@@ -20,7 +20,7 @@ jobs:
       - name: Chamar endpoint de checagem
         run: |
           URL="https://www.impoclick.com.br/api/ml-reviews"
-          if [ -n "${{ github.event.inputs.offset }}" ]; then
-            URL="$URL?offset=${{ github.event.inputs.offset }}"
+          if [ -n "${{ github.event.inputs.query }}" ]; then
+            URL="$URL?${{ github.event.inputs.query }}"
           fi
           curl -sf -X POST "$URL" -H "x-cron-secret: ${{ secrets.CRON_SECRET }}"
