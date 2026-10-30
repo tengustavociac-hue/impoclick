@@ -1,0 +1,12 @@
+{
+  // Typecheck dos módulos do site que usam a biblioteca de componentes
+  // (navio.js e lote.js). Separado de design-system/tsconfig.json porque aquele
+  // fixa rootDir na pasta do design system, e estes arquivos vivem na raiz.
+  // Mesmas regras estritas; `npm run typecheck` roda os dois.
+  "extends": "./design-system/tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "."
+  },
+  "include": ["navio.js", "lote.js", "patrocinados.js", "patrocinados-regras.js", "admin.js", "ml-painel.js", "ml-conexao.js"],
+  "exclude": ["design-system/reference/**", "design-system/dist/**"]
+}

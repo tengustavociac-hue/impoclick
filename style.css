@@ -1,119 +1,67 @@
-/* DESIGN SYSTEM - IMPORT RATEIO */
 
+/* DESIGN SYSTEM — ponte para os tokens da Impoclick
+ *
+ * A fonte da verdade dos tokens é o DESIGN.md da raiz, implementado em
+ * design-system/tokens/*.css, carregado antes deste arquivo. Os nomes abaixo
+ * são os nomes ANTIGOS, mantidos porque as ~4.500 linhas de regras a seguir os
+ * usam: cada um passa a apontar para o token equivalente do sistema, e a troca
+ * de identidade acontece aqui, num lugar só.
+ *
+ * Tokens legados que sumiram porque o sistema já define o mesmo papel:
+ * --text-muted, --success, --warning, --danger e --info.
+ * --secondary virou --surface-2: no legado ele era uma superfície, e no sistema
+ * novo esse nome é o laranja de conversão.
+ */
 :root {
-    /* Fonts */
-    --font-primary: 'Quicksand', system-ui, sans-serif;
-    --font-secondary: 'Nunito', system-ui, sans-serif;
+    /* Tipografia */
+    --font-primary: var(--font-sans);
+    --font-secondary: var(--font-sans);
+    --font-code: var(--font-mono);
 
-    /* Dark Theme Colors - Glass Dourado Original Claude */
-    --bg-app: #1a150e; /* Fundo escuro um pouco mais claro (Mocha) */
-    --glow-1: rgba(245, 196, 81, 0.24);
-    --glow-2: rgba(184, 134, 11, 0.18);
-    --glow-3: rgba(255, 255, 255, 0.035);
-    
-    --bg-card: rgba(255, 255, 255, 0.055);
-    --bg-input: rgba(255, 255, 255, 0.10); /* Fundo dos campos ajustado */
-    
-    --border-color: rgba(245, 196, 81, 0.2);
-    --glass-border-strong: rgba(245, 196, 81, 0.34);
-    
-    --text-primary: #f7ecd8;
-    --text-muted: #b8a888;
-    --text-faint: #6e6250;
+    /* Superfícies */
+    --bg-app: var(--surface-page);
+    --bg-card: var(--surface-card);
+    --bg-input: var(--surface-card);
+    --surface-2: var(--surface-raised);
+    --surface-2-hover: var(--surface-inset);
+    --surface-2-border: var(--border-subtle);
 
-    --primary: #f5c451;
-    --primary-hover: #ffd873;
-    --primary-glow: rgba(245, 196, 81, 0.16);
-    --gradient-brand: linear-gradient(135deg, #ffd873 0%, #b8860b 100%);
-    --gradient-text: linear-gradient(135deg, #ffe9a8 0%, #f0b429 100%);
-    --on-gradient: #1a1305;
+    /* Traços e texto */
+    --border-color: var(--border-subtle);
+    --glass-border-strong: var(--border-strong);
+    --text-primary: var(--text-title);
+    --text-faint: var(--text-muted);
 
-    --secondary: rgba(255, 255, 255, 0.08);
-    --secondary-hover: rgba(255, 255, 255, 0.14);
-    --secondary-border: rgba(245, 196, 81, 0.22);
+    /* Marca. O sistema proíbe gradiente fora do brilho do hero, então o que
+       era degradê dourado virou o aqua chapado. */
+    --primary: var(--accent);
+    --primary-hover: var(--accent-hover);
+    --primary-glow: var(--accent-soft);
+    --nav-active-text: var(--accent);
+    --gradient-brand: var(--accent);
+    --on-gradient: var(--text-on-accent);
 
-    --success: #34d399;
-    --success-bg: rgba(52, 211, 153, 0.12);
-    --success-border: rgba(52, 211, 153, 0.3);
+    /* Status: a cor sólida vem do sistema; aqui ficam só os fundos suaves. */
+    --success-bg: var(--success-soft);
+    --success-border: var(--success-soft);
+    --warning-bg: var(--warning-soft);
+    --warning-border: var(--warning-soft);
+    --danger-bg: var(--danger-soft);
+    --danger-hover: var(--danger);
+    --info-bg: var(--info-soft);
+    --info-border: var(--info-soft);
 
-    --warning: #fb923c;
-    --warning-bg: rgba(251, 146, 60, 0.12);
-    --warning-border: rgba(251, 146, 60, 0.3);
-
-    --danger: #f87171;
-    --danger-hover: #ef4444;
-    --danger-bg: rgba(248, 113, 113, 0.12);
-
-    --info: #38bdf8;
-    --info-bg: rgba(56, 189, 248, 0.1);
-    --info-border: rgba(56, 189, 248, 0.3);
-
-    --card-shadow: 0 8px 40px -8px rgba(245, 196, 81, 0.3);
-    --input-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.15);
-
-    --border-radius-sm: 12px;
-    --border-radius-md: 16px;
-    --border-radius-lg: 24px;
-    --border-radius-full: 9999px;
-
-    --glass-blur: blur(22px) saturate(140%);
-    --transition-smooth: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* Opções de cores que combinam perfeitamente com o dourado */
-body.theme-navy {
-    --bg-app: #08111e; /* Azul Escuro Marinho */
-}
-body.theme-emerald {
-    --bg-app: #061c14; /* Verde Esmeralda Escuro */
-}
-body.theme-wine {
-    --bg-app: #1a080a; /* Vinho / Bordô Escuro */
-}
-body.theme-royal {
-    --bg-app: #140b1c; /* Roxo Real Escuro */
-}
-
-/* Light Theme Overrides — glass claro sobre fundo marfim com glow dourado suave */
-[data-theme="light"] {
-    --bg-app: #faf6ec;
-    --glow-1: rgba(234, 179, 8, 0.12);
-    --glow-2: rgba(146, 101, 10, 0.08);
-    --glow-3: rgba(0, 0, 0, 0.015);
-    --bg-card: rgba(255, 255, 255, 0.62);
-    --bg-input: rgba(255, 255, 255, 0.8);
-    --border-color: rgba(180, 130, 20, 0.22);
-    --text-primary: #2b2410;
-    --text-muted: #6b5d3f;
-
-    --primary: #b8860b;
-    --primary-hover: #92650a;
-    --primary-glow: rgba(180, 130, 20, 0.12);
-    --gradient-brand: linear-gradient(135deg, #eab308 0%, #92650a 100%);
-    --on-gradient: #1a1305;
-
-    --secondary: rgba(255, 255, 255, 0.65);
-    --secondary-hover: rgba(255, 255, 255, 0.9);
-    --secondary-border: rgba(180, 130, 20, 0.28);
-
-    --success: #059669;
-    --success-bg: rgba(5, 150, 105, 0.1);
-    --success-border: rgba(5, 150, 105, 0.25);
-
-    --warning: #ea580c;
-    --warning-bg: rgba(234, 88, 12, 0.1);
-    --warning-border: rgba(234, 88, 12, 0.25);
-
-    --danger: #dc2626;
-    --danger-hover: #b91c1c;
-    --danger-bg: rgba(220, 38, 38, 0.08);
-
-    --info: #0284c7;
-    --info-bg: rgba(2, 132, 199, 0.08);
-    --info-border: rgba(2, 132, 199, 0.25);
-
-    --card-shadow: 0 8px 32px -8px rgba(180, 130, 20, 0.18);
-    --input-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.03);
+    /* Forma e profundidade */
+    --border-radius-sm: var(--radius-field);
+    --border-radius-md: var(--radius-md);
+    --border-radius-lg: var(--radius-card);
+    --border-radius-full: var(--radius-pill);
+    --card-shadow: var(--shadow-sm);
+    --input-shadow: none;
+    /* Blur só é permitido em barra fixa e tooltip; as regras antigas aplicavam
+       em card, modal e cabeçalho por este token. */
+    --glass-blur: none;
+    --transition-smooth: var(--transition-control);
 }
 
 /* Reset & Global */
@@ -138,17 +86,11 @@ textarea:focus-visible,
 }
 
 body {
-    background:
-        radial-gradient(ellipse 900px 650px at 8% -8%, var(--glow-1), transparent 60%),
-        radial-gradient(ellipse 800px 750px at 108% 15%, var(--glow-2), transparent 60%),
-        radial-gradient(ellipse 700px 550px at 45% 115%, var(--glow-3), transparent 60%),
-        var(--bg-app);
-    background-attachment: fixed;
-    color: var(--text-primary);
-    font-family: var(--font-secondary);
-    line-height: 1.5;
+    background: var(--surface-page);
+    color: var(--text-body);
+    font-family: var(--font-sans);
+    line-height: var(--leading-normal);
     -webkit-font-smoothing: antialiased;
-    transition: var(--transition-smooth);
     min-height: 100vh;
 }
 
@@ -195,7 +137,7 @@ h1, h2, h3, .card-title, .modal-header h3, .auth-header h2, .nav-logo span, .bra
     background: var(--gradient-brand);
     color: var(--on-gradient);
     border-radius: var(--border-radius-md);
-    box-shadow: 0 6px 18px -4px rgba(180, 130, 20, 0.5);
+    box-shadow: var(--shadow-sm);
 }
 
 .logo-area h1 {
@@ -461,23 +403,73 @@ h1, h2, h3, .card-title, .modal-header h3, .auth-header h2, .nav-logo span, .bra
     background: var(--gradient-brand);
     color: var(--on-gradient);
     border-color: transparent;
-    box-shadow: 0 8px 22px -6px rgba(180, 130, 20, 0.55);
+    box-shadow: none;
 }
 
 .btn-primary:hover {
-    box-shadow: 0 12px 28px -6px rgba(180, 130, 20, 0.7);
+    box-shadow: none;
     transform: translateY(-2px);
 }
 
 .btn-secondary {
-    background-color: var(--secondary);
+    background-color: var(--surface-2);
     border-color: var(--border-color);
     color: var(--text-primary);
 }
 
 .btn-secondary:hover {
-    background-color: var(--secondary-hover);
-    border-color: var(--secondary-border);
+    background-color: var(--surface-2-hover);
+    border-color: var(--surface-2-border);
+}
+
+/* ── Botões do modal de assinatura ────────────────────────────────────────
+   Antes cada botão trazia sua própria cor por style inline: azul #009ee3 no
+   primeiro (que nem aparecia, porque o gradiente dourado do .btn-primary
+   cobria) e verde #21b183 no segundo. Dourado brigando com verde, nenhum dos
+   dois na paleta do tema, e ambos com o texto de 14px do .btn padrão — difícil
+   de ler.
+
+   Aqui os dois passam a viver na mesma família de cor, com hierarquia: ação
+   principal em dourado sólido, alternativa em contorno dourado. Como tudo sai
+   de variáveis, funciona igual no tema claro e no escuro. */
+.btn-pay {
+    width: 100%;
+    font-size: 1.0625rem;
+    padding: 0.95rem 1.5rem;
+    line-height: 1.3;
+}
+
+.btn-pay-alt {
+    background: transparent;
+    border-color: var(--primary);
+    /* --primary-hover, não --primary: no tema claro o --primary (#b8860b)
+       sobre o card quase branco dá 3,17:1 de contraste, abaixo dos 4,5:1 que
+       o WCAG AA exige para texto de 17px peso 600 (que não conta como "texto
+       grande"). O --primary-hover (#92650a) dá 5,00:1 e passa. No tema escuro
+       ele é mais claro que o --primary, então o contraste também melhora.
+       A BORDA pode seguir com --primary: elemento gráfico exige só 3:1. */
+    color: var(--primary-hover);
+    box-shadow: none;
+}
+
+.btn-pay-alt:hover {
+    background: var(--primary-glow);
+    border-color: var(--primary-hover);
+    transform: translateY(-2px);
+}
+
+/* O texto de apoio usava --text-muted em 0.85rem: contraste e tamanho baixos
+   demais para uma tela de decisão de compra. */
+.payment-instruction {
+    font-size: 0.95rem !important;
+    line-height: 1.6 !important;
+    color: var(--text-primary) !important;
+    opacity: 0.85;
+}
+
+.payment-instruction strong {
+    color: var(--primary);
+    opacity: 1;
 }
 
 .btn-warning {
@@ -489,18 +481,18 @@ h1, h2, h3, .card-title, .modal-header h3, .auth-header h2, .nav-logo span, .bra
 
 .btn-warning:hover {
     background-color: var(--warning);
-    color: #ffffff;
+    color: var(--ink-0);
 }
 
 .btn-danger {
     background-color: var(--danger-bg);
-    border-color: rgba(239, 68, 68, 0.2);
+    border-color: var(--danger-soft);
     color: var(--danger);
 }
 
 .btn-danger:hover {
     background-color: var(--danger);
-    color: #ffffff;
+    color: var(--ink-0);
 }
 
 .btn-sm {
@@ -530,7 +522,7 @@ h1, h2, h3, .card-title, .modal-header h3, .auth-header h2, .nav-logo span, .bra
 .theme-toggle button:hover {
     color: var(--text-primary);
     border-color: var(--primary);
-    background-color: var(--secondary);
+    background-color: var(--surface-2);
 }
 
 /* Main Layout Grid */
@@ -674,8 +666,12 @@ h1, h2, h3, .card-title, .modal-header h3, .auth-header h2, .nav-logo span, .bra
 }
 
 .home-continue-card .btn {
+    /* Botão invertido: fundo claro (--on-gradient) com o texto na cor do
+       próprio card (--accent, a mesma de --gradient-brand). Antes o texto
+       usava --ink-0 (branco fixo) — em cima do fundo também branco do tema
+       claro, o botão ficava em branco sobre branco, sem nada legível. */
     background: var(--on-gradient);
-    color: #fff8e7;
+    color: var(--accent);
     border: none;
     flex-shrink: 0;
 }
@@ -731,7 +727,7 @@ h1, h2, h3, .card-title, .modal-header h3, .auth-header h2, .nav-logo span, .bra
 .home-quick-card:hover {
     border-color: var(--glass-border-strong);
     transform: translateY(-2px);
-    box-shadow: 0 12px 30px -8px rgba(180, 130, 20, 0.35);
+    box-shadow: var(--shadow-md);
 }
 
 .home-quick-icon {
@@ -743,7 +739,7 @@ h1, h2, h3, .card-title, .modal-header h3, .auth-header h2, .nav-logo span, .bra
     background: var(--gradient-brand);
     color: var(--on-gradient);
     border-radius: var(--border-radius-md);
-    box-shadow: 0 6px 18px -4px rgba(180, 130, 20, 0.5);
+    box-shadow: var(--shadow-sm);
     flex-shrink: 0;
 }
 
@@ -767,7 +763,7 @@ h1, h2, h3, .card-title, .modal-header h3, .auth-header h2, .nav-logo span, .bra
 .badge {
     background-color: var(--primary-glow);
     color: var(--primary);
-    border: 1px solid rgba(245, 196, 81, 0.2);
+    border: 1px solid var(--accent-soft-border);
     font-size: 0.75rem;
     font-weight: 700;
     padding: 0.25rem 0.75rem;
@@ -783,7 +779,14 @@ h1, h2, h3, .card-title, .modal-header h3, .auth-header h2, .nav-logo span, .bra
     margin-bottom: 0;
 }
 
-label {
+/* Rótulo do site legado. Os componentes do design system também renderizam
+   <label> (campo, checkbox, switch) e têm estilo próprio; sem a exclusão, esta
+   regra de elemento os deixava em caixa alta, espaçados e com margem extra —
+   foi o que apareceu no formulário da aba Navio - Container.
+   O :where() mantém a especificidade de um seletor de elemento, como antes:
+   com :not() solto ela subiria para três classes e esta regra passaria a
+   vencer ajustes legados como .label-with-toggle label. */
+label:where(:not(.ic-label, .ic-check, .ic-switch)) {
     display: block;
     font-size: 0.8rem;
     font-weight: 600;
@@ -1073,8 +1076,8 @@ label {
     align-items: center;
     margin-top: 1rem;
     padding: 0.8rem 0.9rem;
-    background: linear-gradient(120deg, rgba(234, 179, 8, 0.14), rgba(146, 101, 10, 0.08));
-    border: 1px solid var(--secondary-border);
+    background: var(--accent-soft);
+    border: 1px solid var(--surface-2-border);
     border-radius: var(--border-radius-sm);
     font-size: 0.85rem;
 }
@@ -1096,21 +1099,21 @@ label {
 
 /* Taxation badges in tables */
 .badge-taxable {
-    background-color: rgba(245, 196, 81, 0.1);
+    background-color: var(--accent-soft);
     color: var(--primary);
-    border: 1px solid rgba(245, 196, 81, 0.3);
+    border: 1px solid var(--accent-soft-border);
 }
 
 .badge-exempt-books {
-    background-color: rgba(16, 185, 129, 0.1);
+    background-color: var(--success-soft);
     color: var(--success);
-    border: 1px solid rgba(16, 185, 129, 0.3);
+    border: 1px solid var(--success-soft);
 }
 
 .badge-exempt-meds {
-    background-color: rgba(6, 182, 212, 0.1);
+    background-color: var(--info-soft);
     color: var(--info);
-    border: 1px solid rgba(6, 182, 212, 0.3);
+    border: 1px solid var(--info-soft);
 }
 
 /* Tables Styling */
@@ -1171,7 +1174,7 @@ tbody tr {
 }
 
 tbody tr:hover {
-    background-color: rgba(245, 196, 81, 0.03);
+    background-color: var(--surface-raised);
 }
 
 tfoot tr {
@@ -1320,7 +1323,7 @@ tfoot th, tfoot td {
 
 /* KPI Accent Colors */
 .info-card::before { background-color: var(--info); }
-.secondary-card::before { background-color: var(--secondary-border); }
+.secondary-card::before { background-color: var(--surface-2-border); }
 .warning-card::before { background-color: var(--warning); }
 .primary-card::before { background: var(--gradient-brand); }
 .success-card::before { background-color: var(--success); }
@@ -1331,13 +1334,13 @@ tfoot th, tfoot td {
 
 /* Results Table Details */
 .highlight-col {
-    background-color: rgba(245, 196, 81, 0.04);
+    background-color: var(--surface-raised);
     font-weight: 700;
     color: var(--primary);
 }
 
 .table-results th.highlight-col {
-    background-color: rgba(245, 196, 81, 0.1);
+    background-color: var(--accent-soft);
 }
 
 .multiplier-badge {
@@ -1363,7 +1366,7 @@ tfoot th, tfoot td {
 .multiplier-badge.high {
     background-color: var(--danger-bg);
     color: var(--danger);
-    border: 1px solid rgba(239, 68, 68, 0.2);
+    border: 1px solid var(--danger-soft);
 }
 
 /* Charts Card Custom Setup */
@@ -1525,23 +1528,24 @@ tfoot th, tfoot td {
     bottom: 20px;
     left: 50%;
     transform: translateX(-50%);
-    background-color: #0f172a;
-    color: #ffffff;
+    background-color: var(--surface-invert);
+    color: var(--ink-0);
     padding: 0.25rem 0.5rem;
     font-size: 0.7rem;
     border-radius: 4px;
     white-space: nowrap;
     z-index: 10;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+    box-shadow: var(--shadow-md);
     pointer-events: none;
 }
 
-/* Color codes for items */
-.color-product { background-color: #6366f1; } /* Blue/Indigo */
-.color-freight { background-color: #a855f7; } /* Purple */
-.color-insurance { background-color: #ec4899; } /* Pink */
-.color-fees { background-color: #14b8a6; } /* Teal */
-.color-taxes { background-color: #f59e0b; } /* Amber */
+/* Composição do custo. A ordem é a do sistema: --chart-1 a --chart-5, na
+   sequência em que aparecem na barra. Nunca inventar cor de gráfico. */
+.color-product { background-color: var(--chart-1); }
+.color-freight { background-color: var(--chart-2); }
+.color-insurance { background-color: var(--chart-3); }
+.color-fees { background-color: var(--chart-4); }
+.color-taxes { background-color: var(--chart-5); }
 
 /* Footer */
 .app-footer-info {
@@ -1677,10 +1681,7 @@ tfoot th, tfoot td {
        on mobile (exactly what made "Acessar Sistema" unreachable). */
     align-items: safe center;
     justify-content: center;
-    background:
-        radial-gradient(ellipse 900px 700px at 12% 15%, rgba(245, 196, 81, 0.14), transparent 60%),
-        radial-gradient(ellipse 700px 600px at 90% 85%, rgba(184, 134, 11, 0.1), transparent 60%),
-        rgb(9, 7, 4);
+    background: var(--surface-page);
     z-index: 9999;
     padding: 1.5rem;
     overflow-y: auto;
@@ -1689,30 +1690,18 @@ tfoot th, tfoot td {
 }
 
 .auth-card {
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--surface-card);
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius-lg);
     width: 100%;
     max-width: 420px;
     padding: 2.25rem 2rem;
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    box-shadow: var(--shadow-lg);
     transition: var(--transition-smooth);
 }
 
-[data-theme="light"] .auth-screen {
-    background:
-        radial-gradient(ellipse 900px 700px at 12% 15%, rgba(234, 179, 8, 0.14), transparent 60%),
-        radial-gradient(ellipse 700px 600px at 90% 85%, rgba(146, 101, 10, 0.1), transparent 60%),
-        rgb(250, 246, 236);
-}
-
-[data-theme="light"] .auth-card {
-    background: rgba(255, 255, 255, 0.68);
-    box-shadow: 0 15px 35px rgba(180, 130, 20, 0.12);
-    border-color: var(--border-color);
-}
+/* O tema claro não precisa mais de exceção aqui: os tokens de superfície do
+   design system já mudam sozinhos com o data-theme. */
 
 /* ==========================================
    LOGIN SCREEN — split art panel
@@ -1721,30 +1710,35 @@ tfoot th, tfoot td {
    for every visitor before they're authenticated).
    ========================================== */
 #auth-container.auth-screen {
-    --bg-app: #faf6ec;
-    --bg-input: rgba(255, 255, 255, 0.8);
-    --border-color: rgba(180, 130, 20, 0.22);
-    --text-primary: #2b2410;
-    --text-muted: #6b5d3f;
-    --primary: #b8860b;
-    --primary-hover: #92650a;
-    --primary-glow: rgba(180, 130, 20, 0.12);
-    --gradient-brand: linear-gradient(135deg, #eab308 0%, #92650a 100%);
-    --secondary: rgba(255, 255, 255, 0.65);
-    --secondary-hover: rgba(255, 255, 255, 0.9);
-    --secondary-border: rgba(180, 130, 20, 0.28);
+    /* Esta tela é sempre clara, mesmo com o app no escuro, então usa tokens da
+       PALETA BASE do design system — que não mudam com o data-theme — em vez
+       dos semânticos. */
+    --bg-app: var(--ink-50);
+    --bg-card: var(--ink-0);
+    --bg-input: var(--ink-0);
+    --border-color: var(--ink-200);
+    --glass-border-strong: var(--ink-300);
+    --text-primary: var(--ink-900);
+    --text-muted: var(--ink-500);
+    --text-faint: var(--ink-400);
+    --primary: var(--aqua-600);
+    --primary-hover: var(--aqua-700);
+    --primary-glow: var(--aqua-50);
+    --nav-active-text: var(--aqua-700);
+    --gradient-brand: var(--aqua-600);
+    --on-gradient: var(--ink-0);
+    --surface-2: var(--ink-0);
+    --surface-2-hover: var(--ink-100);
+    --surface-2-border: var(--ink-200);
 
-    background:
-        radial-gradient(ellipse 900px 700px at 12% 15%, rgba(234, 179, 8, 0.14), transparent 60%),
-        radial-gradient(ellipse 700px 600px at 90% 85%, rgba(146, 101, 10, 0.1), transparent 60%),
-        rgb(250, 246, 236);
+    background: var(--ink-50);
     align-items: stretch;
     padding: 0;
 }
 
 #auth-container .auth-card {
-    background: rgba(255, 255, 255, 0.68);
-    box-shadow: 0 15px 35px rgba(180, 130, 20, 0.12);
+    background: var(--ink-0);
+    box-shadow: var(--shadow-lg);
 }
 
 #auth-container .auth-split {
@@ -1766,6 +1760,11 @@ tfoot th, tfoot td {
     min-height: 100vh;
 }
 
+/* O canvas é filho do #auth-container, então cobre a tela INTEIRA, não só a
+   metade da arte. Ele é decorativo (aria-hidden), e sem pointer-events:none
+   engolia o clique nos campos de e-mail e senha: o card só ficava na frente
+   porque o backdrop-filter dele criava um contexto de empilhamento, e o vidro
+   fosco saiu na migração para o design system. */
 #auth-container .auth-art-canvas {
     position: absolute;
     inset: 0;
@@ -1773,6 +1772,13 @@ tfoot th, tfoot td {
     height: 100%;
     display: block;
     z-index: 0;
+    pointer-events: none;
+}
+
+/* O formulário fica acima da arte por posição própria, não por efeito visual. */
+#auth-container .auth-split {
+    position: relative;
+    z-index: 1;
 }
 
 #auth-container .auth-logo-wrap {
@@ -1785,7 +1791,7 @@ tfoot th, tfoot td {
 #auth-container .auth-logo-wrap canvas {
     width: 100%;
     display: block;
-    filter: drop-shadow(0 18px 40px rgba(43, 36, 16, 0.28));
+    filter: drop-shadow(0 18px 40px color-mix(in oklab, var(--sea-900) 28%, transparent));
 }
 
 #auth-container .auth-art-copy {
@@ -1800,14 +1806,14 @@ tfoot th, tfoot td {
     font-size: 0.7rem;
     letter-spacing: 0.14em;
     text-transform: uppercase;
-    color: #92650a;
+    color: var(--aqua-600);
     font-weight: 700;
     margin: 0 0 0.5rem;
 }
 
 #auth-container .auth-art-copy h4 {
     font-family: var(--font-primary);
-    color: #2b2410;
+    color: var(--ink-900);
     font-size: 1.15rem;
     line-height: 1.4;
     margin: 0;
@@ -1936,13 +1942,49 @@ tfoot th, tfoot td {
 .auth-alert.error {
     background-color: var(--danger-bg);
     color: var(--danger);
-    border: 1px solid rgba(239, 68, 68, 0.2);
+    border: 1px solid var(--danger-soft);
 }
 
 .auth-alert.success {
     background-color: var(--success-bg);
     color: var(--success);
     border: 1px solid var(--success-border);
+}
+
+/* Ações secundárias do login ("Esqueci minha senha", "Voltar"): texto
+   clicável, sem o peso de um botão, para não competir com o "Acessar". */
+.auth-link {
+    align-self: center;
+    background: none;
+    border: none;
+    padding: 0.25rem 0;
+    color: var(--primary);
+    font: inherit;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.auth-link:hover {
+    text-decoration: underline;
+}
+
+.auth-link:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+.auth-link-end {
+    display: block;
+    margin: 0.4rem 0 0 auto;
+}
+
+.auth-help {
+    margin: 0;
+    font-size: 0.88rem;
+    line-height: 1.5;
+    color: var(--text-muted);
 }
 
 /* User Profile Badge Header */
@@ -2009,16 +2051,13 @@ tfoot th, tfoot td {
     align-items: center;
     justify-content: space-between;
     padding: 0.75rem 1.5rem;
-    background: linear-gradient(90deg, rgba(245, 196, 81, 0.16) 0%, rgba(184, 134, 11, 0.12) 100%);
+    background: var(--accent-soft);
     border-bottom: 1px solid var(--border-color);
     animation: slideDown 0.4s ease;
     gap: 1rem;
 }
 
-[data-theme="light"] .trial-banner {
-    background: linear-gradient(90deg, rgba(234, 179, 8, 0.1) 0%, rgba(146, 101, 10, 0.08) 100%);
-    border-bottom-color: var(--border-color);
-}
+/* Sem exceção de tema: --accent-soft já muda com o data-theme. */
 
 .trial-banner-content {
     display: flex;
@@ -2083,7 +2122,7 @@ tfoot th, tfoot td {
     font-size: 0.7rem;
     font-weight: 800;
     padding: 0.2rem 0.6rem;
-    border-radius: 12px;
+    border-radius: var(--border-radius-sm);
     text-transform: uppercase;
     letter-spacing: 0.05em;
 }
@@ -2205,7 +2244,7 @@ tfoot th, tfoot td {
     left: 0;
     width: 100vw;
     height: 100vh;
-    background-color: rgba(4, 8, 15, 0.8);
+    background-color: var(--surface-scrim);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
     display: flex;
@@ -2223,17 +2262,13 @@ tfoot th, tfoot td {
     width: 100%;
     max-width: 440px;
     padding: 2rem;
-    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+    box-shadow: var(--shadow-lg);
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
     position: relative;
 }
 
-[data-theme="light"] .modal-card {
-    background-color: var(--bg-card);
-    border-color: var(--border-color);
-    box-shadow: 0 15px 35px rgba(180, 130, 20, 0.14);
-}
+/* Sem exceção de tema: superfície e sombra já mudam com o data-theme. */
 
 .modal-header {
     display: flex;
@@ -2390,9 +2425,9 @@ tfoot th, tfoot td {
 }
 
 @keyframes pulseGlow {
-    0% { box-shadow: 0 0 0 0 rgba(245, 196, 81, 0.4); }
-    70% { box-shadow: 0 0 0 15px rgba(245, 196, 81, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(245, 196, 81, 0); }
+    0% { box-shadow: 0 0 0 0 var(--accent-soft-border); }
+    70% { box-shadow: 0 0 0 15px transparent; }
+    100% { box-shadow: 0 0 0 0 transparent; }
 }
 
 /* Dollar Ticker Bar Styles */
@@ -2458,7 +2493,7 @@ tfoot th, tfoot td {
 .ticker-change.up {
     background-color: var(--danger-bg);
     color: var(--danger);
-    border: 1px solid rgba(239, 68, 68, 0.2);
+    border: 1px solid var(--danger-soft);
 }
 
 .ticker-change.down {
@@ -2550,7 +2585,7 @@ tfoot th, tfoot td {
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 6px 18px -4px rgba(180, 130, 20, 0.5);
+    box-shadow: var(--shadow-sm);
 }
 
 .nav-logo span {
@@ -2569,7 +2604,7 @@ tfoot th, tfoot td {
     width: 40px;
     height: 40px;
     margin-left: auto;
-    background: var(--secondary);
+    background: var(--surface-2);
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius-sm);
     color: var(--text-primary);
@@ -2596,12 +2631,12 @@ tfoot th, tfoot td {
 
 .nav-eyebrow {
     font-family: var(--font-secondary);
-    font-size: 0.72rem;
-    font-weight: 700;
+    font-size: 0.82rem;
+    font-weight: 800;
     letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: var(--text-muted);
-    opacity: 0.7;
+    color: var(--text-primary);
+    opacity: 0.92;
     padding: 0.7rem 0.85rem 0.35rem;
 }
 
@@ -2617,8 +2652,8 @@ tfoot th, tfoot td {
     border-radius: var(--border-radius-md);
     color: var(--text-muted);
     font-family: var(--font-secondary);
-    font-weight: 700;
-    font-size: 1rem;
+    font-weight: 500;
+    font-size: 0.875rem;
     display: flex;
     align-items: center;
     gap: 0.75rem;
@@ -2636,7 +2671,7 @@ tfoot th, tfoot td {
 }
 
 .nav-item:hover {
-    background-color: var(--secondary);
+    background-color: var(--surface-2);
     color: var(--text-primary);
 }
 
@@ -2644,16 +2679,19 @@ tfoot th, tfoot td {
     opacity: 1;
 }
 
+/* Item selecionado: mesmo tratamento dos subitens — fundo suave em
+   --primary-glow com texto dourado. Antes era gradiente cheio com sombra
+   projetada, o que pesava demais na barra e destoava do item de dentro dos
+   subgrupos, que já usava esta forma. */
 .nav-item.active {
-    background: var(--gradient-brand);
-    color: #1a1305;
-    border-radius: var(--border-radius-sm);
-    box-shadow: 0 6px 20px -6px rgba(180, 130, 20, 0.55);
+    background-color: var(--primary-glow);
+    color: var(--nav-active-text);
+    border-radius: var(--border-radius-md);
     font-weight: 700;
 }
 
 .nav-item.active svg {
-    color: #1a1305;
+    color: var(--nav-active-text);
     opacity: 1;
 }
 
@@ -2672,8 +2710,8 @@ tfoot th, tfoot td {
 
 .nav-badge {
     margin-left: auto;
-    background-color: var(--danger, #ef4444);
-    color: #fff;
+    background-color: var(--danger);
+    color: var(--ink-0);
     font-size: 0.7rem;
     font-weight: 700;
     line-height: 1;
@@ -2685,6 +2723,30 @@ tfoot th, tfoot td {
 
 .nav-dropdown-group.open .chevron {
     transform: rotate(180deg);
+}
+
+/* Subgrupos recolhíveis da barra lateral (Documentos, Monitoramento).
+   Reaproveitam .nav-dropdown-group/.chevron, que já existiam para Documentos —
+   o que muda é o botão de cabeçalho e o recuo dos itens de dentro. */
+.nav-subgroup-toggle {
+    cursor: pointer;
+    /* Mesmo peso dos itens: "Documentos" e "Monitoramento" são um nível
+       intermediário, não devem competir com o título do grupo acima. O que os
+       diferencia é o chevron, não o peso da fonte. */
+    font-weight: 500;
+}
+
+/* Recuo: deixa visível que estes itens pertencem ao subgrupo acima, e não ao
+   grupo em maiúsculas. */
+.nav-dropdown-group .nav-dropdown-items .nav-item,
+.nav-dropdown-group .nav-dropdown-items .nav-subitem {
+    padding-left: 1.75rem;
+}
+
+/* Subgrupo fechado com a tela ativa lá dentro ganha marca: sem isso o usuário
+   perde a referência de onde está ao recolher. */
+.nav-dropdown-group:not(.open) .nav-subgroup-toggle.contem-ativo {
+    color: var(--primary-hover);
 }
 
 .nav-dropdown-items {
@@ -2705,8 +2767,8 @@ tfoot th, tfoot td {
     border-radius: var(--border-radius-md);
     color: var(--text-muted);
     font-family: var(--font-secondary);
-    font-weight: 700;
-    font-size: 1rem;
+    font-weight: 500;
+    font-size: 0.875rem;
     display: flex;
     align-items: center;
     gap: 0.75rem;
@@ -2724,7 +2786,7 @@ tfoot th, tfoot td {
 
 .nav-subitem:hover {
     color: var(--text-primary);
-    background-color: var(--secondary);
+    background-color: var(--surface-2);
 }
 
 .nav-subitem:hover svg {
@@ -2732,13 +2794,14 @@ tfoot th, tfoot td {
 }
 
 .nav-subitem.active {
-    color: var(--primary);
+    color: var(--nav-active-text);
     font-weight: 700;
     background-color: var(--primary-glow);
+    border-radius: var(--border-radius-md);
 }
 
 .nav-subitem.active svg {
-    color: var(--primary);
+    color: var(--nav-active-text);
     opacity: 1;
 }
 
@@ -2766,7 +2829,8 @@ tfoot th, tfoot td {
     display: none !important;
 }
 
-/* Documents Styling (A4 printable area) */
+/* Pré-visualização A4. Imita papel: fica branca com texto escuro nos dois
+   temas, então as cores abaixo são fixas de propósito e não usam token. */
 .document-preview-a4 {
     background: white;
     color: #0f172a;
@@ -2896,7 +2960,9 @@ tfoot th, tfoot td {
         width: 100%;
         min-height: 48px;
         padding: 0.75rem 1rem;
-        font-size: 1rem;
+        /* Um pouco maior que no desktop por causa do toque, mas sem voltar ao
+           1rem: isso desfazia a hierarquia que os títulos de grupo ganharam. */
+        font-size: 0.9375rem;
     }
     .nav-subitem {
         min-height: 44px;
@@ -3141,6 +3207,20 @@ tfoot th, tfoot td {
     flex-shrink: 0;
 }
 
+/* Título do card virando link pro anúncio no Mercado Livre (Catálogo —
+   Ganhando/Perdendo): mesma aparência do <strong> que substitui, só muda ao
+   passar o mouse — sem isso pareceria um link qualquer, azul e sublinhado. */
+.item-card-title-link {
+    color: inherit;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.item-card-title-link:hover {
+    color: var(--accent);
+    text-decoration: underline;
+}
+
 @media (max-width: 480px) {
     .item-card-header {
         flex-wrap: wrap;
@@ -3191,6 +3271,21 @@ tfoot th, tfoot td {
     display: none !important;
 }
 
+/* Contagem numa aba de resultados (ex.: "Prejuízo (3)") — mesma cor/forma do
+   .nav-badge da barra lateral, sem o margin-left: auto (aqui o flex do botão
+   já encosta os dois). */
+.tab-badge {
+    background-color: var(--danger);
+    color: var(--ink-0);
+    font-size: 0.7rem;
+    font-weight: 700;
+    line-height: 1;
+    padding: 0.2rem 0.45rem;
+    border-radius: 999px;
+    min-width: 1.1rem;
+    text-align: center;
+}
+
 .ncm-preview {
     padding: 0.75rem 1rem;
     background-color: var(--bg-hover);
@@ -3206,18 +3301,18 @@ tfoot th, tfoot td {
 }
 
 .ncm-preview.success {
-    border-color: rgba(16, 185, 129, 0.4);
-    background-color: rgba(16, 185, 129, 0.04);
+    border-color: var(--success);
+    background-color: var(--success-soft);
 }
 
 .ncm-preview.warning {
-    border-color: rgba(245, 158, 11, 0.4);
-    background-color: rgba(245, 158, 11, 0.04);
+    border-color: var(--warning);
+    background-color: var(--warning-soft);
 }
 
 .ncm-preview.error {
-    border-color: rgba(239, 68, 68, 0.4);
-    background-color: rgba(239, 68, 68, 0.04);
+    border-color: var(--danger);
+    background-color: var(--danger-soft);
 }
 
 .ncm-badge {
@@ -3315,7 +3410,7 @@ html.has-session #landing-container {
 .lp-btn-primary {
     background: var(--gradient-brand);
     color: var(--on-gradient);
-    box-shadow: 0 6px 20px -6px rgba(180, 130, 20, 0.55);
+    box-shadow: var(--shadow-md);
 }
 
 .lp-btn-primary:hover {
@@ -3323,13 +3418,13 @@ html.has-session #landing-container {
 }
 
 .lp-btn-ghost {
-    background: var(--secondary);
-    border-color: var(--secondary-border);
+    background: var(--surface-2);
+    border-color: var(--surface-2-border);
     color: var(--text-primary);
 }
 
 .lp-btn-ghost:hover {
-    background: var(--secondary-hover);
+    background: var(--surface-2-hover);
 }
 
 .lp-btn-lg {
@@ -3911,4 +4006,506 @@ html.has-session #landing-container {
         grid-template-columns: 1fr;
         gap: 2.25rem;
     }
+}
+
+/* ── Precificação Marketplaces ─────────────────────────────────────────── */
+
+.pmk-secao-titulo {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0 0 0.15rem;
+}
+
+/* Campos à esquerda, diagrama da caixa à direita. O desenho existe porque
+   "comprimento, largura e altura" é ambíguo sem referência visual — e medir a
+   dimensão errada muda o frete cobrado. */
+.pmk-medidas {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 210px;
+    gap: 1.5rem;
+    align-items: start;
+    margin-top: 1.75rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.pmk-caixa {
+    margin: 0;
+    padding: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    background: var(--bg-input);
+    text-align: center;
+    color: var(--primary-hover);
+}
+
+.pmk-caixa svg {
+    width: 100%;
+    max-width: 180px;
+    height: auto;
+}
+
+.pmk-caixa figcaption {
+    margin-top: 0.5rem;
+    text-align: left;
+}
+
+/* Abaixo de 900px o diagrama vai para cima dos campos: espremido na lateral
+   ele fica ilegível justamente onde mais se usa o app, no celular. */
+@media (max-width: 900px) {
+    .pmk-medidas {
+        grid-template-columns: 1fr;
+    }
+    .pmk-caixa {
+        order: -1;
+        max-width: 320px;
+    }
+}
+
+/* Tipo de anúncio: fica no bloco de entrada, junto dos outros campos, mas
+   marcado como específico do Mercado Livre — Shopee e Amazon não têm esse
+   conceito, e deixar o seletor solto sugeriria que vale para os três. */
+.pmk-tipo-anuncio {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1.25rem;
+    margin-top: 1.25rem;
+    padding: 0.9rem 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    background: var(--bg-input);
+}
+
+.pmk-tipo-rotulo {
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+}
+
+.pmk-tipo-tag {
+    margin-left: 0.5rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    color: var(--primary-hover);
+    background: var(--primary-glow);
+    white-space: nowrap;
+}
+
+.pmk-tipo-opcoes {
+    display: flex;
+    gap: 1.25rem;
+    flex-wrap: wrap;
+}
+
+.pmk-tipo-opcoes label {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    cursor: pointer;
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: normal;
+}
+
+/* ==========================================================================
+   MODAL DE PAGAMENTO — assinatura cobrada dentro do site
+   --------------------------------------------------------------------------
+   Antes o mensal só redirecionava pro checkout do Mercado Pago, e quem tinha
+   e-mail diferente do da conta MP batia na tela "Seu e-mail não corresponde ao
+   da assinatura" e não conseguia assinar. Agora o cartão é tokenizado aqui, com
+   MP Fields — daí os .mp-field serem <div> e não <input>: quem desenha o campo
+   por dentro é um iframe do próprio Mercado Pago.
+   ========================================================================== */
+
+.mp-planos {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    width: 100%;
+    margin-bottom: 1.1rem;
+}
+
+.mp-plano {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 0.85rem 0.9rem;
+    text-align: left;
+    cursor: pointer;
+    border: 2px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    background: var(--bg-input);
+    color: var(--text-primary);
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.mp-plano:hover { border-color: var(--primary); }
+
+.mp-plano.ativo {
+    border-color: var(--primary);
+    background: color-mix(in srgb, var(--primary) 12%, transparent);
+}
+
+.mp-plano-nome { font-size: 0.9rem; font-weight: 700; }
+.mp-plano-preco { font-size: 1.1rem; font-weight: 800; color: var(--primary); }
+.mp-plano-preco small { font-size: 0.72rem; font-weight: 600; }
+.mp-plano-obs { font-size: 0.72rem; color: var(--text-muted); line-height: 1.35; }
+
+.mp-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    width: 100%;
+    text-align: left;
+}
+
+.mp-linha {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+}
+
+.mp-campo { display: flex; flex-direction: column; gap: 0.3rem; }
+
+.mp-campo label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.mp-input {
+    width: 100%;
+    height: 46px;
+    padding: 0 0.9rem;
+    font-size: 1rem;
+    border-radius: var(--border-radius-md);
+    border: 1px solid var(--border-color);
+    background: var(--bg-input);
+    color: var(--text-primary);
+}
+
+.mp-input:focus,
+.mp-field.mp-field-focado {
+    outline: none;
+    border-color: var(--primary);
+}
+
+/* Container dos MP Fields: o iframe do MP entra aqui dentro e precisa ocupar a
+   altura toda, senão o campo nasce com 0px e parece que não carregou. */
+.mp-field { display: block; padding: 0 0.9rem; }
+.mp-field iframe { width: 100%; height: 44px; border: 0; display: block; }
+
+.mp-field.mp-field-invalido,
+.mp-input.mp-field-invalido { border-color: var(--danger); }
+
+/* Precisam existir no DOM porque o cardForm preenche os três, mas não dizem
+   nada pro assinante de um plano mensal de parcela única. */
+.mp-oculto { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+
+.mp-selo {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    text-align: center;
+    margin: 0;
+}
+
+.mp-avulso-texto {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+    margin: 0 0 0.25rem;
+    text-align: center;
+}
+
+.mp-status {
+    font-size: 0.88rem;
+    color: var(--primary);
+    text-align: center;
+    margin: 0.75rem 0 0;
+    line-height: 1.45;
+}
+
+.mp-status-erro { color: var(--danger); font-weight: 600; }
+
+.mp-sucesso {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.6rem;
+    width: 100%;
+    text-align: center;
+}
+
+.mp-sucesso-icone {
+    width: 56px;
+    height: 56px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--ink-0);
+    background: var(--success);
+}
+
+.mp-sucesso h4 { font-size: 1.2rem; font-weight: 700; color: var(--text-primary); margin: 0; }
+.mp-sucesso p { font-size: 0.9rem; color: var(--text-muted); line-height: 1.5; margin: 0 0 0.5rem; }
+
+@media (max-width: 420px) {
+    .mp-planos { grid-template-columns: 1fr; }
+}
+
+/* ==========================================================================
+   IMPORTAÇÃO POR NF-e (XML)
+   --------------------------------------------------------------------------
+   A caixa aparece só depois que o XML é lido, mostrando o que foi encontrado
+   antes de qualquer coisa entrar na lista de produtos: a conversão depende da
+   cotação, e cotação errada contamina o custo de toda a simulação.
+   ========================================================================== */
+
+.nfe-cambio {
+    margin-bottom: 1rem;
+    padding: 1rem 1.1rem;
+    border: 1px solid var(--primary);
+    border-radius: var(--border-radius-md);
+    background: color-mix(in srgb, var(--primary) 8%, transparent);
+}
+
+.nfe-cambio-achados {
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    line-height: 1.5;
+    margin: 0 0 0.75rem;
+}
+
+.nfe-cambio > label {
+    display: block;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.4rem;
+}
+
+.nfe-cambio-linha {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.nfe-cambio-linha .form-control {
+    width: 9rem;
+    flex: 0 0 auto;
+}
+
+.nfe-cambio-dica {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    line-height: 1.45;
+    margin: 0.6rem 0 0;
+}
+
+.nfe-falha { color: var(--danger); }
+
+@media (max-width: 520px) {
+    .nfe-cambio-linha .form-control { width: 100%; }
+    .nfe-cambio-linha .btn { flex: 1 1 auto; }
+}
+
+/* ==========================================================================
+   IMPORTAÇÃO POR COMMERCIAL INVOICE
+   --------------------------------------------------------------------------
+   Reaproveita a caixa .nfe-cambio. O que muda é o mapeamento de colunas: como
+   a invoice não tem formato padrão, a adivinhação precisa ser corrigível e o
+   resultado precisa estar visível ANTES de virar custo.
+   ========================================================================== */
+
+.ci-mapa {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 0.85rem;
+}
+
+.ci-campo { display: flex; flex-direction: column; gap: 0.3rem; }
+
+.ci-campo label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.ci-previa { margin-bottom: 0.85rem; }
+
+.ci-tabela {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.78rem;
+    color: var(--text-primary);
+}
+
+.ci-tabela th {
+    text-align: left;
+    font-weight: 600;
+    color: var(--text-muted);
+    padding: 0.3rem 0.4rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.ci-tabela td {
+    padding: 0.3rem 0.4rem;
+    border-bottom: 1px solid color-mix(in srgb, var(--border-color) 50%, transparent);
+}
+
+.ci-tabela .text-right { text-align: right; }
+
+.ci-resumo {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    line-height: 1.45;
+    margin: 0.5rem 0 0;
+}
+
+/* ==========================================================================
+   DIAGNÓSTICO DE NCM NA IMPORTAÇÃO
+   --------------------------------------------------------------------------
+   NCM ruim não impede a importação: o produto entra com alíquota genérica e o
+   custo sai errado em silêncio. Por isso o aviso é detalhado — qual código,
+   qual produto e por que falhou — e agrupado por tipo de problema, senão uma
+   invoice de 58 itens viraria uma parede repetindo a mesma explicação.
+   ========================================================================== */
+
+.ncm-problemas-box {
+    margin-top: 0.85rem;
+    padding: 0.85rem 1rem;
+    border: 1px solid var(--warning);
+    border-radius: var(--border-radius-md);
+    background: color-mix(in srgb, var(--warning) 10%, transparent);
+}
+
+.ncm-problemas-titulo {
+    display: block;
+    font-size: 0.86rem;
+    color: var(--text-primary);
+    margin-bottom: 0.6rem;
+}
+
+.ncm-problema { margin-bottom: 0.75rem; }
+.ncm-problema:last-of-type { margin-bottom: 0; }
+
+.ncm-problema strong {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--text-primary);
+}
+
+.ncm-problema p {
+    font-size: 0.76rem;
+    color: var(--text-muted);
+    line-height: 1.45;
+    margin: 0.2rem 0 0.35rem;
+}
+
+.ncm-problema ul {
+    margin: 0;
+    padding-left: 1.1rem;
+    font-size: 0.76rem;
+    color: var(--text-primary);
+    line-height: 1.6;
+}
+
+.ncm-problema code {
+    font-family: var(--font-code);
+    font-size: 0.74rem;
+    padding: 0.05rem 0.3rem;
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--text-primary) 12%, transparent);
+    margin-right: 0.35rem;
+}
+
+.ncm-problemas-rodape {
+    font-size: 0.76rem;
+    color: var(--text-muted);
+    line-height: 1.45;
+    margin: 0.7rem 0 0;
+    padding-top: 0.6rem;
+    border-top: 1px solid color-mix(in srgb, var(--warning) 30%, transparent);
+}
+
+/* ── Códigos de barras (GTIN) ─────────────────────────────────────────── */
+/* Caixa de aviso: o projeto não tinha um componente para isso, e a diferença
+   entre "código que pode ir no anúncio" e "código só de estoque" precisa de
+   destaque — trocar os dois deixa o anúncio pausado por moderação. */
+
+.gtin-aviso {
+    padding: 0.85rem 1rem;
+    border-radius: 10px;
+    border: 1px solid var(--warning-border);
+    background: var(--warning-bg);
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    line-height: 1.5;
+}
+
+.gtin-aviso-forte {
+    border-color: var(--border-color);
+    background: var(--bg-card);
+}
+
+.gtin-linha {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.7rem 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.gtin-linha:last-child { border-bottom: none; }
+
+.gtin-marca {
+    font-weight: 800;
+    font-size: 0.95rem;
+    min-width: 1.2rem;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+/* Algarismos de largura fixa: comparar dois códigos lado a lado só funciona
+   se as colunas de dígitos alinharem. */
+.gtin-codigo {
+    display: block;
+    font-family: var(--font-code);
+    font-size: 0.95rem;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+    color: var(--text-primary);
+}
+
+.gtin-detalhe {
+    display: block;
+    margin-top: 0.15rem;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+.gtin-codigo-bloco {
+    margin: 0;
+    padding: 0.85rem 1rem;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-input);
+    color: var(--text-primary);
+    font-family: var(--font-code);
+    font-size: 0.8rem;
+    line-height: 1.55;
+    overflow-x: auto;
 }

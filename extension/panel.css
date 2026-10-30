@@ -5,13 +5,13 @@
     right: 20px;
     z-index: 2147483647;
     width: 360px;
-    font-family: 'Segoe UI', Arial, sans-serif;
-    background: #fffaf0;
-    border: 1px solid #f0e0b0;
+    font-family: var(--font-sans);
+    background: var(--surface-card);
+    border: 1px solid var(--accent-soft);
     border-radius: 14px;
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
+    box-shadow: var(--shadow-md);
     overflow: hidden;
-    color: #1f2937;
+    color: var(--text-title);
 }
 
 #impoclick-panel-header {
@@ -22,14 +22,14 @@
     box-sizing: border-box;
     width: 100%;
     padding: 10px 14px;
-    background: linear-gradient(135deg, #ffd873 0%, #b8860b 100%);
+    background: var(--accent);
     cursor: default;
 }
 
 #impoclick-panel-title {
     font-size: 13px;
     font-weight: 700;
-    color: #1a1305;
+    color: var(--text-on-accent);
 }
 
 #impoclick-panel-toggle {
@@ -37,7 +37,7 @@
     cursor: pointer;
     font-size: 16px;
     font-weight: 700;
-    color: #1a1305;
+    color: var(--text-on-accent);
     width: 22px;
     height: 22px;
     display: flex;
@@ -47,7 +47,7 @@
 }
 
 #impoclick-panel-toggle:hover {
-    background: rgba(26, 19, 5, 0.12);
+    background: var(--accent-soft);
 }
 
 #impoclick-panel-body {
@@ -65,7 +65,7 @@
 .impoclick-item-title {
     font-size: 12.5px;
     font-weight: 600;
-    color: #1f2937;
+    color: var(--text-title);
     margin: 0 0 10px;
     line-height: 1.35;
     display: -webkit-box;
@@ -79,12 +79,12 @@
     justify-content: space-between;
     align-items: center;
     font-size: 12.5px;
-    color: #4b5563;
+    color: var(--text-body);
     margin-bottom: 6px;
 }
 
 .impoclick-row strong {
-    color: #1f2937;
+    color: var(--text-title);
     font-weight: 700;
 }
 
@@ -92,7 +92,7 @@
     display: block;
     font-size: 11px;
     font-weight: 600;
-    color: #6b7280;
+    color: var(--text-body);
     text-transform: uppercase;
     letter-spacing: 0.03em;
     margin: 12px 0 4px;
@@ -105,15 +105,15 @@
     width: 100%;
     padding: 8px 10px;
     font-size: 13px;
-    border: 1px solid #e5d9b6;
+    border: 1px solid var(--accent-soft-border);
     border-radius: 8px;
-    background: #ffffff;
-    color: #1f2937;
+    background: var(--ink-0);
+    color: var(--text-title);
     margin-bottom: 10px;
 }
 
 .impoclick-input:focus {
-    border-color: #b8860b;
+    border-color: var(--accent);
 }
 
 .impoclick-dim-grid {
@@ -135,13 +135,13 @@
     gap: 10px;
     margin: 10px 0;
     font-size: 12px;
-    color: #4b5563;
+    color: var(--text-body);
 }
 
 .impoclick-toggle-label {
     font-size: 11px;
     font-weight: 600;
-    color: #6b7280;
+    color: var(--text-body);
     text-transform: uppercase;
     letter-spacing: 0.03em;
     flex-basis: 100%;
@@ -163,8 +163,8 @@
     padding: 9px 10px;
     font-size: 13px;
     font-weight: 700;
-    color: #1a1305;
-    background: linear-gradient(135deg, #ffd873 0%, #b8860b 100%);
+    color: var(--text-on-accent);
+    background: var(--accent);
     border-radius: 8px;
     cursor: pointer;
 }
@@ -175,20 +175,20 @@
 
 .impoclick-text {
     font-size: 12.5px;
-    color: #4b5563;
+    color: var(--text-body);
     line-height: 1.5;
     margin: 0 0 8px;
 }
 
 .impoclick-note {
     font-size: 11px;
-    color: #9ca3af;
+    color: var(--text-muted);
     line-height: 1.4;
     margin-top: 8px;
 }
 
 .impoclick-error {
-    color: #b91c1c;
+    color: var(--danger);
 }
 
 .impoclick-trademark-search {
@@ -210,11 +210,11 @@
 }
 
 .impoclick-trademark-item {
-    border: 1px solid #f0e0b0;
+    border: 1px solid var(--accent-soft);
     border-radius: 8px;
     padding: 8px 10px;
     margin: 8px 0;
-    background: #fffdf7;
+    background: var(--surface-card);
 }
 
 .impoclick-trademark-item-header {
@@ -235,22 +235,22 @@
 }
 
 .impoclick-tm-active {
-    background: #dcfce7;
-    color: #15803d;
+    background: var(--success-soft);
+    color: var(--success);
 }
 
 .impoclick-tm-inactive {
-    background: #f3f4f6;
-    color: #6b7280;
+    background: var(--surface-raised);
+    color: var(--text-body);
 }
 
 .impoclick-tm-confirmed {
-    color: #15803d;
+    color: var(--success);
     font-weight: 600;
 }
 
 .impoclick-tm-unconfirmed {
-    color: #b45309;
+    color: var(--warning);
 }
 
 .impoclick-verdict {
@@ -263,26 +263,26 @@
 }
 
 .impoclick-verdict.impoclick-good {
-    background: #dcfce7;
-    color: #15803d;
+    background: var(--success-soft);
+    color: var(--success);
 }
 
 .impoclick-verdict.impoclick-warn {
-    background: #fef3c7;
-    color: #b45309;
+    background: var(--warning-soft);
+    color: var(--warning);
 }
 
 .impoclick-verdict.impoclick-bad {
-    background: #fee2e2;
-    color: #b91c1c;
+    background: var(--danger-soft);
+    color: var(--danger);
 }
 
 .impoclick-breakdown {
-    border: 1px solid #f0e0b0;
+    border: 1px solid var(--accent-soft);
     border-radius: 8px;
     padding: 8px 10px;
     margin: 4px 0 8px;
-    background: #fffdf7;
+    background: var(--surface-card);
 }
 
 .impoclick-breakdown-row {
@@ -291,12 +291,12 @@
     align-items: baseline;
     gap: 8px;
     font-size: 12px;
-    color: #4b5563;
+    color: var(--text-body);
     padding: 4px 0;
 }
 
 .impoclick-breakdown-row:not(:last-child) {
-    border-bottom: 1px dashed #eee0c0;
+    border-bottom: 1px dashed var(--accent-soft);
 }
 
 .impoclick-breakdown-row strong {
@@ -305,60 +305,113 @@
 }
 
 .impoclick-breakdown-minus strong {
-    color: #b91c1c;
+    color: var(--danger);
 }
 
 .impoclick-breakdown-subtotal {
     font-weight: 600;
-    color: #1f2937;
+    color: var(--text-title);
 }
 
 .impoclick-breakdown-total {
     font-weight: 800;
     font-size: 13px;
-    border-top: 2px solid #eab308 !important;
+    border-top: 2px solid var(--accent) !important;
     border-bottom: none !important;
     margin-top: 2px;
     padding-top: 6px;
 }
 
 .impoclick-breakdown-total.impoclick-breakdown-positive strong {
-    color: #15803d;
+    color: var(--success);
 }
 
 .impoclick-breakdown-total.impoclick-breakdown-negative strong {
-    color: #b91c1c;
+    color: var(--danger);
 }
 
 /* Etiqueta "CATÁLOGO" injetada em links de produto catálogo (/p/MLB...)
    nos resultados de busca e listas — all:initial pra não herdar estilo
    nenhum da página do Mercado Livre. */
+/* Crachá do canto superior direito de cada card de busca. Duas linhas
+   empilhadas: o tipo do anúncio (que sai da própria URL) e, quando o Mercado
+   Livre deixa consultar, a data de criação. */
+.impoclick-card-badge {
+    all: initial;
+    position: absolute;
+    z-index: 999999;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 3px;
+    pointer-events: none;
+}
+
+.impoclick-card-tipo {
+    font-family: var(--font-sans);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    padding: 3px 8px;
+    border-radius: 999px;
+    /* O anel branco vem antes da sombra: o crachá flutua sobre a foto do
+       produto, que pode ser de qualquer cor, e sem ele a etiqueta escura
+       desaparecia em foto escura (e a clara, em foto clara). */
+    box-shadow: 0 0 0 1.5px var(--ink-0), var(--shadow-sm);
+    white-space: nowrap;
+}
+
+/* Cada tipo tem sua cor, não um tom do mesmo azul: na busca os dois aparecem
+   lado a lado e a diferença precisa ser perceptível de relance, antes de ler.
+   Catálogo leva o azul da marca — é o caso que muda a estratégia do vendedor;
+   tradicional leva o grafite, que informa sem disputar atenção. */
+.impoclick-tipo-catalogo {
+    color: var(--text-on-accent);
+    background: var(--accent);
+}
+
+.impoclick-tipo-tradicional {
+    color: var(--ink-0);
+    background: var(--surface-invert);
+}
+
+.impoclick-card-data {
+    font-family: var(--font-sans);
+    font-size: 9.5px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 999px;
+    border: 1px solid currentColor;
+    box-shadow: 0 0 0 1.5px var(--ink-0), var(--shadow-xs);
+    white-space: nowrap;
+}
+
 .impoclick-catalog-badge {
     all: initial;
     position: absolute;
     z-index: 999999;
-    font-family: 'Segoe UI', Arial, sans-serif;
+    font-family: var(--font-sans);
     font-size: 10px;
     font-weight: 800;
     letter-spacing: 0.03em;
-    color: #1a1305;
-    background: linear-gradient(135deg, #ffd873 0%, #b8860b 100%);
+    color: var(--text-on-accent);
+    background: var(--accent);
     padding: 3px 7px;
     border-radius: 999px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+    box-shadow: var(--shadow-sm);
     pointer-events: none;
 }
 
 /* --- Análise de anúncio (erros e oportunidades) --- */
 .impoclick-btn-secondary {
-    background: #fff8e6;
-    border: 1px solid #e5d9b6;
-    color: #5c4a12;
+    background: var(--accent-soft);
+    border: 1px solid var(--accent-soft-border);
+    color: var(--accent);
     box-shadow: none;
 }
 
 .impoclick-btn-secondary:hover {
-    background: #fff2d2;
+    background: var(--accent-soft);
 }
 
 .impoclick-an-block {
@@ -370,13 +423,13 @@
     font-weight: 800;
     letter-spacing: 0.04em;
     text-transform: uppercase;
-    color: #6b7280;
+    color: var(--text-body);
     margin: 12px 0 6px;
 }
 
 .impoclick-an-item {
-    border-left: 3px solid #d1d5db;
-    background: #fbfaf6;
+    border-left: 3px solid var(--border-strong);
+    background: var(--surface-raised);
     border-radius: 6px;
     padding: 7px 9px;
     margin-bottom: 6px;
@@ -385,7 +438,7 @@
 .impoclick-an-item strong {
     display: block;
     font-size: 12px;
-    color: #1f2937;
+    color: var(--text-title);
     line-height: 1.35;
 }
 
@@ -393,12 +446,12 @@
     margin: 4px 0 0;
     font-size: 11.5px;
     line-height: 1.45;
-    color: #4b5563;
+    color: var(--text-body);
 }
 
 .impoclick-an-item p.impoclick-note {
     font-size: 10.5px;
-    color: #9ca3af;
+    color: var(--text-muted);
 }
 
 .impoclick-an-item a {
@@ -406,7 +459,7 @@
     margin-top: 5px;
     font-size: 11.5px;
     font-weight: 700;
-    color: #b8860b;
+    color: var(--accent);
     text-decoration: none;
 }
 
@@ -415,25 +468,25 @@
 }
 
 .impoclick-an-ok {
-    border-left-color: #15803d;
-    background: #f2fbf5;
+    border-left-color: var(--success);
+    background: var(--success-soft);
 }
 
 .impoclick-an-warn {
-    border-left-color: #b91c1c;
-    background: #fef4f4;
+    border-left-color: var(--danger);
+    background: var(--danger-soft);
 }
 
 .impoclick-an-opp {
-    border-left-color: #b45309;
-    background: #fffaf0;
+    border-left-color: var(--warning);
+    background: var(--surface-card);
 }
 
 /* --- Abas do painel (Viabilidade / Análise) --- */
 #impoclick-panel-tabs {
     display: flex;
-    border-bottom: 1px solid #f0e0b0;
-    background: #fffdf7;
+    border-bottom: 1px solid var(--accent-soft);
+    background: var(--surface-card);
 }
 
 #impoclick-panel-tabs.impoclick-hidden {
@@ -446,23 +499,23 @@
     flex: 1;
     text-align: center;
     padding: 9px 6px;
-    font-family: 'Segoe UI', Arial, sans-serif;
+    font-family: var(--font-sans);
     font-size: 12px;
     font-weight: 700;
-    color: #9a8a63;
+    color: var(--text-muted);
     cursor: pointer;
     border-bottom: 2px solid transparent;
 }
 
 .impoclick-tab:hover {
-    color: #5c4a12;
-    background: #fff6e0;
+    color: var(--accent);
+    background: var(--accent-soft);
 }
 
 .impoclick-tab-active {
-    color: #5c4a12;
-    border-bottom-color: #b8860b;
-    background: #fffaf0;
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+    background: var(--surface-card);
 }
 
 #impoclick-panel-analise.impoclick-hidden,
@@ -477,7 +530,7 @@
     display: block;
     height: 5px;
     width: 100%;
-    background: #ece5d3;
+    background: var(--surface-inset);
     border-radius: 999px;
     overflow: hidden;
     margin: 6px 0 2px;
@@ -489,16 +542,16 @@
     border-radius: 999px;
 }
 
-.impoclick-bar-good { background: #15803d; }
-.impoclick-bar-warn { background: #d97706; }
-.impoclick-bar-bad { background: #b91c1c; }
+.impoclick-bar-good { background: var(--success); }
+.impoclick-bar-warn { background: var(--warning); }
+.impoclick-bar-bad { background: var(--danger); }
 
 .impoclick-score {
     text-align: center;
     padding: 10px 8px 12px;
-    border: 1px solid #f0e0b0;
+    border: 1px solid var(--accent-soft);
     border-radius: 10px;
-    background: #fffdf7;
+    background: var(--surface-card);
     margin-bottom: 4px;
 }
 
@@ -512,12 +565,12 @@
 .impoclick-score-value span {
     font-size: 14px;
     font-weight: 700;
-    color: #9ca3af;
+    color: var(--text-muted);
 }
 
-.impoclick-score-value.impoclick-good { color: #15803d; }
-.impoclick-score-value.impoclick-warn { color: #b45309; }
-.impoclick-score-value.impoclick-bad { color: #b91c1c; }
+.impoclick-score-value.impoclick-good { color: var(--success); }
+.impoclick-score-value.impoclick-warn { color: var(--warning); }
+.impoclick-score-value.impoclick-bad { color: var(--danger); }
 
 .impoclick-score-class {
     margin-top: 6px;
@@ -525,7 +578,7 @@
     font-weight: 800;
     letter-spacing: 0.04em;
     text-transform: uppercase;
-    color: #6b7280;
+    color: var(--text-body);
 }
 
 .impoclick-check {
@@ -540,13 +593,13 @@
 }
 
 .impoclick-check-ok {
-    background: #f2fbf5;
-    color: #15803d;
+    background: var(--success-soft);
+    color: var(--success);
 }
 
 .impoclick-check-bad {
-    background: #fef4f4;
-    color: #b91c1c;
+    background: var(--danger-soft);
+    color: var(--danger);
 }
 
 .impoclick-check-icon {
@@ -555,7 +608,7 @@
 }
 
 .impoclick-check-label {
-    color: #1f2937;
+    color: var(--text-title);
 }
 
 .impoclick-check-detail {
@@ -565,12 +618,12 @@
 /* Valor do atributo: fonte monoespaçada porque o que importa aqui é
    contar caracteres e comparar palavra a palavra com o título. */
 .impoclick-attr-value {
-    font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+    font-family: var(--font-mono);
     font-size: 11px !important;
-    color: #374151 !important;
+    color: var(--text-body) !important;
     word-break: break-word;
-    background: #ffffff;
-    border: 1px solid #eee0c0;
+    background: var(--ink-0);
+    border: 1px solid var(--accent-soft);
     border-radius: 5px;
     padding: 4px 6px;
     margin: 5px 0 6px !important;
@@ -588,13 +641,13 @@
     line-height: 1.3;
     padding: 3px 7px;
     border-radius: 999px;
-    background: #f3f4f6;
-    color: #4b5563;
+    background: var(--surface-raised);
+    color: var(--text-body);
 }
 
 .impoclick-field-chip.impoclick-field-required {
-    background: #fee2e2;
-    color: #b91c1c;
+    background: var(--danger-soft);
+    color: var(--danger);
     font-weight: 700;
 }
 
@@ -611,9 +664,9 @@
     border-radius: 5px;
 }
 
-.impoclick-tag-good { background: #dcfce7; color: #15803d; }
-.impoclick-tag-bad { background: #fee2e2; color: #b91c1c; font-weight: 700; }
-.impoclick-tag-neutral { background: #f3f4f6; color: #6b7280; }
+.impoclick-tag-good { background: var(--success-soft); color: var(--success); }
+.impoclick-tag-bad { background: var(--danger-soft); color: var(--danger); font-weight: 700; }
+.impoclick-tag-neutral { background: var(--surface-raised); color: var(--text-body); }
 
 /* Minigráfico de visitas por dia: uma barra por dia dos últimos 30. */
 .impoclick-spark {
@@ -627,40 +680,40 @@
 
 .impoclick-spark-bar {
     flex: 1;
-    background: linear-gradient(180deg, #ffd873 0%, #b8860b 100%);
+    background: var(--accent);
     border-radius: 2px 2px 0 0;
     min-height: 2px;
 }
 
-.impoclick-up { color: #15803d; font-size: 11px; font-weight: 700; }
-.impoclick-down { color: #b91c1c; font-size: 11px; font-weight: 700; }
+.impoclick-up { color: var(--success); font-size: 11px; font-weight: 700; }
+.impoclick-down { color: var(--danger); font-size: 11px; font-weight: 700; }
 
 .impoclick-review {
-    border-top: 1px dashed #eee0c0;
+    border-top: 1px dashed var(--accent-soft);
     margin-top: 6px;
     padding-top: 5px;
 }
 
 .impoclick-review-stars {
     font-size: 11px;
-    color: #d97706;
+    color: var(--warning);
     letter-spacing: 0.05em;
 }
 
 /* Cabeçalho "Analisando X" — deixa visível qual anúncio a análise pegou,
    já que uma página /up/ mostra vários vendedores e recomendados. */
 .impoclick-analyzed {
-    border: 1px solid #f0e0b0;
-    border-left: 3px solid #b8860b;
+    border: 1px solid var(--accent-soft);
+    border-left: 3px solid var(--accent);
     border-radius: 8px;
     padding: 8px 10px;
     margin-bottom: 10px;
-    background: #fffdf7;
+    background: var(--surface-card);
 }
 
 .impoclick-analyzed.impoclick-analyzed-warn {
-    border-left-color: #b91c1c;
-    background: #fef4f4;
+    border-left-color: var(--danger);
+    background: var(--danger-soft);
 }
 
 .impoclick-analyzed-label {
@@ -669,7 +722,7 @@
     font-weight: 800;
     letter-spacing: 0.05em;
     text-transform: uppercase;
-    color: #9a8a63;
+    color: var(--text-muted);
     margin-bottom: 3px;
 }
 
@@ -678,7 +731,7 @@
 }
 
 .impoclick-analyzed a {
-    color: #b8860b;
+    color: var(--accent);
     font-weight: 700;
     text-decoration: none;
 }
@@ -693,8 +746,8 @@
     padding: 2px 7px;
     margin: 0 3px 3px 0;
     border-radius: 4px;
-    background: #fee2e2;
-    color: #b91c1c;
+    background: var(--danger-soft);
+    color: var(--danger);
     text-decoration: line-through;
 }
 
@@ -704,7 +757,7 @@
     align-items: baseline;
     gap: 8px;
     padding: 4px 0;
-    border-bottom: 1px dashed #eee0c0;
+    border-bottom: 1px dashed var(--accent-soft);
 }
 
 .impoclick-kw-row:last-of-type {
@@ -713,7 +766,7 @@
 
 .impoclick-kw-term {
     font-size: 12px;
-    color: #1f2937;
+    color: var(--text-title);
     font-weight: 600;
 }
 
@@ -721,10 +774,1370 @@
 .impoclick-kw-new {
     font-size: 10.5px;
     font-weight: 700;
-    color: #15803d;
+    color: var(--success);
     text-align: right;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 45%;
+}
+
+/* Cor da data = idade do anúncio. Vermelho até 50 dias, amarelo até 100, azul
+   depois disso. Contraste conferido: 6,8:1, 6,2:1 e 7,2:1 — texto de 9px
+   precisa de folga.
+
+   A origem do dado (exata ou estimada) fica só no "~" e na dica ao passar o
+   mouse: a cor já carrega a idade, e um canal visual não comporta duas
+   informações sem tornar as duas ilegíveis. */
+.impoclick-idade-novo {
+    color: var(--danger);
+    background: var(--danger-soft);
+}
+
+.impoclick-idade-medio {
+    color: var(--warning);
+    background: var(--warning-soft);
+}
+
+.impoclick-idade-antigo {
+    color: var(--info);
+    background: var(--info-soft);
+}
+
+/* ══ Cartão de análise na página do anúncio ═════════════════════════════
+   Encaixa na coluna da direita, abaixo do bloco de compra. O "all: initial"
+   é a mesma defesa do painel antigo: o CSS do Mercado Livre é agressivo e
+   herdaria fonte, cor e espaçamento para dentro daqui. */
+#impoclick-pdp-card {
+    all: initial;
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    margin: 12px 0;
+    padding: 14px;
+    font-family: var(--font-sans);
+    color: var(--text-title);
+    background: var(--surface-card);
+    border: 1px solid var(--accent-soft);
+    border-radius: 12px;
+}
+
+#impoclick-pdp-card * { box-sizing: border-box; }
+
+.impoclick-pdp-topo {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.impoclick-pdp-marca {
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--accent);
+}
+
+.impoclick-pdp-idade {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-muted);
+    background: var(--accent-soft);
+    border-radius: 999px;
+    padding: 3px 8px;
+}
+
+/* Quatro caixas em grade 2x2: cabem na coluna estreita do anúncio sem
+   espremer o número, que é o que se lê de relance. */
+.impoclick-pdp-grade {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.impoclick-pdp-caixa {
+    padding: 9px 10px;
+    border: 1px solid var(--accent-soft);
+    border-radius: 9px;
+    background: var(--ink-0);
+}
+
+.impoclick-pdp-valor {
+    display: block;
+    font-size: 17px;
+    font-weight: 800;
+    line-height: 1.2;
+    color: var(--text-title);
+}
+
+.impoclick-pdp-rotulo {
+    display: block;
+    margin-top: 2px;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+/* ── Payout ──────────────────────────────────────────────────────────── */
+
+.impoclick-pdp-payout {
+    margin-top: 10px;
+    padding: 11px 12px;
+    border: 1px solid var(--accent-soft);
+    border-radius: 10px;
+    background: var(--surface-card);
+}
+
+.impoclick-pdp-payout-topo {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+}
+
+.impoclick-pdp-ajuda {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    font-size: 9px;
+    font-weight: 800;
+    color: var(--text-muted);
+    border: 1px solid var(--accent-soft-border);
+    border-radius: 50%;
+    cursor: help;
+}
+
+/* Empilhado, nao lado a lado. Em 288px de cartao a coluna da direita ficava
+   com ~110px e TODO valor quebrava: "R$ 70,39" virava duas linhas, "14% - R$
+   9,85" virava tres. Largura inteira para cada parte resolve na origem. */
+.impoclick-pdp-payout-corpo {
+    display: block;
+}
+
+#impoclick-pdp-liquido {
+    display: block;
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--success);
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    margin-bottom: 10px;
+    white-space: nowrap;
+}
+
+.impoclick-pdp-linhas {
+    border-top: 1px solid var(--accent-soft);
+    padding-top: 9px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.impoclick-pdp-linhas > div {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    font-size: 11.5px;
+    line-height: 1.4;
+}
+
+/* Numero nunca quebra, e as casas decimais alinham entre as linhas. */
+.impoclick-pdp-linhas strong {
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.impoclick-pdp-linhas span { color: var(--text-muted); }
+.impoclick-pdp-linhas strong { color: var(--text-title); font-weight: 700; }
+
+/* ── Ações e vendedor ────────────────────────────────────────────────── */
+
+.impoclick-pdp-acoes {
+    display: flex;
+    gap: 8px;
+    margin-top: 11px;
+}
+
+.impoclick-pdp-btn {
+    all: unset;
+    flex: 1;
+    box-sizing: border-box;
+    text-align: center;
+    padding: 9px 8px;
+    font-family: var(--font-sans);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-on-accent);
+    background: var(--accent);
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.impoclick-pdp-btn:hover { filter: brightness(1.04); }
+
+.impoclick-pdp-btn-sec {
+    color: var(--accent);
+    background: var(--ink-0);
+    border: 1px solid var(--accent-soft-border);
+}
+
+.impoclick-pdp-aviso {
+    margin: 8px 0 0;
+    font-size: 10.5px;
+    line-height: 1.4;
+    color: var(--accent);
+}
+
+.impoclick-pdp-oculto { display: none; }
+
+.impoclick-pdp-vendedor {
+    margin-top: 12px;
+    padding-top: 11px;
+    border-top: 1px solid var(--accent-soft);
+}
+
+.impoclick-pdp-vendedor-nome {
+    display: block;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--text-title);
+}
+
+.impoclick-pdp-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+.impoclick-pdp-tags span {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-muted);
+    background: var(--accent-soft);
+    border: 1px solid var(--accent-soft);
+    border-radius: 999px;
+    padding: 3px 8px;
+}
+
+/* Sem âncora conhecida na página, o cartão flutua no canto. É o modo de
+   reserva: melhor visível fora do fluxo do que perdido no rodapé. */
+.impoclick-pdp-flutuante {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    z-index: 2147483646;
+    width: 320px;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: var(--shadow-md);
+}
+
+/* ==========================================================================
+   PAINEL DE FILTROS NA BUSCA
+   --------------------------------------------------------------------------
+   Encaixa na coluna de filtros do próprio Mercado Livre quando ela existe.
+   Se o layout deles mudar, .impo-f-flutuante segura o painel no canto e ele
+   continua utilizável em vez de sumir.
+   ========================================================================== */
+
+#impoclick-filtros {
+    box-sizing: border-box;
+    width: 100%;
+    margin: 0 0 16px;
+    padding: 16px;
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    background: var(--ink-0);
+    box-shadow: var(--shadow-xs);
+    font-family: var(--font-sans);
+    color: var(--text-title);
+}
+
+#impoclick-filtros.impo-f-flutuante {
+    position: fixed;
+    top: 90px;
+    left: 12px;
+    width: 260px;
+    max-height: calc(100vh - 110px);
+    overflow-y: auto;
+    z-index: 2147483000;
+}
+
+#impoclick-filtros * { box-sizing: border-box; }
+
+.impo-f-topo {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+/* A página do Mercado Livre tem regras próprias de display que vencem o
+   [hidden] do agente de usuário. Sem o !important, esconder não esconde. */
+#impoclick-filtros [hidden] { display: none !important; }
+
+/* Logo + nome: é o que identifica o painel de relance no meio dos filtros
+   do próprio Mercado Livre, onde todo o resto é cinza e sem marca. */
+.impo-f-marca {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 19px;
+    font-weight: 800;
+    letter-spacing: -.02em;
+    color: var(--accent);
+}
+
+.impo-f-marca img {
+    width: 30px;
+    height: 30px;
+    display: block;
+    /* O ícone tem fundo próprio; o raio evita o quadrado duro ao lado do nome. */
+    border-radius: 7px;
+}
+
+.impo-f-itens { font-size: 13px; color: var(--text-muted); }
+
+.impo-f-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 14px; }
+
+.impo-f-tile {
+    text-align: center;
+    padding: 8px 4px;
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+}
+
+.impo-f-tile strong { display: block; font-size: 20px; font-weight: 700; color: var(--text-title); }
+.impo-f-tile span { display: block; font-size: 11.5px; color: var(--text-muted); margin-top: 2px; }
+
+.impo-f-secao {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 13px;
+    color: var(--text-muted);
+    text-transform: none;
+    margin: 14px 0 10px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-subtle);
+}
+
+
+
+/* O texto longo vive no title da seção; isto só sinaliza que há explicação.
+   aria-hidden porque é decorativo — quem lê tela já recebe o title. */
+.impo-f-ajuda {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    border: 1px solid var(--border-strong);
+    border-radius: 50%;
+    font-size: 9.5px;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--text-muted);
+    cursor: help;
+}
+
+.impo-f-ajuda:focus-visible,
+.impoclick-pdp-ajuda:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+/* O <input> real fica escondido atrás do switch desenhado, mas continua sendo
+   o elemento focável — teclado e leitor de tela seguem funcionando. */
+.impo-f-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 0;
+    cursor: pointer;
+    position: relative;
+}
+
+.impo-f-rotulo { flex: 1; font-size: 14.5px; color: var(--accent); line-height: 1.35; }
+.impo-f-conta { font-size: 13.5px; color: var(--text-muted); }
+
+.impo-f-toggle input {
+    position: absolute;
+    opacity: 0;
+    width: 34px;
+    height: 20px;
+    right: 0;
+    margin: 0;
+    cursor: pointer;
+}
+
+.impo-f-switch {
+    flex: 0 0 auto;
+    width: 34px;
+    height: 20px;
+    border-radius: 10px;
+    background: var(--border-strong);
+    position: relative;
+    transition: background .15s ease;
+}
+
+.impo-f-switch::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--ink-0);
+    transition: transform .15s ease;
+}
+
+.impo-f-toggle input:checked ~ .impo-f-switch { background: var(--accent); }
+.impo-f-toggle input:checked ~ .impo-f-switch::after { transform: translateX(14px); }
+.impo-f-toggle input:focus-visible ~ .impo-f-switch { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.impo-f-num {
+    width: 100%;
+    max-width: 120px;
+    padding: 8px 10px;
+    font-size: 15px;
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    color: var(--text-title);
+    background: var(--ink-0);
+}
+
+.impo-f-nota { font-size: 12px; color: var(--text-muted); line-height: 1.45; margin: 6px 0 0; }
+
+.impo-f-ordens { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+
+.impo-f-ordem {
+    padding: 9px 6px;
+    font-size: 13.5px;
+    font-family: inherit;
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    background: var(--ink-0);
+    color: var(--text-title);
+    cursor: pointer;
+}
+
+.impo-f-ordem:hover { border-color: var(--accent); }
+.impo-f-ordem.ativo { background: var(--accent); border-color: var(--accent); color: var(--ink-0); font-weight: 600; }
+
+.impo-f-limpar {
+    width: 100%;
+    margin-top: 12px;
+    padding: 9px;
+    font-size: 13.5px;
+    font-family: inherit;
+    border: 1px dashed var(--border-strong);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+.impo-f-limpar:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ==========================================================================
+   ABAS DE CATÁLOGO — Concorrentes e Líder
+   --------------------------------------------------------------------------
+   Só aparecem em página /p/MLB…, onde existe disputa entre vendedores. O corpo
+   nasce fechado e a consulta só sai no clique: são várias chamadas à API do
+   Mercado Livre (uma por vendedor) e não faz sentido gastá-las sem pedido.
+   ========================================================================== */
+
+.impo-cat { margin-top: 10px; border-top: 1px solid var(--border-subtle); padding-top: 10px; }
+
+.impo-cat-abas { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+
+.impo-cat-aba {
+    padding: 7px 6px;
+    font-size: 11.5px;
+    font-family: inherit;
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    background: var(--ink-0);
+    color: var(--text-title);
+    cursor: pointer;
+}
+
+.impo-cat-aba:hover { border-color: var(--accent); }
+.impo-cat-aba.ativa { background: var(--accent); border-color: var(--accent); color: var(--ink-0); font-weight: 600; }
+
+.impo-cat-corpo { margin-top: 10px; }
+
+.impo-cat-tabela { width: 100%; border-collapse: collapse; font-size: 11px; }
+
+.impo-cat-tabela th {
+    text-align: left;
+    font-weight: 600;
+    color: var(--text-muted);
+    padding: 4px 4px 6px;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.impo-cat-tabela td {
+    padding: 7px 4px;
+    border-bottom: 1px solid var(--surface-raised);
+    vertical-align: top;
+    color: var(--text-title);
+}
+
+.impo-cat-num { text-align: right; }
+
+/* O ganhador precisa saltar aos olhos: é a informação que decide se vale
+   entrar no catálogo ou não. */
+.impo-cat-ganhador td { background: var(--success-soft); }
+
+.impo-cat-sub { font-size: 10px; color: var(--text-muted); margin-top: 2px; line-height: 1.35; }
+.impo-cat-risco { text-decoration: line-through; }
+
+.impo-cat-selo {
+    display: inline-block;
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 9.5px;
+    font-weight: 700;
+    background: var(--border-subtle);
+    color: var(--text-body);
+}
+
+.impo-cat-full { background: var(--success); color: var(--ink-0); }
+.impo-cat-vencedor { background: var(--success); color: var(--ink-0); margin-left: 5px; }
+
+.impo-cat-linha {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--surface-raised);
+    font-size: 11.5px;
+}
+
+.impo-cat-linha span { color: var(--text-muted); }
+.impo-cat-linha strong { color: var(--text-title); text-align: right; }
+
+.impo-cat-vazio { font-size: 11px; color: var(--text-muted); line-height: 1.5; margin: 6px 0 0; }
+.impo-cat-nota { font-size: 10px; color: var(--text-muted); margin: 8px 0 0; }
+
+.impo-cat-lider .impo-cat-linha:last-child { border-bottom: none; }
+.impo-cat-lider .impo-cat-linha:last-child strong { color: var(--accent); font-size: 13px; }
+
+/* Repasse com custo faltando: sinaliza que o numero e teto, nao valor final. */
+.impoclick-pdp-incerto { color: var(--accent) !important; }
+
+/* ==========================================================================
+   PAINEL LÍDER — grade de atributos
+   --------------------------------------------------------------------------
+   Vendedor no topo, atributos em blocos de dois, preço na faixa inteira. Oito
+   linhas iguais não davam hierarquia: nada saltava primeiro. Aqui o preço e o
+   nome do vendedor carregam o peso, e o resto se lê em diagonal.
+
+   Cor semântica (verde/vermelho = estado) fica separada do dourado da marca:
+   se "Sim" também fosse dourado, a marca perderia significado e o estado
+   perderia legibilidade.
+   ========================================================================== */
+
+.impo-ico {
+    width: 14px;
+    height: 14px;
+    flex: 0 0 14px;
+    stroke: var(--border-strong);
+    fill: none;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.impo-ico-mini { width: 11px; height: 11px; flex: 0 0 11px; }
+
+.impo-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .02em;
+    border-radius: 5px;
+    padding: 2px 6px;
+    white-space: nowrap;
+}
+
+.impo-pill .impo-ico {
+    width: 11px;
+    height: 11px;
+    flex: 0 0 11px;
+    stroke: currentColor;
+    stroke-width: 2.4;
+}
+
+.impo-pill-full   { background: var(--success); color: var(--ink-0); }
+.impo-pill-sim    { background: var(--success-soft); color: var(--success); }
+.impo-pill-nao    { background: var(--danger-soft); color: var(--danger); }
+.impo-pill-neutro { background: var(--surface-raised); color: var(--text-muted); }
+
+/* O ponto colorido não é enfeite: no Mercado Livre a reputação do vendedor É
+   uma cor, então repeti-la em forma poupa a leitura do rótulo. */
+.impo-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    flex: 0 0 8px;
+    margin-right: 5px;
+    vertical-align: -1px;
+}
+
+.impo-b-topo {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    padding-bottom: 11px;
+    margin-bottom: 11px;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.impo-b-topo > .impo-ico { margin-top: 2px; }
+.impo-b-nome { font-size: 13.5px; font-weight: 700; line-height: 1.25; color: var(--text-title); }
+.impo-b-sub { font-size: 10.5px; color: var(--text-muted); margin-top: 3px; line-height: 1.4; }
+
+.impo-b-grade { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+
+.impo-b-tile {
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    padding: 8px 9px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-height: 56px;
+}
+
+.impo-b-rot {
+    font-size: 9.5px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.impo-b-val {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text-title);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    /* Valor longo encolhe em vez de estourar o bloco de duas colunas. */
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+/* O preço ocupa a faixa inteira: é a resposta que a aba existe para dar. */
+.impo-b-preco {
+    grid-column: 1 / -1;
+    border-color: var(--accent-soft-border);
+    background: var(--accent-soft);
+}
+
+.impo-b-preco .impo-b-val {
+    color: var(--accent);
+    font-size: 18px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ==========================================================================
+   MODAL DE CONCORRENTES
+   --------------------------------------------------------------------------
+   Sai do cartão de 288px porque comparar vendedores é onde a largura importa:
+   ali dentro o preço quebrava em duas linhas e metade das colunas não cabia.
+
+   z-index no teto: o Mercado Livre usa valores altos nos próprios overlays, e
+   um modal que abre atrás da página é pior que modal nenhum.
+   ========================================================================== */
+
+#impoclick-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 2147483000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    font-family: var(--font-sans);
+}
+
+.impo-m-fundo {
+    position: absolute;
+    inset: 0;
+    background: var(--surface-scrim);
+    backdrop-filter: blur(2px);
+}
+
+.impo-m-caixa {
+    position: relative;
+    width: min(1080px, 100%);
+    max-height: min(80vh, 720px);
+    display: flex;
+    flex-direction: column;
+    background: var(--ink-0);
+    border-radius: 14px;
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+}
+
+.impo-m-topo {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 16px 20px 12px;
+}
+
+.impo-m-titulo { display: flex; align-items: baseline; gap: 9px; }
+.impo-m-titulo strong { font-size: 16px; font-weight: 700; color: var(--accent); }
+.impo-m-titulo span { font-size: 15px; color: var(--text-muted); }
+
+.impo-m-conta {
+    font-size: 11px !important;
+    font-weight: 700;
+    color: var(--text-muted) !important;
+    background: var(--surface-raised);
+    border-radius: 999px;
+    padding: 2px 9px;
+}
+
+.impo-m-fechar {
+    border: 0;
+    background: transparent;
+    font-size: 26px;
+    line-height: 1;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0 4px;
+    border-radius: 6px;
+}
+.impo-m-fechar:hover { color: var(--text-title); background: var(--surface-raised); }
+.impo-m-fechar:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.impo-m-produto {
+    margin: 0;
+    padding: 0 20px 12px;
+    font-size: 12.5px;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+/* A tabela rola dentro da própria caixa: a página do ML atrás nunca ganha
+   barra horizontal por causa do nosso conteúdo. */
+.impo-m-rolagem { overflow: auto; border-top: 1px solid var(--border-subtle); }
+
+.impo-m-tabela { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+
+.impo-m-tabela th {
+    position: sticky;
+    top: 0;
+    background: var(--surface-raised);
+    text-align: left;
+    font-weight: 600;
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: .03em;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border-subtle);
+    white-space: nowrap;
+}
+
+.impo-m-tabela td {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--surface-raised);
+    color: var(--text-title);
+    vertical-align: middle;
+}
+
+.impo-m-tabela tbody tr:hover td { background: var(--surface-raised); }
+
+/* O ganhador precisa saltar: é a linha que decide se vale entrar no catálogo. */
+.impo-m-ganhador td { background: var(--success-soft); }
+.impo-m-ganhador td:first-child { box-shadow: inset 3px 0 0 var(--success); }
+.impo-m-ganhador:hover td { background: var(--success-soft); }
+
+.impo-m-vend { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.impo-m-nome { font-weight: 600; }
+.impo-m-oficial { stroke: var(--success); width: 13px; height: 13px; flex: 0 0 13px; }
+
+.impo-m-num { text-align: right; }
+.impo-m-num strong { font-weight: 700; font-variant-numeric: tabular-nums; }
+.impo-m-de { font-size: 10.5px; color: var(--text-muted); text-decoration: line-through; margin-top: 1px; }
+
+.impo-m-rep { display: inline-flex; align-items: center; white-space: nowrap; }
+.impo-m-vazio { color: var(--text-muted); }
+
+.impo-m-rodape {
+    padding: 10px 20px;
+    border-top: 1px solid var(--border-subtle);
+    font-size: 11px;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+@media (max-width: 760px) {
+    #impoclick-modal { padding: 12px; }
+    .impo-m-caixa { max-height: 88vh; }
+    .impo-m-tabela th, .impo-m-tabela td { padding: 9px 10px; }
+}
+
+/* ── Modal: resumo, avatar e comparação de preço ─────────────────────────
+   O esforço visual está concentrado na coluna de preço, que é onde a decisão
+   acontece. O resto fica quieto de propósito. */
+
+.impo-m-resumo {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--border-subtle);
+    border-top: 1px solid var(--border-subtle);
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.impo-m-stat { background: var(--ink-0); padding: 12px 16px; display: flex; flex-direction: column; gap: 2px; }
+.impo-m-stat-val { font-size: 16px; font-weight: 700; color: var(--text-title); font-variant-numeric: tabular-nums; }
+.impo-m-stat-rot { font-size: 10.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; }
+.impo-m-stat-destaque .impo-m-stat-val { color: var(--success); }
+
+.impo-m-avatar {
+    width: 30px; height: 30px; flex: 0 0 30px;
+    border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 12.5px; font-weight: 700;
+    background: var(--accent-soft); color: var(--accent);
+}
+.impo-m-avatar-ganhador { background: var(--success-soft); color: var(--success); }
+
+.impo-m-vend { display: flex; align-items: center; gap: 10px; }
+.impo-m-vend-txt { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.impo-m-nome { font-weight: 600; white-space: nowrap; }
+.impo-m-oficial-txt {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 10.5px; color: var(--success); white-space: nowrap;
+}
+.impo-m-oficial { stroke: var(--success); width: 12px; height: 12px; flex: 0 0 12px; }
+
+.impo-m-chip-ganhador {
+    font-size: 9.5px; font-weight: 700; letter-spacing: .04em;
+    background: var(--success); color: var(--ink-0);
+    border-radius: 5px; padding: 3px 7px; white-space: nowrap;
+}
+
+/* Coluna de preço: o número, a diferença para o mais barato, e a posição na
+   faixa do catálogo. Três leituras no mesmo lugar. */
+.impo-m-preco { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 2px; min-width: 110px; }
+.impo-m-preco > strong { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.impo-m-de { font-size: 10.5px; color: var(--text-muted); text-decoration: line-through; }
+
+.impo-m-menor {
+    font-size: 9.5px; font-weight: 700; letter-spacing: .03em;
+    color: var(--success); background: var(--success-soft);
+    border-radius: 4px; padding: 2px 6px;
+}
+.impo-m-delta {
+    font-size: 10.5px; font-weight: 600; color: var(--danger);
+    font-variant-numeric: tabular-nums;
+}
+
+.impo-m-barra {
+    display: block; width: 100%; height: 3px; margin-top: 4px;
+    background: var(--surface-raised); border-radius: 2px; overflow: hidden;
+}
+.impo-m-barra i {
+    display: block; height: 100%; min-width: 3px;
+    background: var(--accent);
+    border-radius: 2px;
+}
+
+@media (max-width: 760px) {
+    .impo-m-resumo { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ── Modal: visitas e fatia ──────────────────────────────────────────────
+   Visitas são o único dado REAL da tabela — as outras colunas descrevem o
+   anúncio, esta mede o comportamento dele. Daí o tratamento próprio. */
+
+.impo-m-visitas { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+.impo-m-visitas > strong { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text-title); }
+.impo-m-visitas-tot { font-size: 10px; color: var(--text-muted); white-space: nowrap; }
+
+.impo-m-fatia { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 3px; min-width: 66px; }
+.impo-m-fatia > strong { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--accent); }
+.impo-m-fatia-barra { display: block; width: 100%; height: 4px; background: var(--surface-raised); border-radius: 2px; overflow: hidden; }
+.impo-m-fatia-barra i { display: block; height: 100%; min-width: 2px; background: var(--accent); border-radius: 2px; }
+.impo-m-ganhador .impo-m-fatia-barra i { background: var(--success); }
+.impo-m-ganhador .impo-m-fatia > strong { color: var(--success); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   TEMA CLARO — cartão do anúncio
+   ══════════════════════════════════════════════════════════════════════════
+   Substitui o tema creme, que por sua vez substituiu o grafite. Vem depois de
+   tudo de propósito: sobrescreve sem reescrever a estrutura, e reverter este
+   bloco devolve o visual anterior inteiro.
+
+   A direção é a de um painel de análise claro: branco, cinzas quase neutros,
+   muito ar. O dourado da marca deixou de pintar o cartão e ficou reservado a
+   UMA coisa — o dinheiro que entra no bolso. Cor que aparece em todo lugar
+   para de significar alguma coisa.
+
+   O que a cor diz:
+     quase-preto  var(--text-title)  número comum
+     verde        var(--success)  medido pela API (visitas)
+     âmbar        var(--accent)  dinheiro (payout, faturamento, conversão)
+     cinza        var(--text-muted)  rótulo e estimativa
+
+   Os cinzas têm viés levemente quente (para o bege, não para o azul), o que
+   os mantém em família com o dourado sem que o cartão pareça amarelado.
+
+   Contraste medido em todos os textos contra os DOIS extremos de cada
+   gradiente — o mínimo é 4,52:1, acima do AA de 4,5.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Fontes ─────────────────────────────────────────────────────────────
+   Empacotadas na extensão: a CSP da página do Mercado Livre bloqueia fonte
+   externa, mas deixa passar recurso da própria extensão declarado em
+   web_accessible_resources. Caminho relativo funciona porque CSS injetado
+   por content_scripts resolve contra a raiz da extensão.
+
+   Plus Jakarta Sans sozinha, sem serifado. O humanista geométrico é o que
+   sustenta corpo 9,5px nos rótulos e ainda tem algarismos de largura fixa. */
+
+/* ── Cartão ─────────────────────────────────────────────────────────── */
+
+#impoclick-pdp-card {
+  color: var(--text-title);
+  background: var(--ink-0);
+  border-color: var(--border-subtle);
+  border-radius: 14px;
+  box-shadow: var(--shadow-xs);
+  padding: 16px;
+  font-family: var(--font-sans);
+}
+
+#impoclick-pdp-card * { font-family: inherit; }
+
+/* ── Cabeçalho: logo + nome ─────────────────────────────────────────── */
+
+.impoclick-pdp-marca {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-title);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -.02em;
+}
+
+.impoclick-pdp-marca img {
+  width: 18px;
+  height: 18px;
+  display: block;
+  /* O ícone tem fundo próprio; o raio evita o quadrado duro ao lado do nome. */
+  border-radius: 4px;
+}
+
+.impoclick-pdp-idade {
+  background: var(--surface-raised);
+  color: var(--text-muted);
+  border-radius: 6px;
+  padding: 4px 9px;
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+/* ── Caixas de número ───────────────────────────────────────────────── */
+
+.impoclick-pdp-grade { gap: 10px; }
+
+/* O gradiente é quase imperceptível de propósito: dá volume à caixa sem virar
+   enfeite. Bloco chapado ao lado de bloco chapado achata o cartão inteiro. */
+.impoclick-pdp-caixa {
+  background: var(--surface-card);
+  border-color: var(--border-subtle);
+  border-radius: 11px;
+  padding: 12px 13px;
+}
+
+.impoclick-pdp-valor {
+  color: var(--text-title);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -.025em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Rótulo em caixa baixa, não versalete: o Cargoos acerta nisso — versalete a
+   9px vira ruído cinza, e o rótulo aqui é para ser lido, não para decorar. */
+.impoclick-pdp-rotulo {
+  color: var(--text-muted);
+  margin-top: 3px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+#impoclick-pdp-visitas { color: var(--success); }
+#impoclick-pdp-conversao { color: var(--accent); }
+.impoclick-pdp-incerto { color: var(--warning) !important; }
+
+/* ── Payout ─────────────────────────────────────────────────────────── */
+
+.impoclick-pdp-payout {
+  background: var(--accent-soft);
+  border-color: var(--accent-soft-border);
+  border-radius: 12px;
+  padding: 13px 14px;
+  margin-top: 10px;
+}
+
+.impoclick-pdp-payout-topo {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  margin-bottom: 8px;
+}
+
+.impoclick-pdp-ajuda {
+  border-color: var(--accent-soft-border);
+  color: var(--accent);
+  background: transparent;
+}
+
+/* O único lugar do cartão com dourado em corpo grande. É o número que o
+   cartão existe para mostrar. */
+#impoclick-pdp-liquido {
+  color: var(--accent);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.impoclick-pdp-linhas { border-color: var(--accent-soft-border); }
+
+.impoclick-pdp-linhas span {
+  color: var(--accent);
+  font-size: 11.5px;
+}
+
+.impoclick-pdp-linhas strong {
+  color: var(--text-title);
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Ações ──────────────────────────────────────────────────────────── */
+
+.impoclick-pdp-acoes { gap: 9px; margin-top: 13px; }
+
+.impoclick-pdp-btn {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--text-on-accent);
+  border-radius: 9px;
+  padding: 10px 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.impoclick-pdp-btn-sec {
+  background: var(--surface-card);
+  border-color: var(--border-subtle);
+  color: var(--text-body);
+}
+
+.impoclick-pdp-aviso { color: var(--accent); }
+
+/* ── Vendedor ───────────────────────────────────────────────────────── */
+
+.impoclick-pdp-vendedor {
+  border-color: var(--border-subtle);
+  margin-top: 13px;
+  padding-top: 12px;
+}
+
+.impoclick-pdp-vendedor-nome {
+  color: var(--text-title);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.impoclick-pdp-tags span {
+  background: var(--surface-card);
+  border-color: var(--border-subtle);
+  color: var(--text-muted);
+  border-radius: 6px;
+  padding: 4px 9px;
+  font-size: 10.5px;
+  font-weight: 500;
+}
+
+/* ── Abas e painel de catálogo dentro do cartão ─────────────────────── */
+
+.impo-cat-abas { border-color: var(--border-subtle); }
+
+.impo-cat-aba {
+  color: var(--text-muted);
+  border-color: var(--border-subtle);
+  background: var(--surface-card);
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+.impo-cat-aba.ativa {
+  background: var(--text-title);
+  border-color: var(--text-title);
+  color: var(--ink-0);
+}
+
+.impo-cat-corpo, .impo-cat-vazio { color: var(--text-muted); }
+.impo-cat-num, .impo-cat-nota { color: var(--text-title); font-variant-numeric: tabular-nums; }
+.impo-cat-sub { color: var(--text-muted); }
+
+.impo-cat-selo {
+  background: var(--surface-raised);
+  border-color: var(--border-subtle);
+  color: var(--text-muted);
+  border-radius: 6px;
+}
+
+.impo-cat-vencedor, .impo-cat-ganhador { color: var(--success); }
+.impo-cat-risco { color: var(--warning); }
+
+/* ── Blocos auxiliares (comparativo, filtros) ───────────────────────── */
+
+.impo-b-tile, .impo-f-tile {
+  background: var(--surface-card);
+  border-color: var(--border-subtle);
+  border-radius: 11px;
+}
+
+.impo-b-nome, .impo-b-val, .impo-f-num {
+  color: var(--text-title);
+  font-variant-numeric: tabular-nums;
+}
+
+.impo-b-rot, .impo-b-sub, .impo-f-rotulo, .impo-f-nota { color: var(--text-muted); }
+.impo-b-preco, .impo-f-marca { color: var(--accent); }
+.impo-b-topo, .impo-f-topo, .impo-f-secao { border-color: var(--border-subtle); }
+
+.impo-f-flutuante {
+  background: var(--ink-0);
+  border-color: var(--border-subtle);
+  border-radius: 14px;
+  box-shadow: var(--shadow-md);
+}
+
+.impo-f-limpar { color: var(--accent); }
+
+/* ── Painel de filtros: mesma tipografia e mesma paleta do cartão ─────
+   O painel nasceu antes deste tema e ficou de fora dele: fonte do sistema e
+   o ouro antigo (var(--accent)). Na mesma página do Mercado Livre os dois
+   componentes apareciam em tipografias diferentes, e o ouro pintava switch,
+   botão, borda e foco — cor em todo lugar, que é o que este tema deixou de
+   fazer. Aqui o dourado volta a ser só a marca e o estado ligado. */
+
+#impoclick-filtros {
+  font-family: var(--font-sans);
+}
+
+#impoclick-filtros * { font-family: inherit; }
+
+/* var(--text-muted) sobre branco mede 2,85:1 e reprova no AA — era a cor dos rótulos dos
+   tiles e dos títulos de seção. var(--text-muted) é o cinza de rótulo da paleta e mede
+   5,30:1: mesma função, mesmo tom quente do resto. */
+.impo-f-tile span, .impo-f-secao, .impo-f-ajuda { color: var(--text-muted); }
+
+/* Número comum, com largura fixa de algarismo. Sem tabular-nums o painel
+   treme a cada toggle, porque todas as contagens mudam de uma vez. */
+.impo-f-tile strong, .impo-f-conta {
+  color: var(--text-title);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A contagem é a informação acionável da linha — quantos itens sobram. Estava
+   no mesmo cinza do rótulo, e a linha ficava sem âncora para o olho. */
+.impo-f-conta { font-weight: 600; }
+
+/* Cinzas de borda na família quente do tema: mesmo peso visual do var(--border-strong)
+   que substituem, só param de puxar para o azul. */
+.impo-f-num, .impo-f-ordem, .impo-f-limpar, .impo-f-ajuda { border-color: var(--border-strong); }
+.impo-f-switch { background: var(--border-strong); }
+
+.impo-f-toggle input:checked ~ .impo-f-switch { background: var(--accent); }
+.impo-f-toggle input:focus-visible ~ .impo-f-switch { outline-color: var(--accent); }
+.impo-f-ordem:hover { border-color: var(--accent); }
+.impo-f-ordem.ativo { background: var(--accent); border-color: var(--accent); }
+.impo-f-limpar:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── Dica: balão de ajuda ────────────────────────────────────────────
+   Substitui o title nativo. O title desenha uma faixa de UMA linha, e com
+   texto deste tamanho ela atravessa a janela inteira — ilegível justamente
+   onde há mais a explicar.
+
+   position:fixed preso ao <body>, não ao cartão: o cartão mora dentro do DOM
+   do Mercado Livre e basta um ancestral com overflow:hidden para recortar um
+   balão posicionado dentro dele. O z-index fica um acima do painel
+   flutuante, que é o elemento mais alto que a extensão desenha. */
+
+#impoclick-dica {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 2147483001;
+  box-sizing: border-box;
+  max-width: 264px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface-invert);
+  color: var(--surface-raised);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.45;
+  letter-spacing: 0;
+  text-align: left;
+  box-shadow: var(--shadow-lg);
+  /* Nunca vira alvo de mouse: o balão nasce logo abaixo do "?" e roubaria o
+     hover de quem o invocou, fazendo-o piscar. */
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity .12s ease;
+}
+
+#impoclick-dica.visivel { opacity: 1; visibility: visible; }
+
+.impo-m-caixa {
+  background: var(--surface-card);
+  border-color: var(--border-subtle);
+}
+
+.impo-m-barra { background: var(--border-subtle); }
+
+/* ── Escolha do tipo de anúncio (Clássico x Premium) ─────────────────────
+   A comissão do Mercado Livre depende da categoria E do tipo do anúncio. Os
+   dois repasses aparecem juntos porque a pergunta do vendedor é comparativa;
+   o tipo real do anúncio leva a etiqueta "este anúncio", para simulação não
+   passar por realidade. */
+/* Seletor segmentado: um trilho com a opção ativa destacada em branco, a mesma
+   linguagem do "Não / Sim" do painel lateral. Substitui as caixas com borda,
+   que pareciam botões soltos.
+
+   Nome e valor em DUAS linhas, e não numa só: a coluna do anúncio no Mercado
+   Livre é mais estreita do que parece, e em linha única "Clássico R$ 10,10"
+   não cabia — o texto, centralizado e proibido de quebrar, vazava para os dois
+   lados e o ponto do outro botão invadia este. */
+.impoclick-pdp-tipos {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  margin-bottom: 12px;
+  border-radius: var(--radius-md);
+  /* Um tom acima do fundo da caixa de payout, que já é o azul-claro: no mesmo
+     tom o trilho desaparecia e só a opção ativa aparecia, solta. */
+  background: var(--accent-soft-border);
+}
+
+.impoclick-pdp-tipos button {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  /* O CSS do Mercado Livre mexe em botão; tudo que muda a caixa é declarado. */
+  margin: 0;
+  height: auto;
+  min-height: 0;
+  padding: 5px 6px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font-family: var(--font-sans);
+  line-height: 1.2;
+  letter-spacing: normal;
+  text-transform: none;
+  cursor: pointer;
+  transition: var(--transition-control);
+}
+
+.impoclick-pdp-tipos button:hover .impoclick-pdp-tipo-nome { color: var(--accent); }
+
+.impoclick-pdp-tipos button.ativo {
+  background: var(--ink-0);
+  box-shadow: var(--shadow-xs);
+}
+
+.impoclick-pdp-tipo-nome,
+.impoclick-pdp-tipo-valor {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.impoclick-pdp-tipo-nome {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
+  color: var(--text-muted);
+}
+
+.impoclick-pdp-tipos button.ativo .impoclick-pdp-tipo-nome { color: var(--accent); }
+
+/* O tipo que o anúncio tem hoje leva um ponto antes do nome. A frase logo
+   abaixo do valor diz por extenso qual é; o ponto só liga uma coisa à outra. */
+.impoclick-pdp-tipos button.real .impoclick-pdp-tipo-nome::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+  vertical-align: 1px;
+}
+
+.impoclick-pdp-tipo-valor {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.impoclick-pdp-tipos button.ativo .impoclick-pdp-tipo-valor { color: var(--text-title); }
+
+.impoclick-pdp-compara {
+  margin: 3px 0 0;
+  font-size: var(--text-caption);
+  line-height: var(--leading-snug);
+  color: var(--text-muted);
 }

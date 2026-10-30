@@ -1,0 +1,7 @@
+/* Impoclick webfonts.
+   Urbanist  — display + UI (matches the brand reference specimen exactly)
+   JetBrains Mono — tracking codes, HS codes, tabular figures
+   Material Symbols Rounded — the icon set (see readme.md › ICONOGRAPHY)
+   All three are served from Google Fonts; no licensed binaries were supplied with the brand. */
+@import url("https://fonts.googleapis.com/css2?family=Urbanist:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,300,0,0&display=block");

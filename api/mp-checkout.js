@@ -17,6 +17,13 @@ module.exports = async (req, res) => {
         return res.status(401).json({ error: 'Sessão inválida ou expirada. Faça login novamente.' });
     }
 
+    // Nada de `payer` na preference, de propósito. Chegamos a mandar o e-mail da
+    // sessão aqui achando que o botão "Criar Pix" travava por falta de dado do
+    // pagador. O teste mostrou o contrário: a preference SEM payer funciona, e a
+    // COM payer trava quando esse e-mail é o da própria conta vendedora —
+    // ninguém pode pagar para si mesmo. Quem coleta os dados do comprador é a
+    // tela do Mercado Pago, e ela faz isso sozinha.
+
     // Inicializa o Mercado Pago
     // IMPORTANTE: Adicione MP_ACCESS_TOKEN nas variáveis de ambiente da Vercel
     const client = new MercadoPagoConfig({ accessToken: process.env.MP_ACCESS_TOKEN });
@@ -31,12 +38,22 @@ module.exports = async (req, res) => {
             body: {
                 items: [
                     {
-                        title: 'Acesso PRO (1 Mês)',
+                        // O título aparece na tela de checkout e no comprovante.
+                        // Levar a marca aqui garante que o cliente veja
+                        // "Impoclick" mesmo que algum ponto do fluxo caia para o
+                        // nome da conta.
+                        title: 'Impoclick PRO — 1 mês',
+                        description: 'Assinatura mensal do Impoclick',
                         quantity: 1,
                         unit_price: 29.90,
                         currency_id: 'BRL',
                     }
                 ],
+                // Texto que aparece na FATURA DO CARTÃO do cliente. Sem isso, a
+                // operadora usa o nome cadastrado na conta do Mercado Pago —
+                // que, em conta de pessoa física, é o nome civil do titular.
+                // Máx. 22 caracteres; só letras, números e espaço.
+                statement_descriptor: 'IMPOCLICK',
                 // O external_reference é o nosso salva-vidas para saber quem pagou!
                 external_reference: userId,
                 back_urls: {

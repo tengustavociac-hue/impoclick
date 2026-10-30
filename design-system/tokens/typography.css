@@ -1,0 +1,36 @@
+:root{
+--font-sans:"Urbanist","Urbanist Fallback",-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+--font-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+--font-icon:"Material Symbols Rounded";
+
+/* Type scale — display sizes are set tight, UI sizes are set normal */
+--text-micro:11px;
+--text-caption:12px;
+--text-sm:13px;
+--text-body-size:15px;
+--text-lg:17px;
+--text-title-sm:20px;
+--text-title-md:24px;
+--text-title-lg:30px;
+--text-display-sm:38px;
+--text-display-md:48px;
+--text-display-lg:64px;
+--text-hero:80px;
+
+--leading-tight:1.05; /* @kind other */
+--leading-snug:1.2; /* @kind other */
+--leading-normal:1.45; /* @kind other */
+--leading-relaxed:1.6; /* @kind other */
+
+--tracking-tighter:-0.03em; /* @kind other */
+--tracking-tight:-0.015em; /* @kind other */
+--tracking-normal:0em; /* @kind other */
+--tracking-wide:0.04em; /* @kind other */
+--tracking-widest:0.12em; /* @kind other */
+
+--weight-regular:400; /* @kind other */
+--weight-medium:500; /* @kind other */
+--weight-semibold:600; /* @kind other */
+--weight-bold:700; /* @kind other */
+--weight-extrabold:800; /* @kind other */
+}

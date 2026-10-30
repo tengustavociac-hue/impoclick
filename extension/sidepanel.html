@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Impoclick — Viabilidade</title>
+    <!-- panel.css vem primeiro: é o mesmo visual que o painel já tinha dentro
+         da página. sidepanel.css só ajusta o que muda por ele agora ocupar a
+         lateral inteira em vez de flutuar num canto. -->
+    <link rel="stylesheet" href="ds-tokens.css">
+    <link rel="stylesheet" href="panel.css">
+    <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body class="impoclick-page">
+    <div id="impoclick-panel">
+        <div id="impoclick-panel-header">
+            <span id="impoclick-panel-title">Impoclick</span>
+        </div>
+
+        <div id="impoclick-panel-tabs" class="impoclick-hidden">
+            <button class="impoclick-tab impoclick-tab-active" data-tab="viab">Viabilidade</button>
+            <button class="impoclick-tab" data-tab="analise">Análise</button>
+        </div>
+
+        <div id="impoclick-panel-body">
+            <div id="impoclick-aviso"></div>
+            <div id="impoclick-panel-content" class="impoclick-hidden"></div>
+            <div id="impoclick-panel-analise" class="impoclick-hidden"></div>
+        </div>
+    </div>
+
+    <script src="sidepanel.js"></script>
+</body>
+</html>

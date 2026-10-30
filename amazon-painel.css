@@ -1,0 +1,11 @@
+.amp-grid {
+    display: grid;
+    gap: 1rem;
+}
+
+.amp-taxas-cel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    font-size: 0.85rem;
+}

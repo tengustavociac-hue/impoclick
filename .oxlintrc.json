@@ -1,0 +1,281 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": [
+    "eslint",
+    "unicorn",
+    "oxc",
+    "import"
+  ],
+  "jsPlugins": [
+    {
+      "name": "eslint-js",
+      "specifier": "oxlint-plugin-eslint"
+    }
+  ],
+  "categories": {
+    "correctness": "error"
+  },
+  "env": {
+    "browser": true,
+    "node": true,
+    "es2024": true
+  },
+  "ignorePatterns": [
+    "node_modules/**",
+    "**/node_modules/**",
+    "dist/**",
+    "design-system/dist/**",
+    "design-system/reference/**"
+  ],
+  "rules": {
+    "no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          {
+            "group": [
+              "**/design-system/components/core/*",
+              "**/design-system/components/forms/*",
+              "**/design-system/components/navigation/*",
+              "**/design-system/components/feedback/*",
+              "**/design-system/components/data/*",
+              "**/design-system/components/dom.js"
+            ],
+            "message": "Importe os componentes de 'design-system/components/index.js', não dos arquivos internos."
+          }
+        ]
+      }
+    ],
+    "eslint-js/no-restricted-syntax": [
+      "error",
+      {
+        "selector": "Literal[value=/#[0-9a-fA-F]{3,8}\\b/]",
+        "message": "Cor hex crua — use um token de cor do design system via var()."
+      },
+      {
+        "selector": "TemplateElement[value.raw=/#[0-9a-fA-F]{3,8}\\b/]",
+        "message": "Cor hex crua — use um token de cor do design system via var()."
+      },
+      {
+        "selector": "Literal[value=/\\b\\d+px\\b/]",
+        "message": "Valor em px cru — use um token de espaçamento/tipografia via var(), ou uma classe CSS para métrica de layout."
+      },
+      {
+        "selector": "TemplateElement[value.raw=/\\b\\d+px\\b/]",
+        "message": "Valor em px cru — use um token de espaçamento/tipografia via var(), ou uma classe CSS para métrica de layout."
+      },
+      {
+        "selector": "Literal[value=/font-family\\s*:(?!\\s*['\"]?(?:Urbanist|JetBrains Mono|Material Symbols Rounded|var\\())/i]",
+        "message": "Fonte fora do design system. Disponíveis: Urbanist, JetBrains Mono, Material Symbols Rounded — via var(--font-*)."
+      },
+      {
+        "selector": "AssignmentExpression[left.property.name='fontFamily'] > Literal.right[value!=/^var\\(--font-/]",
+        "message": "Fonte fora do design system — use var(--font-sans), var(--font-mono) ou var(--font-icon)."
+      },
+      {
+        "selector": "Property[key.name='fontFamily'] > Literal.value[value!=/^var\\(--font-/]",
+        "message": "Fonte fora do design system — use var(--font-sans), var(--font-mono) ou var(--font-icon)."
+      },
+      {
+        "selector": "Literal[value=/\\b(?:rgba?|hsla?)\\(\\s*\\d/]",
+        "message": "Cor crua em rgb()/hsl() — use um token de cor do design system via var()."
+      },
+      {
+        "selector": "CallExpression[callee.name='Alert'] > ObjectExpression > Property > Identifier.key[name!=/^(?:tone|title|children|icon|onDismiss|className|id|style|attrs|on)$/]",
+        "message": "Alert() não aceita essa prop. Declaradas: tone, title, children, icon, onDismiss (+ className, id, style, attrs, on). Ver design-system/components/feedback/Alert.js."
+      },
+      {
+        "selector": "CallExpression[callee.name='Alert'] > ObjectExpression > Property[key.name='tone'] > Literal.value[value!=/^(?:info|success|warning|danger)$/]",
+        "message": "Alert() tone deve ser 'info' | 'success' | 'warning' | 'danger'."
+      },
+      {
+        "selector": "CallExpression[callee.name='Avatar'] > ObjectExpression > Property > Identifier.key[name!=/^(?:src|name|size|accent|className|id|style|attrs|on)$/]",
+        "message": "Avatar() não aceita essa prop. Declaradas: src, name, size, accent (+ className, id, style, attrs, on). Ver design-system/components/core/Avatar.js."
+      },
+      {
+        "selector": "CallExpression[callee.name='Avatar'] > ObjectExpression > Property[key.name='size'] > Literal.value[value!=/^(?:xs|sm|md|lg)$/]",
+        "message": "Avatar() size deve ser 'xs' | 'sm' | 'md' | 'lg'."
+      },
+      {
+        "selector": "CallExpression[callee.name='AvatarGroup'] > ObjectExpression > Property > Identifier.key[name!=/^(?:children|className|id|style|attrs|on)$/]",
+        "message": "AvatarGroup() não aceita essa prop. Declaradas: children (+ className, id, style, attrs, on). Ver design-system/components/core/Avatar.js."
+      },
+      {
+        "selector": "CallExpression[callee.name='Badge'] > ObjectExpression > Property > Identifier.key[name!=/^(?:children|tone|icon|dot|solid|className|id|style|attrs|on)$/]",
+        "message": "Badge() não aceita essa prop. Declaradas: children, tone, icon, dot, solid (+ className, id, style, attrs, on). Ver design-system/components/core/Badge.js."
+      },
+      {
+        "selector": "CallExpression[callee.name='Badge'] > ObjectExpression > Property[key.name='tone'] > Literal.value[value!=/^(?:neutral|accent|success|warning|danger|secondary)$/]",
+        "message": "Badge() tone deve ser 'neutral' | 'accent' | 'success' | 'warning' | 'danger' | 'secondary'."
+      },
+      {
+        "selector": "CallExpression[callee.name='Breadcrumbs'] > ObjectExpression > Property > Identifier.key[name!=/^(?:items|className|id|style|attrs|on)$/]",
+        "message": "Breadcrumbs() não aceita essa prop. Declaradas: items (+ className, id, style, attrs, on). Ver design-system/components/navigation/Breadcrumbs.js."
+      },
+      {
+        "selector": "CallExpression[callee.name='Button'] > ObjectExpression > Property > Identifier.key[name!=/^(?:children|variant|size|iconLeft|iconRight|block|disabled|as|href|className|id|style|attrs|on)$/]",
+        "message": "Button() não aceita essa prop. Declaradas: children, variant, size, iconLeft, iconRight, block, disabled, as, href (+ className, id, style, attrs, on). Ver design-system/components/core/Button.js."
+      },
+      {
+        "selector": "CallExpression[callee.name='Button'] > ObjectExpression > Property[key.name='variant'] > Literal.value[value!=/^(?:primary|secondary|outline|ghost|danger)$/]",
+        "message": "Button() variant deve ser 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger'."
+      },
+      {
+        "selector": "CallExpression[callee.name='Button'] > ObjectExpression > Property[key.name='size'] > Literal.value[value!=/^(?:sm|md|lg)$/]",
+        "message": "Button() size deve ser 'sm' | 'md' | 'lg'."
+      },
+      {
+        "selector": "CallExpression[callee.name='Button'] > ObjectExpression > Property[key.name='as'] > Literal.value[value!=/^(?:button|a)$/]",
+        "message": "Button() as deve ser 'button' | 'a'."
+      },
+      {
+        "selector": "CallExpression[callee.name='Card'] > ObjectExpression > Property > Identifier.key[name!=/^(?:children|title|eyebrow|action|variant|compact|interactive|className|id|style|attrs|on)$/]",
+        "message": "Card() não aceita essa prop. Declaradas: children, title, eyebrow, action, variant, compact, interactive (+ className, id, style, attrs, on). Ver design-system/components/core/Card.js."
+      },
+      {
+        "selector": "CallExpression[callee.name='Card'] > ObjectExpression > Property[key.name='variant'] > Literal.value[value!=/^(?:default|flat|accent|invert)$/]",
+        "message": "Card() variant deve ser 'default' | 'flat' | 'accent' | 'invert'."
+      },
+      {
+        "selector": "CallExpression[callee.name='Checkbox'] > ObjectExpression > Property > Identifier.key[name!=/^(?:label|radio|disabled|checked|name|value|className|id|style|attrs|on)$/]",
+        "message": "Checkbox() não aceita essa prop. Declaradas: label, radio, disabled, checked, name, value (+ className, id, style, attrs, on). Ver design-system/components/forms/Checkbox.js."
+      },
+      {
+        "selector": "CallExpression[callee.name='DataTable'] > ObjectExpression > Property > Identifier.key[name!=/^(?:columns|rows|className|id|style|attrs|on)$/]",
+        "message": "DataTable() não aceita essa prop. Declaradas: columns, rows (+ className, id, style, attrs, on). Ver design-system/components/data/DataTable.js."
+      },
+      {
+        "selector": "CallExpression[callee.name='DonutMeter'] > ObjectExpression > Property > Identifier.key[name!=/^(?:segments|size|thickness|value|label|className|id|style|attrs|on)$/]",
+        "message": "DonutMeter() não aceita essa prop. Declaradas: segments, size, thickness, value, label (+ className, id, style, attrs, on). Ver design-system/components/data/DonutMeter.js."
+      },
+      {
+        "selector": "CallExpression[callee.name='EmptyState'] > ObjectExpression > Property > Identifier.key[name!=/^(?:icon|title|children|action|className|id|style|attrs|on)$/]",
+        "message": "EmptyState() não aceita essa prop. Declaradas: icon, title, children, action (+ className, id, style, attrs, on). Ver design-system/components/feedback/EmptyState.js."
+      },
+      {
+        "selector": "CallExpression[callee.name='Icon'] > ObjectExpression > Property > Identifier.key[name!=/^(?:name|size|filled|className|id|style|attrs|on)$/]",
+        "message": "Icon() não aceita essa prop. Declaradas: name, size, filled (+ className, id, style, attrs, on). Ver design-system/components/core/Icon.js."
+      },
+      {
+        "selector": "CallExpression[callee.name='IconButton'] > ObjectExpression > Property > Identifier.key[name!=/^(?:icon|label|size|variant|disabled|className|id|style|attrs|on)$/]",
+        "message": "IconButton() não aceita essa prop. Declaradas: icon, label, size, variant, disabled (+ className, id, style, attrs, on). Ver design-system/components/core/IconButton.js."
+      },
+      {
+        "selector": "CallExpression[callee.name='IconButton'] > ObjectExpression > Property[key.name='size'] > Literal.value[value!=/^(?:sm|md|lg)$/]",
+        "message": "IconButton() size deve ser 'sm' | 'md' | 'lg'."
+      },
+      {
+        "selector": "CallExpression[callee.name='IconButton'] > ObjectExpression > Property[key.name='variant'] > Literal.value[value!=/^(?:default|accent|bare)$/]",
+        "message": "IconButton() variant deve ser 'default' | 'accent' | 'bare'."
+      },
+      {
+        "selector": "CallExpression[callee.name='Input'] > ObjectExpression > Property > Identifier.key[name!=/^(?:label|hint|error|icon|required|pill|multiline|type|name|placeholder|value|disabled|readOnly|className|id|style|attrs|on)$/]",
+        "message": "Input() não aceita essa prop. Declaradas: label, hint, error, icon, required, pill, multiline, type, name, placeholder, value, disabled, readOnly (+ className, id, style, attrs, on). Ver design-system/components/forms/Input.js."
+      },
+      {
+        "selector": "CallExpression[callee.name='Legend'] > ObjectExpression > Property > Identifier.key[name!=/^(?:items|className|id|style|attrs|on)$/]",
+        "message": "Legend() não aceita essa prop. Declaradas: items (+ className, id, style, attrs, on). Ver design-system/components/data/DonutMeter.js."
+      },
+      {
+        "selector": "CallExpression[callee.name='NavPills'] > ObjectExpression > Property > Identifier.key[name!=/^(?:items|value|onChange|accent|className|id|style|attrs|on)$/]",
+        "message": "NavPills() não aceita essa prop. Declaradas: items, value, onChange, accent (+ className, id, style, attrs, on). Ver design-system/components/navigation/NavPills.js."
+      },
+      {
+        "selector": "CallExpression[callee.name='ProgressBar'] > ObjectExpression > Property > Identifier.key[name!=/^(?:value|max|label|valueText|tone|thick|className|id|style|attrs|on)$/]",
+        "message": "ProgressBar() não aceita essa prop. Declaradas: value, max, label, valueText, tone, thick (+ className, id, style, attrs, on). Ver design-system/components/core/ProgressBar.js."
+      },
+      {
+        "selector": "CallExpression[callee.name='ProgressBar'] > ObjectExpression > Property[key.name='tone'] > Literal.value[value!=/^(?:accent|secondary|success|danger)$/]",
+        "message": "ProgressBar() tone deve ser 'accent' | 'secondary' | 'success' | 'danger'."
+      },
+      {
+        "selector": "CallExpression[callee.name='SegmentedControl'] > ObjectExpression > Property > Identifier.key[name!=/^(?:options|value|onChange|accent|className|id|style|attrs|on)$/]",
+        "message": "SegmentedControl() não aceita essa prop. Declaradas: options, value, onChange, accent (+ className, id, style, attrs, on). Ver design-system/components/forms/SegmentedControl.js."
+      },
+      {
+        "selector": "CallExpression[callee.name='Select'] > ObjectExpression > Property > Identifier.key[name!=/^(?:label|hint|error|options|required|name|value|disabled|children|className|id|style|attrs|on)$/]",
+        "message": "Select() não aceita essa prop. Declaradas: label, hint, error, options, required, name, value, disabled, children (+ className, id, style, attrs, on). Ver design-system/components/forms/Select.js."
+      },
+      {
+        "selector": "CallExpression[callee.name='SideNav'] > ObjectExpression > Property > Identifier.key[name!=/^(?:items|value|onChange|collapsed|header|footer|className|id|style|attrs|on)$/]",
+        "message": "SideNav() não aceita essa prop. Declaradas: items, value, onChange, collapsed, header, footer (+ className, id, style, attrs, on). Ver design-system/components/navigation/SideNav.js."
+      },
+      {
+        "selector": "CallExpression[callee.name='SparkBars'] > ObjectExpression > Property > Identifier.key[name!=/^(?:data|labels|peakIndex|height|className|id|style|attrs|on)$/]",
+        "message": "SparkBars() não aceita essa prop. Declaradas: data, labels, peakIndex, height (+ className, id, style, attrs, on). Ver design-system/components/data/SparkBars.js."
+      },
+      {
+        "selector": "CallExpression[callee.name='Stat'] > ObjectExpression > Property > Identifier.key[name!=/^(?:label|value|prefix|suffix|fraction|delta|deltaDirection|deltaNote|size|className|id|style|attrs|on)$/]",
+        "message": "Stat() não aceita essa prop. Declaradas: label, value, prefix, suffix, fraction, delta, deltaDirection, deltaNote, size (+ className, id, style, attrs, on). Ver design-system/components/core/Stat.js."
+      },
+      {
+        "selector": "CallExpression[callee.name='Stat'] > ObjectExpression > Property[key.name='deltaDirection'] > Literal.value[value!=/^(?:up|down|flat)$/]",
+        "message": "Stat() deltaDirection deve ser 'up' | 'down' | 'flat'."
+      },
+      {
+        "selector": "CallExpression[callee.name='Stat'] > ObjectExpression > Property[key.name='size'] > Literal.value[value!=/^(?:sm|md|lg)$/]",
+        "message": "Stat() size deve ser 'sm' | 'md' | 'lg'."
+      },
+      {
+        "selector": "CallExpression[callee.name='Switch'] > ObjectExpression > Property > Identifier.key[name!=/^(?:label|disabled|checked|name|className|id|style|attrs|on)$/]",
+        "message": "Switch() não aceita essa prop. Declaradas: label, disabled, checked, name (+ className, id, style, attrs, on). Ver design-system/components/forms/Switch.js."
+      },
+      {
+        "selector": "CallExpression[callee.name='Tabs'] > ObjectExpression > Property > Identifier.key[name!=/^(?:items|value|onChange|className|id|style|attrs|on)$/]",
+        "message": "Tabs() não aceita essa prop. Declaradas: items, value, onChange (+ className, id, style, attrs, on). Ver design-system/components/navigation/Tabs.js."
+      },
+      {
+        "selector": "CallExpression[callee.name='Tag'] > ObjectExpression > Property > Identifier.key[name!=/^(?:children|onRemove|className|id|style|attrs|on)$/]",
+        "message": "Tag() não aceita essa prop. Declaradas: children, onRemove (+ className, id, style, attrs, on). Ver design-system/components/core/Tag.js."
+      },
+      {
+        "selector": "CallExpression[callee.name='Timeline'] > ObjectExpression > Property > Identifier.key[name!=/^(?:steps|className|id|style|attrs|on)$/]",
+        "message": "Timeline() não aceita essa prop. Declaradas: steps (+ className, id, style, attrs, on). Ver design-system/components/data/Timeline.js."
+      },
+      {
+        "selector": "CallExpression[callee.name='Toast'] > ObjectExpression > Property > Identifier.key[name!=/^(?:tone|children|actionLabel|onAction|className|id|style|attrs|on)$/]",
+        "message": "Toast() não aceita essa prop. Declaradas: tone, children, actionLabel, onAction (+ className, id, style, attrs, on). Ver design-system/components/feedback/Toast.js."
+      },
+      {
+        "selector": "CallExpression[callee.name='Toast'] > ObjectExpression > Property[key.name='tone'] > Literal.value[value!=/^(?:info|success|danger)$/]",
+        "message": "Toast() tone deve ser 'info' | 'success' | 'danger'."
+      },
+      {
+        "selector": "CallExpression[callee.name='Tooltip'] > ObjectExpression > Property > Identifier.key[name!=/^(?:label|children|className|id|style|attrs|on)$/]",
+        "message": "Tooltip() não aceita essa prop. Declaradas: label, children (+ className, id, style, attrs, on). Ver design-system/components/feedback/Tooltip.js."
+      },
+      {
+        "selector": "CallExpression[callee.name='TopBar'] > ObjectExpression > Property > Identifier.key[name!=/^(?:brand|center|actions|className|id|style|attrs|on)$/]",
+        "message": "TopBar() não aceita essa prop. Declaradas: brand, center, actions (+ className, id, style, attrs, on). Ver design-system/components/navigation/TopBar.js."
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": [
+        "design-system/components/**"
+      ],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    },
+    {
+      "files": [
+        "app.js",
+        "supabase_client.js",
+        "ncm_db.js",
+        "ncm_rates.js",
+        "api/**",
+        "server/**",
+        "extension/**",
+        "tools/**"
+      ],
+      "rules": {
+        "eslint-js/no-restricted-syntax": "off",
+        "no-unused-vars": "off",
+        "no-useless-escape": "off",
+        "unicorn/no-useless-fallback-in-spread": "off"
+      }
+    }
+  ]
+}

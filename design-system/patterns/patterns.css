@@ -1,0 +1,168 @@
+/* Layout dos padrões de composição (patterns/).
+ *
+ * Cor, fonte, espaçamento e raio vêm sempre de token. Os ui_kits originais tinham
+ * valores fora da escala (14px, 10px, 19px, 28px…); no porte eles foram
+ * arredondados para o token mais próximo, com empate indo para o menor. Os
+ * originais continuam abrindo em reference/ui-kits/ para comparação.
+ *
+ * Ficam literais apenas as MÉTRICAS DE LAYOUT, que não são espaçamento: largura
+ * mínima de trilho de grade, largura de coluna, altura de barra, tamanho de logo.
+ * Essas estão marcadas com "métrica".
+ */
+
+/* ---------- Shell do app ---------- */
+.ic-p-shell{min-height:100%;background:var(--surface-page)}
+.ic-p-shell__body{display:flex;align-items:stretch;min-height:calc(100vh - var(--nav-height))}
+.ic-p-shell__plan{margin-top:auto;padding-top:var(--space-6)}
+.ic-p-shell__plancard{background:var(--surface-raised);border-radius:var(--radius-md);padding:var(--space-3)}
+.ic-p-shell__planname{display:flex;align-items:center;gap:var(--space-2);color:var(--accent);font-weight:var(--weight-semibold);font-size:var(--text-sm);margin-bottom:var(--space-1)}
+.ic-p-shell__plannote{font-size:var(--text-caption);color:var(--text-muted)}
+.ic-p-shell__main{flex:1;min-width:0;padding:var(--space-6) var(--space-8) var(--space-12)}
+
+/* ---------- Página ---------- */
+.ic-p-page{display:flex;flex-direction:column;gap:var(--space-5);max-width:var(--container-max);margin:0 auto}
+.ic-p-page--narrow{max-width:1080px} /* métrica: largura da tela de cotação */
+.ic-p-pagehead{display:flex;align-items:flex-end;justify-content:space-between;gap:var(--space-6);flex-wrap:wrap}
+.ic-p-pagehead--top{align-items:flex-start}
+.ic-p-kicker{font-size:var(--text-sm);color:var(--text-muted);font-weight:var(--weight-medium)}
+.ic-p-title{font-size:var(--text-title-lg)}
+.ic-p-title--gap{margin-top:var(--space-1)}
+.ic-p-subtitle{font-size:var(--text-sm);color:var(--text-muted);margin-top:var(--space-1)}
+.ic-p-codeline{font-size:var(--text-sm);color:var(--text-muted);margin-top:var(--space-1)}
+.ic-p-actions{display:flex;gap:var(--space-2)}
+.ic-p-actions--center{align-items:center}
+.ic-p-fieldlabel{font-size:var(--text-sm);font-weight:var(--weight-semibold);color:var(--text-title)}
+
+/* ---------- Linhas, pilhas e grades ---------- */
+.ic-p-row{display:flex;gap:var(--space-2)}
+.ic-p-row--wrap{flex-wrap:wrap}
+.ic-p-row--center{align-items:center}
+.ic-p-row--end{align-items:flex-end}
+.ic-p-row--gap3{gap:var(--space-3)}
+.ic-p-row--gap4{gap:var(--space-4)}
+.ic-p-row--gap5{gap:var(--space-5)}
+.ic-p-row--gap6{gap:var(--space-6)}
+.ic-p-row--mt5{margin-top:var(--space-5)}
+.ic-p-stack{display:flex;flex-direction:column;gap:var(--space-4)}
+.ic-p-stack--tight{gap:var(--space-2)}
+.ic-p-mt1{margin-top:var(--space-1)}
+.ic-p-mt2{margin-top:var(--space-2)}
+.ic-p-mt3{margin-top:var(--space-3)}
+.ic-p-mt4{margin-top:var(--space-4)}
+.ic-p-mt5{margin-top:var(--space-5)}
+.ic-p-mb4{margin-bottom:var(--space-4)}
+.ic-p-mb5{margin-bottom:var(--space-5)}
+.ic-p-inline{display:inline-flex;align-items:center;gap:var(--space-2)}
+.ic-p-center{text-align:center}
+
+.ic-p-grid{display:grid;gap:var(--gap-grid)}
+.ic-p-grid--240{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))} /* métrica */
+.ic-p-grid--250{grid-template-columns:repeat(auto-fit,minmax(250px,1fr))} /* métrica */
+.ic-p-grid--260{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))} /* métrica: piso de card do painel */
+.ic-p-grid--300{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))} /* métrica */
+.ic-p-grid--stretch{align-items:stretch}
+
+.ic-p-split{display:grid;gap:var(--gap-grid);align-items:start}
+.ic-p-split--wide{grid-template-columns:minmax(0,1.6fr) minmax(0,1fr)}
+.ic-p-split--half{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.ic-p-split--quote{grid-template-columns:minmax(0,1.45fr) minmax(0,1fr)}
+.ic-p-split--how{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:var(--space-16);align-items:center}
+
+.ic-p-formgrid{display:grid;gap:var(--space-4)}
+.ic-p-formgrid--2{grid-template-columns:1fr 1fr}
+.ic-p-formgrid--3{grid-template-columns:1fr 1fr 1fr}
+
+.ic-p-grow-240{flex:1 1 240px} /* métrica */
+.ic-p-grow-260{flex:1 1 260px} /* métrica */
+.ic-p-w-180{width:180px}       /* métrica: select de filtro */
+.ic-p-minw-120{min-width:120px} /* métrica: barra de margem na célula */
+
+/* ---------- Peças de card ---------- */
+.ic-p-legend-col{flex-direction:column;gap:var(--space-2)}
+.ic-card.ic-p-tablecard{padding:var(--space-5) var(--space-2) var(--space-2)}
+.ic-p-tablecard__tabs{padding:0 var(--space-4)}
+.ic-p-list{display:flex;flex-direction:column}
+.ic-p-list__row{display:flex;align-items:center;gap:var(--space-3);padding:var(--space-3) 0;font-size:var(--text-sm)}
+.ic-p-list__row+.ic-p-list__row{border-top:1px solid var(--border-subtle)}
+.ic-p-list__text{color:var(--text-body)}
+.ic-p-list__when{margin-left:auto;font-size:var(--text-caption);color:var(--text-muted)}
+.ic-p-strong{color:var(--text-title);font-weight:var(--weight-semibold)}
+.ic-p-strong--accent{color:var(--accent)}
+.ic-p-kv__key{font-size:var(--text-caption);color:var(--text-muted)}
+.ic-p-kv__value{font-size:var(--text-title-md);font-weight:var(--weight-semibold);letter-spacing:var(--tracking-tight);color:var(--text-title);font-variant-numeric:tabular-nums}
+.ic-p-sticky{position:sticky;top:calc(var(--nav-height) + var(--space-5))}
+.ic-p-estimate__badges{margin:var(--space-4) 0 var(--space-5)}
+.ic-p-toastslot{position:fixed;left:var(--space-8);bottom:var(--space-6);z-index:80}
+
+/* ---------- Site institucional ---------- */
+.ic-p-eyebrow{display:inline-flex;align-items:center;gap:var(--space-2);height:32px;padding:0 var(--space-3);border-radius:var(--radius-pill);background:var(--accent-soft);border:1px solid var(--accent-soft-border);color:var(--accent);font-size:var(--text-sm);font-weight:var(--weight-semibold)}
+.ic-p-eyebrow__dot{width:7px;height:7px;border-radius:var(--radius-circle);background:currentColor} /* métrica */
+.ic-p-section{padding:var(--space-24) var(--space-8)}
+.ic-p-section--band{background:var(--surface-card);border-top:1px solid var(--border-subtle);border-bottom:1px solid var(--border-subtle)}
+.ic-p-section--flush{padding-top:0}
+.ic-p-container{max-width:var(--container-max);margin:0 auto}
+.ic-p-sectionhead{max-width:54ch;margin-bottom:var(--space-12)}
+
+.ic-p-siteheader{position:sticky;top:0;z-index:50;background:var(--veil-light);backdrop-filter:var(--blur-bar);-webkit-backdrop-filter:var(--blur-bar);border-bottom:1px solid var(--border-subtle)}
+.ic-p-siteheader__inner{max-width:var(--container-wide);margin:0 auto;height:72px;padding:0 var(--space-8);display:flex;align-items:center;gap:var(--space-8)} /* métrica: barra de 72px */
+.ic-p-siteheader__nav{display:flex;gap:var(--space-6);margin-left:var(--space-5)}
+.ic-p-siteheader__nav a{font-size:var(--text-body-size);font-weight:var(--weight-medium);color:var(--text-body);text-decoration:none}
+.ic-p-siteheader__actions{margin-left:auto;display:flex;align-items:center;gap:var(--space-3)}
+.ic-p-brand{display:flex;align-items:center;gap:var(--space-2);text-decoration:none}
+.ic-p-brand:hover{text-decoration:none}
+.ic-p-brand__logo{width:34px;height:34px} /* métrica */
+.ic-p-brand__name{font-size:var(--text-title-sm);font-weight:var(--weight-bold);letter-spacing:var(--tracking-tighter);color:var(--text-title)}
+
+.ic-p-hero{position:relative;overflow:hidden;background:var(--surface-card);border-bottom:1px solid var(--border-subtle)}
+/* O único gradiente permitido na marca: dois brilhos radiais, aqua ≤26% e laranja ≤14%. */
+.ic-p-hero__glow{position:absolute;border-radius:var(--radius-circle);pointer-events:none}
+.ic-p-hero__glow--aqua{top:-220px;right:-120px;width:620px;height:620px;background:radial-gradient(circle,color-mix(in oklab,var(--aqua-400) 26%,transparent) 0%,transparent 68%)} /* métrica */
+.ic-p-hero__glow--orange{bottom:-280px;left:-160px;width:520px;height:520px;background:radial-gradient(circle,color-mix(in oklab,var(--orange-400) 14%,transparent) 0%,transparent 70%)} /* métrica */
+.ic-p-hero__inner{position:relative;max-width:var(--container-max);margin:0 auto;padding:var(--space-24) var(--space-8) 0;text-align:center}
+.ic-p-hero__title{font-size:clamp(var(--text-display-sm),6vw,var(--text-display-lg));line-height:var(--leading-tight);letter-spacing:var(--tracking-tighter);font-weight:var(--weight-semibold);margin:var(--space-6) auto 0;max-width:16ch}
+.ic-p-accent-text{color:var(--accent)}
+.ic-p-hero__lead{font-size:var(--text-title-sm);color:var(--text-muted);max-width:58ch;margin:var(--space-5) auto 0;line-height:var(--leading-normal)}
+.ic-p-hero__cta{display:flex;gap:var(--space-3);justify-content:center;margin:var(--space-8) 0 var(--space-3);flex-wrap:wrap}
+.ic-p-hero__fineprint{font-size:var(--text-sm);color:var(--text-muted)}
+.ic-p-browser{margin-top:var(--space-12);border-radius:var(--radius-sheet) var(--radius-sheet) 0 0;border:1px solid var(--border-subtle);border-bottom:none;background:var(--surface-page);box-shadow:var(--shadow-lg);overflow:hidden;text-align:left}
+.ic-p-browser__bar{height:44px;border-bottom:1px solid var(--border-subtle);display:flex;align-items:center;gap:var(--space-2);padding:0 var(--space-4);background:var(--surface-card)} /* métrica: barra do navegador */
+.ic-p-browser__dot{width:10px;height:10px;border-radius:var(--radius-circle);background:var(--ink-300)} /* métrica */
+.ic-p-browser__url{margin-left:var(--space-3);font-size:var(--text-caption);color:var(--text-muted)}
+.ic-p-browser__body{padding:var(--space-6);display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--space-4)}
+
+.ic-p-logostrip{border-bottom:1px solid var(--border-subtle);background:var(--surface-card)}
+.ic-p-logostrip__inner{max-width:var(--container-max);margin:0 auto;padding:var(--space-6) var(--space-8);display:flex;align-items:center;gap:var(--space-10);flex-wrap:wrap;justify-content:center}
+.ic-p-logostrip__label{font-size:var(--text-sm);color:var(--text-muted)}
+.ic-p-logostrip__name{font-size:var(--text-lg);font-weight:var(--weight-semibold);letter-spacing:var(--tracking-tight);color:var(--ink-400)}
+
+.ic-p-h2{font-size:clamp(var(--text-title-lg),4vw,var(--text-display-md));letter-spacing:var(--tracking-tighter);line-height:var(--leading-tight);margin-top:var(--space-5)}
+.ic-p-h2--spaced{margin:var(--space-5) 0}
+.ic-p-h3{font-size:var(--text-title-sm);margin-bottom:var(--space-2)}
+.ic-p-featureicon{display:inline-flex;width:46px;height:46px;border-radius:var(--radius-md);background:var(--accent-soft);color:var(--accent);align-items:center;justify-content:center;margin-bottom:var(--space-4)} /* métrica: 46px */
+.ic-p-body-muted{font-size:var(--text-body-size);color:var(--text-muted);line-height:var(--leading-normal)}
+.ic-p-lead{font-size:var(--text-lg);color:var(--text-muted);line-height:var(--leading-relaxed);margin-bottom:var(--space-6)}
+
+.ic-card.ic-p-bigcard{padding:var(--space-12)}
+.ic-p-quote{max-width:46ch}
+.ic-p-quote__mark{color:var(--aqua-400)}
+.ic-p-quote__text{font-size:clamp(var(--text-title-sm),2.6vw,var(--text-title-lg));line-height:var(--leading-normal);letter-spacing:var(--tracking-tight);color:var(--text-title);font-weight:var(--weight-medium);margin:var(--space-3) 0 var(--space-6)}
+.ic-p-quote__who{color:var(--text-title);font-weight:var(--weight-semibold);font-size:var(--text-body-size)}
+.ic-p-quote__role{color:var(--text-muted);font-size:var(--text-sm)}
+
+.ic-p-cta__title{font-size:clamp(var(--text-title-lg),4vw,var(--text-display-sm));max-width:20ch;margin:0 auto}
+/* O original usava --text-on-accent aqui, mas dentro do card accent esse token
+   vira a cor do fundo e o parágrafo sumia. --text-body é o texto secundário
+   que o card accent remapeia de propósito. */
+.ic-p-cta__lead{font-size:var(--text-lg);margin:var(--space-4) auto var(--space-6);max-width:52ch;color:var(--text-body)}
+.ic-p-cta__form{display:flex;gap:var(--space-2);justify-content:center;flex-wrap:wrap;max-width:480px;margin:0 auto} /* métrica: 480px */
+
+.ic-p-footer{background:var(--surface-card);border-top:1px solid var(--border-subtle);padding:var(--space-12) var(--space-8) var(--space-8)}
+.ic-p-footer__grid{max-width:var(--container-max);margin:0 auto;display:grid;grid-template-columns:minmax(0,1.4fr) repeat(3,minmax(0,1fr));gap:var(--space-10)}
+.ic-p-footer__brand{display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-3)}
+.ic-p-footer__logo{width:30px;height:30px} /* métrica */
+.ic-p-footer__name{font-size:var(--text-title-sm);font-weight:var(--weight-bold);letter-spacing:var(--tracking-tighter);color:var(--text-title)}
+.ic-p-footer__about{font-size:var(--text-sm);color:var(--text-muted);max-width:34ch;line-height:var(--leading-normal)}
+.ic-p-microlabel{font-size:var(--text-micro);text-transform:uppercase;letter-spacing:var(--tracking-widest);font-weight:var(--weight-semibold);color:var(--text-muted);margin-bottom:var(--space-3)}
+.ic-p-footer__links{display:flex;flex-direction:column;gap:var(--space-2)}
+.ic-p-footer__links a{font-size:var(--text-sm);color:var(--text-body);text-decoration:none}
+.ic-p-footer__legal{max-width:var(--container-max);margin:var(--space-10) auto 0;padding-top:var(--space-5);border-top:1px solid var(--border-subtle);display:flex;justify-content:space-between;gap:var(--space-4);flex-wrap:wrap;font-size:var(--text-sm);color:var(--text-muted)}

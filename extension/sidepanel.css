@@ -1,0 +1,415 @@
+/* Ajustes de quando o painel deixou de flutuar sobre a página e passou a
+   ocupar a lateral da janela. Todo o resto do visual continua vindo do
+   panel.css, que não precisou mudar. */
+
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: var(--surface-card);
+}
+
+/* Antes era um cartão fixo de 360px num canto, com sombra e cantos
+   arredondados para se destacar do anúncio atrás. Agora ele É a lateral: nada
+   disso faz sentido. */
+#impoclick-panel {
+    position: static;
+    width: 100%;
+    height: 100%;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    display: flex;
+    flex-direction: column;
+}
+
+#impoclick-panel-body {
+    flex: 1;
+    max-height: none;
+    overflow-y: auto;
+}
+
+/* No panel.css esta classe só existe colada a IDs específicos, porque lá era
+   usada em três elementos conhecidos. Aqui ela precisa valer para qualquer um. */
+.impoclick-hidden {
+    display: none !important;
+}
+
+/* As abas ficam no corpo rolável, então precisam de respiro em volta — no
+   layout antigo elas eram uma faixa fixa logo abaixo do cabeçalho. */
+#impoclick-panel-tabs {
+    margin: 0 -14px 12px;
+    padding: 0 14px;
+}
+
+/* ── Identidade e monitoramento ──────────────────────────────────────── */
+
+.impoclick-usuario {
+    margin: 0 0 10px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-title);
+}
+
+.impoclick-linhas {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--accent-soft);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 14px;
+}
+
+.impoclick-linha {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 11px;
+    text-decoration: none;
+    color: var(--text-title);
+    font-size: 12.5px;
+    border-bottom: 1px solid var(--accent-soft);
+}
+
+.impoclick-linha:last-child { border-bottom: none; }
+.impoclick-linha:hover { background: var(--accent-soft); }
+
+.impoclick-linha-nome { flex: 1; font-weight: 600; }
+
+/* Número quando há pendência, visto quando não há: o estado é o dado
+   principal da linha. */
+.impoclick-linha-estado {
+    font-weight: 800;
+    font-size: 11.5px;
+    min-width: 18px;
+    text-align: right;
+    color: var(--text-muted);
+}
+
+.impoclick-linha-estado.tem-alerta {
+    color: var(--ink-0);
+    background: var(--danger);
+    border-radius: 999px;
+    padding: 1px 7px;
+    min-width: auto;
+}
+
+.impoclick-linha-estado.tudo-certo { color: var(--success); }
+.impoclick-linha-estado.falhou { color: var(--danger); font-size: 10.5px; }
+
+.impoclick-sair {
+    all: unset;
+    display: block;
+    margin-top: 16px;
+    font-family: var(--font-sans);
+    font-size: 11.5px;
+    color: var(--text-muted);
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.impoclick-sair:hover { color: var(--text-title); }
+
+/* ══ Visual em cartões ═══════════════════════════════════════════════════
+   O painel era uma coluna corrida de rótulo + campo, sem hierarquia: o
+   resultado do cálculo tinha o mesmo peso visual de um placeholder. Agora
+   cada assunto é um cartão, e o resultado é o único bloco em destaque. */
+
+.impoclick-cartao {
+    border: 1px solid var(--accent-soft);
+    border-radius: 12px;
+    padding: 13px 13px 15px;
+    margin-bottom: 12px;
+    background: var(--surface-card);
+}
+
+/* Dentro de um cartão o primeiro rótulo não precisa de respiro acima. */
+.impoclick-cartao > .impoclick-label:first-child,
+.impoclick-cartao > .impoclick-row:first-child {
+    margin-top: 0;
+}
+
+/* Custo e imposto lado a lado: são a mesma decisão (quanto sai do seu bolso)
+   e juntos cabem numa linha só, encurtando a rolagem até o botão. */
+.impoclick-dupla {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.impoclick-dupla .impoclick-input {
+    width: 100%;
+}
+
+/* ── Botões de opção ──────────────────────────────────────────────────── */
+/* Substituem os controles nativos (radio, no caso do frete grátis). A escolha
+   fica no data-valor do contêiner, então o padrão serve para qualquer outra
+   escolha do painel sem CSS novo. */
+
+.impoclick-seg {
+    display: flex;
+    gap: 4px;
+    padding: 3px;
+    margin: 6px 0 14px;
+    border: 1px solid var(--accent-soft);
+    border-radius: 10px;
+    background: var(--accent-soft);
+}
+
+.impoclick-seg-opt {
+    all: unset;
+    flex: 1;
+    box-sizing: border-box;
+    text-align: center;
+    padding: 7px 6px;
+    font-family: var(--font-sans);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    border-radius: 7px;
+    cursor: pointer;
+}
+
+.impoclick-seg-opt:hover { color: var(--accent); }
+
+.impoclick-seg-ativo {
+    background: var(--ink-0);
+    color: var(--accent);
+    font-weight: 700;
+    box-shadow: var(--shadow-xs);
+}
+
+/* A taxa de cada modalidade dentro do próprio botão: a escolha é comparativa,
+   e ver os dois percentuais lado a lado dispensa alternar para comparar. */
+.impoclick-seg-taxa {
+    font-weight: 500;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.impoclick-seg-ativo .impoclick-seg-taxa { color: var(--accent); }
+
+/* ── Cartão do resultado ──────────────────────────────────────────────── */
+
+.impoclick-res {
+    border: 2px solid var(--accent);
+    border-radius: 14px;
+    padding: 14px;
+    margin-bottom: 12px;
+    background: var(--surface-card);
+}
+
+.impoclick-res.impoclick-breakdown-negative {
+    border-color: var(--danger);
+    background: var(--danger-soft);
+}
+
+.impoclick-res-topo {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.impoclick-res-rotulo {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    border: 1px solid var(--accent-soft);
+    border-radius: 999px;
+    padding: 3px 9px;
+}
+
+.impoclick-res-tag {
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    border-radius: 999px;
+    padding: 3px 10px;
+}
+
+/* O veredito reaproveita as classes que o cálculo já devolvia. */
+.impoclick-res-tag.impoclick-good { background: var(--success-soft); color: var(--success); }
+.impoclick-res-tag.impoclick-bad { background: var(--danger-soft); color: var(--danger); }
+.impoclick-res-tag.impoclick-warn { background: var(--warning-soft); color: var(--accent); }
+
+/* O número é o motivo de o painel existir — daí o corpo grande. */
+.impoclick-res-numero {
+    font-size: 31px;
+    font-weight: 800;
+    line-height: 1.1;
+    color: var(--success);
+}
+
+.impoclick-res.impoclick-breakdown-negative .impoclick-res-numero {
+    color: var(--danger);
+}
+
+.impoclick-res-sub {
+    margin: 3px 0 12px;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.impoclick-res-metricas {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    padding-top: 11px;
+    border-top: 1px solid var(--accent-soft);
+}
+
+.impoclick-res-metricas span {
+    display: block;
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 2px;
+}
+
+.impoclick-res-metricas strong {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--text-title);
+}
+
+/* ── Detalhamento recolhível ──────────────────────────────────────────── */
+/* A cascata linha a linha continua inteira; ela só deixa de competir com o
+   número do resultado por atenção. */
+
+.impoclick-det {
+    margin-top: 12px;
+    border-top: 1px solid var(--accent-soft);
+    padding-top: 10px;
+}
+
+.impoclick-det > summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    list-style: none;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent);
+}
+
+.impoclick-det > summary::-webkit-details-marker { display: none; }
+
+.impoclick-det > summary::after {
+    content: '▾';
+    font-size: 10px;
+    color: var(--text-muted);
+}
+
+.impoclick-det[open] > summary::after { content: '▴'; }
+
+.impoclick-det-total {
+    margin-left: auto;
+    font-weight: 700;
+    color: var(--text-muted);
+}
+
+/* Margem apertada é o meio-termo: com lucro, mas pouco. Sem isto o número
+   saía verde igual ao de um resultado folgado, contradizendo a etiqueta. */
+.impoclick-res:has(.impoclick-res-tag.impoclick-warn) {
+    border-color: var(--warning);
+    background: var(--warning-soft);
+}
+
+.impoclick-res:has(.impoclick-res-tag.impoclick-warn) .impoclick-res-numero {
+    color: var(--accent);
+}
+
+/* O título do produto encabeça o primeiro cartão. */
+.impoclick-cartao > .impoclick-item-title:first-child {
+    margin-top: 0;
+}
+
+/* ── Cartão de publicidade ────────────────────────────────────────────── */
+
+.impoclick-ads-topo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.impoclick-ads-titulo {
+    flex: 1;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-title);
+}
+
+/* Diz de onde vieram os números: do painel do Mercado Livre ou de estimativa.
+   Sem isso o vendedor não sabe se está olhando dado real ou chute. */
+.impoclick-ads-fonte {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-muted);
+    background: var(--accent-soft);
+    border-radius: 999px;
+    padding: 3px 8px;
+    white-space: nowrap;
+}
+
+.impoclick-switch {
+    all: unset;
+    box-sizing: border-box;
+    width: 38px;
+    height: 21px;
+    flex-shrink: 0;
+    border-radius: 999px;
+    background: var(--accent-soft-border);
+    cursor: pointer;
+    padding: 2px;
+    transition: background-color 0.15s ease;
+}
+
+.impoclick-switch > span {
+    display: block;
+    width: 17px;
+    height: 17px;
+    border-radius: 50%;
+    background: var(--ink-0);
+    box-shadow: var(--shadow-xs);
+    transition: transform 0.15s ease;
+}
+
+.impoclick-switch-ligado { background: var(--accent); }
+.impoclick-switch-ligado > span { transform: translateX(17px); }
+
+#impoclick-ads-campos > .impoclick-label:first-child { margin-top: 12px; }
+
+/* O TACOS é o resultado das duas escolhas acima — fica destacado porque é o
+   número que de fato entra no cálculo. */
+.impoclick-ads-tacos {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--accent-soft);
+}
+
+.impoclick-ads-tacos strong { color: var(--accent); }
+
+/* Dado vindo do Mercado Livre ganha destaque: é a diferença entre um número
+   que você pode confiar e um que você chutou. */
+.impoclick-ads-fonte-real {
+    background: var(--success-soft);
+    color: var(--success);
+}
+
+/* Aviso de estimativa otimista. Cor de alerta, não de nota de rodapé: ele
+   existe justamente para não passar batido. */
+.impoclick-aviso-otimista {
+    margin-top: 8px;
+    padding: 7px 9px;
+    border-left: 3px solid var(--warning);
+    border-radius: 0 6px 6px 0;
+    background: var(--warning-soft);
+    color: var(--accent);
+}

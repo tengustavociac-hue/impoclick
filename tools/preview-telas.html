@@ -1,0 +1,39 @@
+<!doctype html>
+<!-- Revisão visual das telas do app sem precisar de login: abre o index.html
+     num iframe e revela uma tela específica.
+
+       python -m http.server 4174 --bind 127.0.0.1
+       http://127.0.0.1:4174/tools/preview-telas.html?view=view-calculator&theme=dark
+
+     Parâmetros: view=<id do painel>, auth=auth-container|paywall-screen, theme=light|dark.
+     Fica fora do deploy (tools/ está no .vercelignore). -->
+<html lang="pt-BR"><head><meta charset="utf-8"><style>html,body{margin:0;background:#888}iframe{border:0;display:block;width:1440px;height:1000px}</style></head>
+<body>
+<iframe id="f" src="../index.html"></iframe>
+<script>
+const p = new URLSearchParams(location.search);
+const view = p.get('view') || '';
+const theme = p.get('theme') || 'light';
+const f = document.getElementById('f');
+f.addEventListener('load', () => {
+  setTimeout(() => {
+    const d = f.contentDocument;
+    d.documentElement.setAttribute('data-theme', theme);
+    if (view) {
+      d.documentElement.classList.add('has-session');
+      const lp = d.getElementById('landing-container'); if (lp) lp.style.display = 'none';
+      for (const id of ['auth-container', 'paywall-screen']) { const el = d.getElementById(id); if (el) el.classList.add('hidden'); }
+      for (const el of d.querySelectorAll('.view-panel')) el.classList.add('hidden');
+      const target = d.getElementById(view); if (target) target.classList.remove('hidden');
+      const shell = d.querySelector('.app-container'); if (shell) shell.classList.remove('hidden');
+      const title = d.getElementById('header-view-title'); if (title) title.textContent = view;
+    } else if (p.get('auth')) {
+      d.documentElement.classList.add('has-session');
+      const lp = d.getElementById('landing-container'); if (lp) lp.style.display = 'none';
+      const el = d.getElementById(p.get('auth')); if (el) el.classList.remove('hidden');
+    }
+    document.title = 'pronto';
+  }, 1200);
+});
+</script>
+</body></html>

@@ -73,5 +73,37 @@ const NCM_DATABASE = {
 function lookupLocalNcm(ncmCode) {
     if (!ncmCode) return null;
     const cleanCode = ncmCode.toString().replace(/[^0-9]/g, '');
-    return NCM_DATABASE[cleanCode] || null;
+
+    const curado = NCM_DATABASE[cleanCode];
+
+    // 1) A ALÍQUOTA vem sempre da tabela oficial (TEC + TIPI), gerada por
+    //    tools/gerar-ncm-rates.js. Da base curada aproveitamos só o NOME.
+    //
+    //    A ordem já foi a inversa, e estava errada. Comparando os 42 curados
+    //    com o oficial, apenas 11 batiam: 14 divergiam no II e 28 no IPI.
+    //    Boa parte é desatualização sistemática — vários curados são a TEC
+    //    anterior ao corte linear de 10% (HD 8% vs 7,2%; carregador 14% vs
+    //    12,6%; teclado 12% vs 10,8%, todos exatamente ×0,9). Outros eram
+    //    erro mesmo: SSD/pendrive estava com II 8% contra 16% oficiais,
+    //    metade da alíquota real, num dos NCMs mais importados do site.
+    //
+    //    Valor digitado à mão não pode ganhar de ato normativo. Se um curado
+    //    divergir de novo, é sinal de que a tabela precisa ser regerada, não
+    //    de que o curado está certo.
+    if (typeof lookupNcmRates === 'function') {
+        const oficial = lookupNcmRates(cleanCode);
+        if (oficial) {
+            return Object.assign({}, oficial, {
+                name: curado ? curado.name : null,
+                origem: 'oficial',
+            });
+        }
+    }
+
+    // 2) Só chega aqui NCM que não existe na TEC vigente — por exemplo código
+    //    extinto na migração para o SH-2022. Nesse caso o curado é tudo que
+    //    temos; melhor do que nada, mas fica marcado como tal.
+    if (curado) return Object.assign({}, curado, { origem: 'curada-legada' });
+
+    return null;
 }

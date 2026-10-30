@@ -1,0 +1,130 @@
+<!doctype html>
+<!-- Revisão da margem dos anúncios "Ganhando" na aba Catálogo, sem login:
+     abre o index.html real, troca mlApiFetch e window.db por dados de
+     exemplo, clica no menu e no botão "Calcular margem".
+       python -m http.server 4174 --bind 127.0.0.1
+       http://127.0.0.1:4174/tools/preview-catalogo-margem.html?theme=dark
+     custo=1 digita um custo no card sem custo, disparando o "change" e o save.
+     imposto=1 muda o imposto para 10% (recálculo só no navegador).
+     Fora do deploy (tools/). -->
+<html lang="pt-BR"><head><meta charset="utf-8">
+<style>html,body{margin:0;background:#888}iframe{border:0;display:block;width:900px;height:1500px}</style>
+</head>
+<body>
+<iframe id="f" src="../index.html"></iframe>
+<script>
+const p = new URLSearchParams(location.search);
+
+const CATALOGO = {
+  unreadCount: 0,
+  items: [
+    { id: 1, ml_item_id: 'MLB4211000011', status: 'winning', current_price: 120, price_to_win: null,
+      item_title: 'Kit 4 Sacos Coletor Xiaomi X20+', item_thumbnail: null, is_read: true, updated_at: new Date().toISOString(),
+      permalink: 'https://produto.mercadolivre.com.br/MLB-4211000011', seller_sku: 'KIT-4-SACOS' },
+    { id: 2, ml_item_id: 'MLB4211000022', status: 'winning', current_price: 42.9, price_to_win: null,
+      item_title: 'Escova Lateral Robô Aspirador (sem custo ainda)', item_thumbnail: null, is_read: true, updated_at: new Date().toISOString(),
+      permalink: null, seller_sku: null },
+    { id: 3, ml_item_id: 'MLB4211000033', status: 'competing', current_price: 59.99, price_to_win: 54.9,
+      item_title: 'Filtro Saco Base (perdendo)', item_thumbnail: null, is_read: true, updated_at: new Date().toISOString(),
+      permalink: 'https://produto.mercadolivre.com.br/MLB-4211000033', seller_sku: 'FILTRO-BASE' },
+    { id: 4, ml_item_id: 'MLB4211000044', status: 'winning', current_price: 15, price_to_win: null,
+      item_title: 'Item com prejuízo garantido', item_thumbnail: null, is_read: true, updated_at: new Date().toISOString(),
+      permalink: null, seller_sku: null },
+  ],
+};
+// MLB1: comissão e frete REAIS (de vendas). MLB2: nenhum dos dois vendeu —
+// tudo estimado ("tabela"), pra conferir o rótulo "(estimado)" na tela.
+const MARGEM = {
+  itens: [
+    { mlItemId: 'MLB4211000011', titulo: 'Kit 4 Sacos Coletor Xiaomi X20+', thumbnail: null, preco: 120,
+      comissaoUn: 19.2, comissaoFonte: 'vendas', freteUn: 7.35, freteFonte: 'vendas', adsUn: 15, temAds: true },
+    { mlItemId: 'MLB4211000022', titulo: 'Escova Lateral', thumbnail: null, preco: 42.9,
+      comissaoUn: 6.86, comissaoFonte: 'tabela', freteUn: 14.9, freteFonte: 'tabela', adsUn: null, temAds: false },
+    { mlItemId: 'MLB4211000044', titulo: 'Item com prejuízo garantido', thumbnail: null, preco: 15,
+      comissaoUn: 5, comissaoFonte: 'vendas', freteUn: 8, freteFonte: 'vendas', adsUn: null, temAds: false },
+  ],
+  cortado: false,
+};
+// MLB4211000044 sempre dá prejuízo (15 - 5 - 8 - imposto - 10 < 0) — garante
+// que a aba Prejuízo tenha conteúdo mesmo sem o parâmetro custo=1.
+const CUSTOS = { MLB4211000011: 12, MLB4211000044: 10 };
+
+const f = document.getElementById('f');
+f.addEventListener('load', () => setTimeout(async () => {
+  const w = f.contentWindow, d = f.contentDocument;
+  d.documentElement.setAttribute('data-theme', p.get('theme') || 'light');
+  try { w.localStorage.removeItem('impoclick-catalog-margem'); } catch (e) { /* ok */ }
+  w.eval('state.currentUser = { id: "u1", name: "Teste", is_pro: true, access_token: "x" };');
+  const chamadas = [];
+  w.mlApiFetch = async (path) => {
+    chamadas.push(path);
+    if (/resource=catalog-margem/.test(path)) return JSON.parse(JSON.stringify(MARGEM));
+    if (/resource=catalog/.test(path)) return JSON.parse(JSON.stringify(CATALOGO));
+    return null;
+  };
+  const salvos = [];
+  const salvosImposto = [];
+  // Espelha o comportamento real: getAdsMargemDados relê do banco, então tem
+  // que refletir o que já foi salvo (custo, imposto) nesta sessão.
+  const custosAoVivo = { ...CUSTOS };
+  let impostoAoVivo = 6;
+  w.db.getAdsMargemDados = async () => ({ dados: { custos: { ...custosAoVivo }, impostoPct: impostoAoVivo } });
+  w.db.saveItemCost = async (id, v) => { salvos.push([id, v]); custosAoVivo[id] = v; return { ok: true }; };
+  w.db.saveAdsTax = async (pct) => { salvosImposto.push(pct); impostoAoVivo = pct; return { ok: true }; };
+
+  d.documentElement.classList.add('has-session');
+  const lp = d.getElementById('landing-container'); if (lp) lp.style.display = 'none';
+  for (const id of ['auth-container', 'paywall-screen']) { const el = d.getElementById(id); if (el) el.classList.add('hidden'); }
+  const shell = d.querySelector('.app-container'); if (shell) shell.classList.remove('hidden');
+
+  d.querySelector('[data-view="view-catalog"]').click();
+  await new Promise((r) => setTimeout(r, 500));
+  d.getElementById('btn-catalog-margem').click();
+  await new Promise((r) => setTimeout(r, 600));
+
+  if (p.get('custo')) {
+    const campo = d.getElementById('catalog-custo-MLB4211000022');
+    campo.value = '25.5';
+    campo.dispatchEvent(new w.Event('change', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 200));
+  }
+
+  const impostoAntes = d.getElementById('catalog-imposto-pct').value;
+  if (p.get('imposto')) {
+    const campo = d.getElementById('catalog-imposto-pct');
+    campo.value = '10';
+    campo.dispatchEvent(new w.Event('change', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 150));
+  }
+
+  d.getElementById('catalog-tab-btn-prejuizo').click();
+  await new Promise((r) => setTimeout(r, 150));
+
+  w.scrollTo(0, 0);
+  const cards = [...d.querySelectorAll('#catalog-list-winning .catalog-margem')];
+  const linkTitulo = d.querySelector('#catalog-list-winning a.item-card-title-link');
+  const semLinkTitulo = [...d.querySelectorAll('#catalog-list-winning strong')].find((s) => /Escova Lateral/.test(s.textContent));
+  const semCheckboxDeFrete = !d.getElementById('catalog-sempre-frete-gratis');
+  const cardsPrejuizo = [...d.querySelectorAll('#catalog-list-prejuizo .card')];
+  document.title = JSON.stringify({
+    chamouMargem: chamadas.some((c) => /catalog-margem/.test(c)),
+    status: (d.getElementById('catalog-margem-status') || {}).textContent,
+    blocos: cards.length,
+    resultados: cards.map((c) => (c.querySelector('p:nth-of-type(1)') || {}).textContent),
+    detalhes: cards.map((c) => (c.querySelector('p:nth-of-type(2)') || {}).textContent),
+    salvos,
+    impostoAntes,
+    tituloVirouLink: linkTitulo ? linkTitulo.getAttribute('href') : null,
+    itemSemPermalinkContinuaTexto: !!semLinkTitulo,
+    skuNoCard: (d.querySelector('#catalog-list-winning .card')?.textContent.includes('SKU: KIT-4-SACOS')) || false,
+    salvosImposto,
+    semCheckboxDeFrete,
+    prejuizoBadge: (d.getElementById('catalog-prejuizo-badge') || {}).textContent,
+    prejuizoBadgeEscondido: (d.getElementById('catalog-prejuizo-badge') || {}).classList?.contains('hidden'),
+    prejuizoResumo: (d.getElementById('catalog-prejuizo-resumo') || {}).textContent.replace(/\s+/g, ' ').trim(),
+    prejuizoCards: cardsPrejuizo.length,
+    prejuizoTitulos: cardsPrejuizo.map((c) => (c.querySelector('.item-card-title-group') || {}).textContent.replace(/\s+/g, ' ').trim()),
+  });
+}, 1200));
+</script>
+</body></html>

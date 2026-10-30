@@ -1,0 +1,30 @@
+{
+	"folders": [
+		{
+			"name": "ECOMMERCE",
+			"path": "../../ECOMMERCE"
+		},
+		{
+			"name": "AUTAMAÇÃO ANUNCIOS",
+			"path": "../../AUTAMAÇÃO ANUNCIOS"
+		},
+		{
+			"name": "SITE DESCONTOS",
+			"path": "../../SITE DESCONTOS"
+		},
+		{
+			"name": "IMPOCLICK",
+			"path": ".."
+		},
+		{
+			"name": "Consultório Cibelle",
+			"path": "../../Consultório Cibelle"
+		},
+		{
+			"path": "../../../Documents/ChatGPT/Teste scripst"
+		}
+	],
+	"settings": {
+		"liveServer.settings.multiRootWorkspaceName": "IMPOCLICK"
+	}
+}

@@ -1,0 +1,7 @@
+/* Aviso de conta do Mercado Livre não conectada (ml-conexao.js), no topo das
+   abas do Mercado Livre. Só espaçamento: cor e tipografia vêm do Alert, e a
+   distância até o bloco de baixo é o gap do .view-panel. */
+
+.ml-conexao__texto { margin: 0; }
+
+.ml-conexao__acao { margin-top: var(--space-3); }

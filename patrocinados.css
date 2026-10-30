@@ -1,0 +1,621 @@
+/* Painel de Patrocinados (patrocinados.js). Só layout: cor, tipografia e raio
+   vêm dos componentes do design system e dos tokens. Medidas fixas são
+   métricas de layout, comentadas. */
+
+/* Sem conexão com o Mercado Livre a raiz fica vazia (o aviso de
+   ml-conexao.js explica), e não pode somar mais um gap do .view-panel. */
+#ads-painel-raiz:empty { display: none; }
+
+/* Cores dos gráficos, tiradas das escalas do design system e conferidas no
+   validador de paleta (daltonismo, contraste e brilho) nos dois temas:
+   - lucro/prejuízo: aqua × laranja. Nunca verde × vermelho, o par que quem
+     tem daltonismo não separa. O sinal "−" e o valor escrito ao lado de cada
+     barra garantem que a cor nunca seja a única pista.
+   - custo e preço: cinzas. O que sai do preço é neutro; só o resultado tem cor.
+   No escuro, aqua-500 fica claro demais e aqua-600 apagado demais sobre o
+   fundo: o tom entre os dois (70/30) é o que passa. */
+.pa {
+  --pa-lucro: var(--aqua-500);
+  --pa-prejuizo: var(--orange-600);
+  --pa-custo: var(--ink-500);
+  --pa-preco: var(--ink-300);
+
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  margin-bottom: var(--space-6);
+}
+
+[data-theme="dark"] .pa {
+  --pa-lucro: color-mix(in srgb, var(--aqua-500) 70%, var(--aqua-600));
+  --pa-custo: var(--ink-600);
+  --pa-preco: var(--ink-700);
+}
+
+.pa-topo {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.pa-h {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--text-title-md);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-tight);
+  color: var(--text-title);
+}
+
+.pa-h3 {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  color: var(--text-title);
+}
+
+/* Título de bloco dentro do anúncio aberto: pequeno e em caixa alta, para
+   não competir com os números. */
+.pa-h4 {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.pa-sub {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.pa-texto {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+  color: var(--text-muted);
+}
+
+.pa-texto--acao { color: var(--text-body); }
+
+.pa-nota {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-caption);
+  line-height: var(--leading-relaxed);
+  color: var(--text-muted);
+}
+
+/* Valor com sinal: a cor reforça o "−", nunca o substitui. */
+.pa-ruim { color: var(--danger); }
+.pa-bom { color: var(--success); }
+
+/* ── Premissas (recolhidas) ─────────────────────────────────────────── */
+
+.pa-premissas-box {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  background: var(--surface-card);
+  padding: var(--space-3) var(--space-5);
+}
+
+.pa-premissas-box summary {
+  cursor: pointer;
+  font-size: var(--text-sm);
+  color: var(--text-body);
+}
+
+.pa-premissas-box[open] summary { margin-bottom: var(--space-4); }
+
+.pa-premissas {
+  display: flex;
+  gap: var(--space-5);
+  flex-wrap: wrap;
+}
+
+/* Métrica: 260px por premissa, o tamanho da dica numa linha e meia. */
+.pa-premissa { width: 260px; }
+
+/* ── Números do topo ────────────────────────────────────────────────── */
+
+/* Métrica: 210px por número — cabe "R$ 123.456,78" e a nota em duas linhas. */
+.pa-numeros {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: var(--space-4);
+}
+
+/* ── Gráfico: resultado de cada anúncio ─────────────────────────────── */
+
+.pa-legenda {
+  display: flex;
+  gap: var(--space-4);
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-caption);
+  color: var(--text-muted);
+}
+
+.pa-legenda li { display: flex; align-items: center; gap: var(--space-2); }
+
+/* Métrica: 10px, a amostra de cor da legenda. */
+.pa-legenda i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.pa-legenda i.is-lucro { background: var(--pa-lucro); }
+.pa-legenda i.is-prejuizo { background: var(--pa-prejuizo); }
+
+.pa-grafico {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: var(--space-4) 0 var(--space-2);
+}
+
+/* Métricas: nome em até 280px, valor em 110px ("−R$ 12.345,67"); a barra
+   fica com o resto. */
+.pa-grafico__linha {
+  display: grid;
+  grid-template-columns: minmax(0, 280px) minmax(0, 1fr) 110px;
+  gap: var(--space-4);
+  align-items: center;
+  width: 100%;
+  padding: 6px var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pa-grafico__linha:hover { background: var(--surface-raised); }
+
+.pa-grafico__linha:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.pa-grafico__nome {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--text-sm);
+  color: var(--text-body);
+}
+
+/* Métrica: 14px, a espessura da barra — fina, para 10 linhas caberem. */
+.pa-grafico__trilho {
+  position: relative;
+  height: 14px;
+}
+
+/* A linha do zero passa do trilho para emendar com a da linha vizinha. */
+.pa-grafico__zero {
+  position: absolute;
+  top: -8px;
+  bottom: -8px;
+  width: 1px;
+  background: var(--border-strong);
+}
+
+/* Ponta arredondada só do lado do valor; o lado do zero fica reto. */
+.pa-grafico__barra {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+
+.pa-grafico__barra.is-lucro { background: var(--pa-lucro); border-radius: 0 4px 4px 0; }
+.pa-grafico__barra.is-prejuizo { background: var(--pa-prejuizo); border-radius: 4px 0 0 4px; }
+
+.pa-grafico__valor {
+  text-align: right;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-title);
+}
+
+@media (max-width: 700px) {
+  .pa-grafico__linha { grid-template-columns: minmax(0, 1fr) 96px; row-gap: var(--space-1); }
+  .pa-grafico__nome { grid-column: 1 / -1; }
+}
+
+/* ── O que fazer ────────────────────────────────────────────────────── */
+
+.pa-acoes {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.pa-acoes li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: start;
+}
+
+.pa-acoes__titulo {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--text-title);
+}
+
+.pa-acoes__onde {
+  font-weight: var(--weight-regular);
+  color: var(--text-muted);
+}
+
+/* ── Campanhas ──────────────────────────────────────────────────────── */
+
+/* Métrica: 320px por campanha, o mínimo para a barra de competitividade e as
+   quatro métricas em duas colunas. */
+.pa-campanhas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.pa-kv {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3) var(--space-4);
+  margin: var(--space-3) 0 0;
+}
+
+.pa-kv dt {
+  font-size: var(--text-caption);
+  color: var(--text-muted);
+}
+
+.pa-kv dd {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--text-title);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Barra de competitividade: ganhas, perdidas por orçamento e por ranking
+   somam 100% das oportunidades (documentação do Mercado Ads). */
+.pa-compet { margin-top: var(--space-4); }
+
+.pa-compet__barra {
+  display: flex;
+  height: 8px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--surface-inset);
+}
+
+.pa-compet__barra span { display: block; height: 100%; }
+
+.pa-compet__ganhas { background: var(--chart-1); }
+.pa-compet__orcamento { background: var(--chart-2); }
+.pa-compet__ranking { background: var(--chart-5); }
+
+.pa-compet__legenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-caption);
+  color: var(--text-muted);
+}
+
+.pa-compet__legenda li { display: flex; align-items: center; gap: var(--space-1); }
+
+/* Métrica: 8px, a amostra de cor da legenda. */
+.pa-compet__legenda i {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-circle);
+}
+
+.pa-diag {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.pa-campanhas .pa-diag { margin-top: var(--space-4); }
+
+.pa-diag__topo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  font-size: var(--text-sm);
+  color: var(--text-title);
+}
+
+/* ── Lista de anúncios ──────────────────────────────────────────────── */
+
+.pa-lista-legenda { margin: 0 0 var(--space-3); max-width: 90ch; }
+
+.pa-lista {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  background: var(--surface-card);
+  overflow: hidden;
+}
+
+.pa-anuncio { border-top: 1px solid var(--border-subtle); }
+
+.pa-anuncio.is-aberto { background: var(--surface-raised); }
+
+/* Métricas das colunas: produto flexível; custo 132px (o campo); três
+   números de 116px ("−R$ 12.345,67" e "23,6%"); situação 118px (o maior selo,
+   "Oportunidade") e botão 32px. Larguras fixas porque cada linha é uma grade
+   própria: com "auto", as colunas de uma linha sairiam do alinhamento das
+   outras e do cabeçalho. */
+.pa-linha {
+  display: grid;
+  grid-template-columns: minmax(190px, 1fr) 124px repeat(4, 116px) 118px 32px;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
+}
+
+.pa-anuncio:not(.is-aberto) .pa-linha:hover { background: var(--surface-raised); }
+
+.pa-linha--cabecalho {
+  padding-top: var(--space-2);
+  padding-bottom: var(--space-2);
+  background: var(--surface-raised);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.pa-cel {
+  min-width: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-title);
+}
+
+.pa-cel.pa-ruim { color: var(--danger); }
+.pa-cel.pa-bom { color: var(--success); }
+
+.pa-dir { text-align: right; }
+
+.pa-produto {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+/* Métrica: 40px, a miniatura do anúncio. */
+.pa-foto {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  background: var(--surface-inset);
+}
+
+.pa-produto__titulo {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--text-title);
+  text-decoration: none;
+}
+
+.pa-produto__titulo:hover { color: var(--accent); }
+
+.pa-produto__sub {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  color: var(--text-muted);
+}
+
+/* Abaixo de 1100px a grade não cabe: some o cabeçalho, cada número ganha o
+   próprio rótulo e o produto ocupa a primeira linha, com o botão ao lado. */
+@media (max-width: 1200px) {
+  .pa-linha {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    row-gap: var(--space-3);
+    /* Espaço do botão, que sai do fluxo para não brigar com o produto. */
+    padding-right: 48px;
+  }
+  /* Depois de .pa-linha, senão o display:flex de cima anula (mesma força). */
+  .pa-lista .pa-linha--cabecalho { display: none; }
+  .pa-linha > .pa-produto { order: 0; flex: 1 1 100%; }
+  .pa-linha > .ic-iconbtn { position: absolute; top: var(--space-3); right: var(--space-3); }
+  .pa-linha > .pa-cel { order: 2; flex: 1 1 42%; min-width: 42%; }
+  .pa-linha > .pa-cel--custo { flex: 1 1 100%; }
+  .pa-cel[data-rotulo]::before {
+    content: attr(data-rotulo);
+    display: block;
+    margin-bottom: 2px;
+    font-size: var(--text-caption);
+    font-weight: var(--weight-regular);
+    color: var(--text-muted);
+  }
+  .pa-dir { text-align: left; }
+}
+
+/* ── Anúncio aberto: a conta ────────────────────────────────────────── */
+
+.pa-detalhe {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: var(--space-6);
+  padding: var(--space-2) var(--space-4) var(--space-5);
+}
+
+@media (max-width: 1000px) {
+  .pa-detalhe { grid-template-columns: minmax(0, 1fr); }
+}
+
+.pa-bloco { min-width: 0; }
+
+.pa-bloco .pa-h4:not(:first-child) { margin-top: var(--space-6); }
+
+.pa-ext {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Métricas: rótulo e barra dividem a largura; valor em 100px. */
+.pa-ext__linha {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) 100px;
+  gap: var(--space-3);
+  align-items: center;
+  padding: 5px 0;
+}
+
+.pa-ext__linha.is-total {
+  margin-top: 2px;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.pa-ext__rotulo {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: var(--text-sm);
+  color: var(--text-body);
+}
+
+.pa-ext__rotulo small {
+  font-size: var(--text-caption);
+  color: var(--text-muted);
+}
+
+.is-total .pa-ext__rotulo {
+  font-weight: var(--weight-semibold);
+  color: var(--text-title);
+}
+
+/* Métrica: 10px, a espessura da barra do extrato. */
+.pa-ext__trilho { height: 10px; }
+
+.pa-ext__barra {
+  display: block;
+  height: 100%;
+  border-radius: 0 4px 4px 0;
+}
+
+.pa-ext__barra.is-preco { background: var(--pa-preco); }
+.pa-ext__barra.is-custo { background: var(--pa-custo); }
+.pa-ext__barra.is-lucro { background: var(--pa-lucro); }
+.pa-ext__barra.is-prejuizo { background: var(--pa-prejuizo); }
+
+.pa-ext__valor {
+  text-align: right;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-title);
+}
+
+.is-total .pa-ext__valor { font-weight: var(--weight-semibold); }
+
+.pa-ext__valor.pa-ruim { color: var(--danger); }
+.pa-ext__valor.pa-bom { color: var(--success); }
+
+.pa-conta {
+  margin-top: var(--space-6);
+  display: flex;
+  flex-direction: column;
+}
+
+.pa-conta__linha {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: 5px 0;
+  font-size: var(--text-sm);
+  color: var(--text-body);
+  font-variant-numeric: tabular-nums;
+}
+
+.pa-conta__linha.is-total {
+  margin-top: 2px;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border-subtle);
+  font-weight: var(--weight-semibold);
+  color: var(--text-title);
+}
+
+.pa-conta__linha > span:last-child { flex: none; text-align: right; }
+
+.pa-frases {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+  color: var(--text-body);
+}
+
+/* ── Boas práticas ──────────────────────────────────────────────────── */
+
+.pa-dicas {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  background: var(--surface-card);
+  padding: var(--space-4) var(--space-5);
+}
+
+.pa-dicas summary {
+  cursor: pointer;
+  font-weight: var(--weight-semibold);
+  color: var(--text-title);
+}
+
+.pa-dicas ul {
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--space-4) var(--space-6);
+}
+
+.pa-dicas strong {
+  font-size: var(--text-sm);
+  color: var(--text-title);
+}

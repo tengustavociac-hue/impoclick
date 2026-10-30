@@ -1,0 +1,42 @@
+<!-- @dsCard group="App" viewport="1440x900" name="Painel do importador" subtitle="Web app completo: painel, importações, embarque, cotação e custos — clicável" -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Impoclick · Painel do importador</title>
+<link rel="stylesheet" href="../../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_runtime/ds-bundle.js"></script>
+<style>html,body,#root{height:100%}body{margin:0;background:var(--surface-page)}</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" src="AppShell.jsx"></script>
+<script type="text/babel" src="DashboardScreen.jsx"></script>
+<script type="text/babel" src="ImportsScreen.jsx"></script>
+<script type="text/babel" src="ShipmentScreen.jsx"></script>
+<script type="text/babel" src="QuoteScreen.jsx"></script>
+<script type="text/babel" src="CostsScreen.jsx"></script>
+<script type="text/babel">
+function App() {
+  const [route, setRoute] = React.useState('painel');
+  const [theme, setTheme] = React.useState('light');
+  React.useEffect(() => { document.documentElement.setAttribute('data-theme', theme); }, [theme]);
+  const screens = {
+    painel: <DashboardScreen setRoute={setRoute} />,
+    importacoes: <ImportsScreen setRoute={setRoute} />,
+    embarque: <ShipmentScreen setRoute={setRoute} />,
+    cotacao: <QuoteScreen />,
+    custos: <CostsScreen />,
+    fornecedores: <ImportsScreen setRoute={setRoute} />,
+    docs: <ShipmentScreen setRoute={setRoute} />,
+  };
+  return <AppShell route={route} setRoute={setRoute} theme={theme} setTheme={setTheme}>{screens[route]}</AppShell>;
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

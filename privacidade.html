@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Política de Privacidade — Impoclick</title>
+<meta name="description" content="Como a extensão e a plataforma Impoclick coletam, usam e protegem os seus dados.">
+<link rel="icon" href="/impoclick_logo.png">
+<style>
+  :root{
+    --bg:#1a150e; --card:rgba(255,255,255,.055); --line:rgba(255,255,255,.10);
+    --text:#f7ecd8; --muted:#b8a888; --faint:#6e6250; --primary:#f5c451;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.7;font-size:16px}
+  .wrap{max-width:780px;margin:0 auto;padding:48px 24px 96px}
+  header{border-bottom:1px solid var(--line);padding-bottom:24px;margin-bottom:40px}
+  a{color:var(--primary)}
+  h1{font-size:30px;line-height:1.25;margin:0 0 8px}
+  h2{font-size:19px;margin:40px 0 12px;color:var(--primary)}
+  h3{font-size:16px;margin:24px 0 8px}
+  p,li{color:var(--text)}
+  .meta{color:var(--faint);font-size:14px;margin:0}
+  ul{padding-left:20px}
+  li{margin-bottom:8px}
+  table{width:100%;border-collapse:collapse;margin:16px 0;font-size:15px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted);font-weight:600}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px 24px;margin:24px 0}
+  .card p:last-child{margin-bottom:0}
+  footer{margin-top:56px;padding-top:24px;border-top:1px solid var(--line);color:var(--faint);font-size:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Política de Privacidade</h1>
+  <p class="meta">Impoclick — plataforma web e extensão para Chrome · Última atualização: 14 de setembro de 2026</p>
+</header>
+
+<p>Esta política explica quais dados o Impoclick coleta, para que eles são usados e quais são os seus direitos. Ela vale tanto para o site <a href="https://www.impoclick.com.br">impoclick.com.br</a> quanto para a extensão <strong>Impoclick — Viabilidade no Mercado Livre</strong>.</p>
+
+<div class="card">
+  <p><strong>Resumo:</strong> coletamos apenas o necessário para autenticar você e calcular a viabilidade dos produtos. <strong>Não vendemos seus dados</strong>, não os compartilhamos com terceiros para publicidade e não usamos seus dados para nenhuma finalidade alheia à função principal do produto.</p>
+</div>
+
+<h2>1. Quem é o controlador dos dados</h2>
+<p>O Impoclick é o controlador dos dados tratados por este serviço. Para qualquer assunto relacionado a privacidade, o contato é <a href="mailto:contato@impoclick.com.br">contato@impoclick.com.br</a>.</p>
+
+<h2>2. Dados que coletamos</h2>
+<table>
+  <tr><th>Dado</th><th>Quando é coletado</th><th>Para quê</th></tr>
+  <tr>
+    <td>E-mail e senha</td>
+    <td>No cadastro e no login</td>
+    <td>Autenticar você e vincular a extensão à sua conta do Impoclick</td>
+  </tr>
+  <tr>
+    <td>Token de sessão</td>
+    <td>Após o login bem-sucedido</td>
+    <td>Manter você conectado sem pedir a senha a cada uso</td>
+  </tr>
+  <tr>
+    <td>Dados de produtos e custos que você cadastra</td>
+    <td>Quando você usa a plataforma</td>
+    <td>Calcular custo de importação, margem e viabilidade de venda</td>
+  </tr>
+  <tr>
+    <td>Identificador e preço do anúncio do Mercado Livre que você está visitando</td>
+    <td>Quando você abre uma página de anúncio com a extensão ativa</td>
+    <td>Comparar o preço do anúncio com os seus custos e exibir o resultado na tela</td>
+  </tr>
+</table>
+
+<h3>O que a extensão <em>não</em> faz</h3>
+<ul>
+  <li>Não lê páginas fora dos domínios do Mercado Livre (<code>mercadolivre.com.br</code> e <code>mercadolibre.com</code>).</li>
+  <li>Não coleta histórico de navegação, cookies de terceiros, localização, contatos, dados financeiros de pagamento nem conteúdo de formulários de outros sites.</li>
+  <li>Não executa código remoto: todo o código da extensão está contido no pacote publicado na Chrome Web Store.</li>
+</ul>
+
+<h2>3. Como usamos os dados</h2>
+<p>Os dados são usados exclusivamente para operar o serviço: autenticar seu acesso, salvar seus cálculos, exibir a análise de viabilidade nos anúncios e dar suporte quando você solicita. Não fazemos perfilamento publicitário, não vendemos nem transferimos dados a corretores de dados, e não usamos os dados para avaliar crédito ou conceder empréstimos.</p>
+
+<h2>4. Onde os dados ficam</h2>
+<ul>
+  <li><strong>No seu navegador:</strong> o token de sessão é guardado localmente via <code>chrome.storage.local</code>, acessível apenas pela própria extensão. Ele é apagado quando você sai da conta ou remove a extensão.</li>
+  <li><strong>Nos nossos servidores:</strong> conta e dados cadastrados ficam no Supabase (infraestrutura de banco de dados e autenticação) e as funções da API rodam na Vercel. Ambos atuam como operadores, sob contrato, processando dados apenas em nosso nome.</li>
+  <li><strong>Mercado Livre:</strong> consultas públicas de anúncios, frete e categorias são feitas às APIs oficiais do Mercado Livre. Nenhum dado pessoal seu é enviado nessas consultas.</li>
+</ul>
+
+<h2>5. Compartilhamento com terceiros</h2>
+<p>Não comercializamos dados pessoais. O compartilhamento ocorre apenas com os operadores de infraestrutura citados acima, com processadores de pagamento quando você contrata um plano, e quando houver obrigação legal ou ordem judicial.</p>
+
+<h2>6. Retenção e exclusão</h2>
+<p>Mantemos seus dados enquanto a sua conta existir. Você pode pedir a exclusão da conta e de todos os dados associados a qualquer momento por <a href="mailto:contato@impoclick.com.br">contato@impoclick.com.br</a>; o atendimento ocorre em até 15 dias. Desinstalar a extensão apaga imediatamente os dados guardados no navegador, mas não exclui a sua conta na plataforma.</p>
+
+<h2>7. Segurança</h2>
+<p>Todo o tráfego usa HTTPS. Senhas são armazenadas com hash pelo provedor de autenticação — nunca em texto puro. O acesso à API exige token válido e o servidor restringe cada usuário aos próprios dados.</p>
+
+<h2>8. Seus direitos (LGPD)</h2>
+<p>Conforme a Lei nº 13.709/2018, você pode solicitar confirmação de tratamento, acesso, correção, anonimização, portabilidade, exclusão dos dados e revogação do consentimento. Basta escrever para <a href="mailto:contato@impoclick.com.br">contato@impoclick.com.br</a>.</p>
+
+<h2>9. Crianças</h2>
+<p>O serviço é destinado a maiores de 18 anos e não é direcionado a crianças ou adolescentes.</p>
+
+<h2>10. Alterações nesta política</h2>
+<p>Mudanças relevantes serão publicadas nesta página com a data de atualização revisada. O uso continuado do serviço após a publicação implica concordância com a versão vigente.</p>
+
+<footer>
+  Impoclick · <a href="https://www.impoclick.com.br">impoclick.com.br</a> · <a href="mailto:contato@impoclick.com.br">contato@impoclick.com.br</a>
+</footer>
+
+</div>
+</body>
+</html>

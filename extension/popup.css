@@ -1,125 +1,264 @@
-* {
-    box-sizing: border-box;
+/* Popup da extensão.
+   Paleta alinhada ao site (dourado sobre creme), mas com hierarquia própria:
+   aqui o que importa é bater o olho e saber se há algo pendente. */
+
+/* Os apelidos ficam em .impoclick-page, e não em :root, porque os tokens do
+   design system são escopados ali (ver extension/ds-tokens.css): a extensão não
+   pode declarar variável em :root, senão elas vazam para a página do ML. */
+.impoclick-page {
+    --dourado: var(--accent);
+    --dourado-escuro: var(--accent-hover);
+    --texto: var(--text-title);
+    --texto-fraco: var(--text-muted);
+    --borda: var(--border-subtle);
+    --fundo: var(--surface-page);
+    --fundo-linha: var(--surface-raised);
+    --alerta: var(--danger);
+    --ok: var(--success);
 }
 
+* { box-sizing: border-box; }
+
 body {
+    width: 268px;
     margin: 0;
-    width: 260px;
-    font-family: 'Segoe UI', Arial, sans-serif;
-    background: #fffaf0;
-    color: #1f2937;
+    font-family: var(--font-sans);
+    background: var(--fundo);
+    color: var(--texto);
+    font-size: 13px;
 }
 
 .header {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 14px 16px;
-    background: linear-gradient(135deg, #ffd873 0%, #b8860b 100%);
+    gap: 0.5rem;
+    padding: 0.7rem 0.9rem;
+    background: var(--accent);
+    color: var(--text-on-accent);
 }
 
-.brand {
-    font-size: 15px;
+.brand { font-weight: 800; font-size: 0.95rem; }
+
+.view { padding: 0.9rem; }
+.hidden { display: none !important; }
+
+.user-name {
+    margin: 0 0 0.75rem;
+    font-weight: 700;
+    font-size: 0.95rem;
+}
+
+/* Identifica que as linhas abaixo (Avaliações, Catálogo, Promoções,
+   Patrocinados) leem dados da conta do Mercado Livre conectada, não do
+   Impoclick em si. */
+.rotulo-secao {
+    margin: 0 0 0.4rem;
+    font-size: 0.68rem;
     font-weight: 800;
-    color: #1a1305;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--texto-fraco);
 }
 
-.view {
-    padding: 16px;
+/* ── Linhas de status ─────────────────────────────────────────────────── */
+
+.rows {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--borda);
+    border-radius: 10px;
+    overflow: hidden;
 }
 
-.hidden {
-    display: none;
+.row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.6rem 0.7rem;
+    text-decoration: none;
+    color: var(--texto);
+    border-bottom: 1px solid var(--borda);
+    transition: background-color 0.12s ease;
 }
 
-.muted {
-    font-size: 12.5px;
-    color: #6b7280;
-    margin: 0 0 10px;
+.row:last-child { border-bottom: none; }
+.row:hover { background: var(--fundo-linha); }
+
+.row svg {
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+    fill: none;
+    stroke: var(--dourado-escuro);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
+
+.row-nome { flex: 1; font-weight: 600; }
+
+/* O estado é o dado principal da linha: número quando há pendência, traço
+   discreto quando não há. Frase inteira ("Nenhuma avaliação nova") ocupava
+   duas linhas para dizer o mesmo. */
+.row-estado {
+    font-weight: 800;
+    font-size: 0.8rem;
+    min-width: 20px;
+    text-align: right;
+    color: var(--texto-fraco);
+}
+
+.row-estado.tem-alerta {
+    color: var(--ink-0);
+    background: var(--alerta);
+    border-radius: 999px;
+    padding: 0.05rem 0.4rem;
+    min-width: auto;
+}
+
+.row-estado.tudo-certo { color: var(--ok); }
+.row-estado.falhou { color: var(--alerta); font-size: 0.72rem; font-weight: 700; }
+
+/* ── Atalhos de promoção ──────────────────────────────────────────────── */
+
+/* Escondidos na caixa do popup por pedido do usuário. O cálculo de cada
+   contagem em popup.js (atualizarAtalhosPromo) continua rodando — só a caixa
+   não aparece. Tirar esta regra para voltar a exibi-los. */
+#promo-atalhos { display: none !important; }
+
+.atalhos {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    margin-top: 0.6rem;
+    padding: 0.55rem 0.7rem;
+    border: 1px solid var(--borda);
+    border-radius: 10px;
+    background: var(--fundo-linha);
+}
+
+.atalhos a {
+    color: var(--dourado-escuro);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.78rem;
+}
+
+.atalhos a:hover { text-decoration: underline; }
+
+/* ── Rodapé ───────────────────────────────────────────────────────────── */
+
+.hint {
+    margin: 0.8rem 0 0;
+    font-size: 0.75rem;
+    line-height: 1.45;
+    color: var(--texto-fraco);
+}
+
+.link-sair {
+    margin-top: 0.7rem;
+    padding: 0;
+    background: none;
+    border: none;
+    color: var(--texto-fraco);
+    font-size: 0.78rem;
+    font-family: inherit;
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.link-sair:hover { color: var(--texto); }
+
+/* ── Login ────────────────────────────────────────────────────────────── */
 
 label {
     display: block;
-    font-size: 11px;
-    font-weight: 600;
-    color: #6b7280;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    margin-bottom: 4px;
+    margin-bottom: 0.2rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--texto-fraco);
 }
 
 input {
-    display: block;
     width: 100%;
-    padding: 8px 10px;
-    font-size: 13px;
-    border: 1px solid #e5d9b6;
+    padding: 0.5rem 0.6rem;
+    margin-bottom: 0.6rem;
+    border: 1px solid var(--borda);
     border-radius: 8px;
-    background: #ffffff;
-    color: #1f2937;
-    margin-bottom: 12px;
+    font-size: 0.85rem;
+    font-family: inherit;
+    background: var(--ink-0);
+    color: var(--texto);
 }
 
 input:focus {
-    outline: none;
-    border-color: #b8860b;
+    outline: 2px solid var(--dourado);
+    outline-offset: -1px;
 }
 
 .btn {
-    display: block;
     width: 100%;
-    padding: 9px 10px;
-    font-size: 13px;
-    font-weight: 700;
-    color: #1a1305;
-    background: linear-gradient(135deg, #ffd873 0%, #b8860b 100%);
+    padding: 0.55rem;
     border: none;
     border-radius: 8px;
+    background: var(--accent);
+    color: var(--text-on-accent);
+    font-weight: 700;
+    font-size: 0.85rem;
+    font-family: inherit;
     cursor: pointer;
 }
 
-.btn:hover {
-    filter: brightness(1.05);
-}
-
-.btn-secondary {
-    background: #f3f4f6;
-    color: #374151;
-    margin-top: 12px;
-}
+.btn:hover { filter: brightness(1.05); }
 
 .error {
-    font-size: 12px;
-    color: #b91c1c;
-    margin-top: 8px;
+    margin: 0.5rem 0 0;
+    color: var(--alerta);
+    font-size: 0.78rem;
 }
 
-.user-name {
-    font-size: 14px;
-    font-weight: 700;
-    color: #1f2937;
-    margin: 0 0 12px;
+/* Ação principal do popup: leva ao painel de viabilidade na lateral. Fora do
+   Mercado Livre fica apagado — não há anúncio para ler. */
+.btn-painel {
+    margin-top: 0.7rem;
 }
 
-.hint {
-    font-size: 12px;
-    color: #6b7280;
-    line-height: 1.5;
+.btn-painel:disabled {
+    background: var(--fundo-linha);
+    color: var(--texto-fraco);
+    cursor: not-allowed;
+    filter: none;
 }
 
-.promo-quick-links {
+/* Faixa de sessão expirada. Aparece só quando a consulta volta com
+   not_logged_in — ver refresh() no popup.js. */
+.sessao-aviso {
     display: flex;
+    align-items: center;
+    gap: 0.5rem;
     flex-wrap: wrap;
-    gap: 6px 10px;
-    margin-top: 6px;
+    margin: 0 0 0.7rem;
+    padding: 0.5rem 0.6rem;
+    border-radius: 8px;
+    background: var(--warning-soft);
+    color: var(--warning);
+    font-size: 0.78rem;
+    line-height: 1.35;
 }
 
-.promo-quick-links a {
-    font-size: 11.5px;
-    color: #b8860b;
-    text-decoration: none;
+.sessao-aviso button {
+    margin-left: auto;
+    padding: 0.28rem 0.6rem;
+    border: none;
+    border-radius: 999px;
+    background: var(--accent);
+    color: var(--text-on-accent);
+    font-family: inherit;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
 }
 
-.promo-quick-links a:hover {
-    text-decoration: underline;
+.sessao-aviso button:hover {
+    background: var(--accent-hover);
 }

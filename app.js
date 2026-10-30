@@ -28,6 +28,11 @@ let state = {
     ncmCache: {}
 };
 
+// O estado inicial, guardado antes de qualquer mudança. Lote salvo por uma
+// versão antiga pode não ter algum campo; o relatório "Ver" completa com
+// estes valores, e não com o que estiver aberto na calculadora.
+const ESTADO_PADRAO = JSON.parse(JSON.stringify(state));
+
 let editingProductId = null;
 
 // Escapa texto livre digitado pelo usuário (nome/descrição de produto, nome do
@@ -97,15 +102,88 @@ function escapeHtml(value) {
         .replace(/'/g, '&#039;');
 }
 
+// Preenchem um campo do formulário só se ele existir de fato.
+//
+// O bloco de restauração em loadState() tinha ~20 `getElementById(...).value =`
+// seguidos, sem nenhuma guarda. Como tudo roda dentro de um try, bastava UM id
+// renomeado no index.html pra primeira linha a falhar abortar todo o resto: a
+// simulação do usuário voltava pela metade, alguns campos preenchidos e outros
+// no padrão, e o único sinal era uma linha no console. Agora um id faltando
+// custa só aquele campo, e diz qual é.
+function setFieldValue(id, value) {
+    const el = document.getElementById(id);
+    if (!el) {
+        console.warn(`Campo #${id} não existe no HTML — restauração do estado ignorou este valor.`);
+        return;
+    }
+    el.value = value;
+}
+
+function setFieldChecked(id, checked) {
+    const el = document.getElementById(id);
+    if (!el) {
+        console.warn(`Campo #${id} não existe no HTML — restauração do estado ignorou este valor.`);
+        return;
+    }
+    el.checked = !!checked;
+}
+
+// Subgrupos recolhíveis da barra lateral.
+//
+// O estado fica em localStorage e não no banco: é preferência de janela, não
+// dado da conta — e guardar no servidor faria a barra "piscar" no carregamento,
+// enquanto a sessão não voltasse.
+const CHAVE_SUBGRUPOS = 'impoclick_subgrupos_abertos';
+
+function lerSubgruposAbertos() {
+    try {
+        return new Set(JSON.parse(localStorage.getItem(CHAVE_SUBGRUPOS) || '[]'));
+    } catch (e) {
+        return new Set();
+    }
+}
+
+function abrirSubgrupo(grupo, abrir) {
+    if (!grupo) return;
+    grupo.classList.toggle('open', abrir);
+
+    const itens = grupo.querySelector('.nav-dropdown-items');
+    if (itens) itens.classList.toggle('hidden', !abrir);
+
+    const botao = grupo.querySelector('.nav-subgroup-toggle');
+    if (botao) botao.setAttribute('aria-expanded', String(abrir));
+
+    const chave = grupo.getAttribute('data-subgroup');
+    if (!chave) return;
+    const abertos = lerSubgruposAbertos();
+    if (abrir) abertos.add(chave); else abertos.delete(chave);
+    try {
+        localStorage.setItem(CHAVE_SUBGRUPOS, JSON.stringify([...abertos]));
+    } catch (e) { /* localStorage bloqueado: a barra segue funcionando, só não lembra */ }
+}
+
+function restaurarSubgrupos() {
+    const abertos = lerSubgruposAbertos();
+    document.querySelectorAll('.nav-dropdown-group[data-subgroup]').forEach(g => {
+        abrirSubgrupo(g, abertos.has(g.getAttribute('data-subgroup')));
+    });
+}
+
 // LOAD PERSISTED STATE
 async function loadState() {
     let savedState = null;
     if (state.currentUser) {
-        try { 
+        try {
             savedState = await window.db.getActiveSimulation();
             state.catalog = await window.db.getCatalog();
             state.company = await window.db.getCompany();
-        } catch(e){}
+        } catch(e){
+            // Este catch era vazio: se a leitura do Supabase falhasse, o app
+            // seguia com catálogo e empresa vazios como se o usuário não
+            // tivesse nada salvo — indistinguível de conta nova. Agora pelo
+            // menos aparece no console.
+            console.error('Falha ao carregar dados salvos do Supabase (catálogo/empresa/simulação):', e);
+        }
     } else {
         state.catalog = [];
         state.company = null;
@@ -126,31 +204,30 @@ async function loadState() {
             state.currentUser = currentAuthUser;
 
             // Populate form elements with saved state
-            document.getElementById('select-currency').value = state.currency;
-            document.getElementById('input-exchange-rate').value = state.exchangeRate;
-            document.getElementById('input-freight').value = state.freight;
-            document.getElementById('freight-in-brl').checked = state.freightInBRL;
-            document.getElementById('input-insurance').value = state.insurance;
-            document.getElementById('insurance-in-brl').checked = state.insuranceInBRL;
-            document.getElementById('input-other-fees').value = state.fees;
-            document.getElementById('fees-in-brl').checked = state.feesInBRL;
-            
+            setFieldValue('select-currency', state.currency);
+            setFieldValue('input-exchange-rate', state.exchangeRate);
+            setFieldValue('input-freight', state.freight);
+            setFieldChecked('freight-in-brl', state.freightInBRL);
+            setFieldValue('input-insurance', state.insurance);
+            setFieldChecked('insurance-in-brl', state.insuranceInBRL);
+            setFieldValue('input-other-fees', state.fees);
+            setFieldChecked('fees-in-brl', state.feesInBRL);
+
             // Tax radio
-            document.querySelector(`input[name="tax-mode"][value="${state.taxMode}"]`).checked = true;
-            if (document.getElementById('select-tax-regime')) {
-                document.getElementById('select-tax-regime').value = state.taxRegime;
-            }
-            document.getElementById('input-custom-ii').value = state.customII;
-            document.getElementById('input-custom-icms').value = state.customICMS;
-            document.getElementById('input-icms-rate').value = state.icmsRate;
-            document.getElementById('input-manual-ii').value = state.manualII;
-            document.getElementById('input-manual-icms').value = state.manualICMS;
-            
+            const taxModeRadio = document.querySelector(`input[name="tax-mode"][value="${state.taxMode}"]`);
+            if (taxModeRadio) taxModeRadio.checked = true;
+            setFieldValue('select-tax-regime', state.taxRegime);
+            setFieldValue('input-custom-ii', state.customII);
+            setFieldValue('input-custom-icms', state.customICMS);
+            setFieldValue('input-icms-rate', state.icmsRate);
+            setFieldValue('input-manual-ii', state.manualII);
+            setFieldValue('input-manual-icms', state.manualICMS);
+
             // Splits
-            document.getElementById('select-freight-split').value = state.freightSplit;
-            document.getElementById('select-insurance-split').value = state.insuranceSplit;
-            document.getElementById('select-fees-split').value = state.feesSplit;
-            document.getElementById('select-tax-split').value = state.taxSplit;
+            setFieldValue('select-freight-split', state.freightSplit);
+            setFieldValue('select-insurance-split', state.insuranceSplit);
+            setFieldValue('select-fees-split', state.feesSplit);
+            setFieldValue('select-tax-split', state.taxSplit);
 
             const customRates = document.getElementById('custom-tax-rates');
             const icmsRateGroup = document.getElementById('icms-rate-group');
@@ -164,10 +241,10 @@ async function loadState() {
 
  
             // New fields
-            document.getElementById('input-spread').value = state.spread !== undefined ? state.spread : 4.0;
-            document.getElementById('input-iof').value = state.iof !== undefined ? state.iof : 2.38;
-            document.getElementById('toggle-resale-mode').checked = state.resaleMode || false;
-            document.getElementById('input-global-margin').value = state.globalMargin !== undefined ? state.globalMargin : 40;
+            setFieldValue('input-spread', state.spread !== undefined ? state.spread : 4.0);
+            setFieldValue('input-iof', state.iof !== undefined ? state.iof : 2.38);
+            setFieldChecked('toggle-resale-mode', state.resaleMode || false);
+            setFieldValue('input-global-margin', state.globalMargin !== undefined ? state.globalMargin : 40);
  
             // Load exchange mode selection
             state.exchangeMode = parsed.exchangeMode || 'simple';
@@ -177,10 +254,8 @@ async function loadState() {
             }
  
             const configFields = document.getElementById('resale-config-fields');
-            if (state.resaleMode) {
-                configFields.classList.remove('hidden');
-            } else {
-                configFields.classList.add('hidden');
+            if (configFields) {
+                configFields.classList.toggle('hidden', !state.resaleMode);
             }
         } catch (e) {
             console.error('Erro ao ler estado do localStorage', e);
@@ -325,8 +400,8 @@ function drawSparkline(container, data) {
     const lastVal = data[data.length - 1];
     const isDown = lastVal < firstVal;
     const color = isDown ? 'var(--success)' : 'var(--danger)';
-    const gradStart = isDown ? 'rgba(16, 185, 129, 0.25)' : 'rgba(239, 68, 68, 0.25)';
-    const gradEnd = isDown ? 'rgba(16, 185, 129, 0.0)' : 'rgba(239, 68, 68, 0.0)';
+    const gradStart = `color-mix(in oklab, ${color} 25%, transparent)`;
+    const gradEnd = 'transparent';
     
     const svgId = `spark-grad-${Math.random().toString(36).substr(2, 5)}`;
     
@@ -360,6 +435,24 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (btnSettings) btnSettings.click();
         }, 500);
     }
+    if (urlParams.has('shopee_connected')) {
+        const ok = urlParams.get('shopee_connected') === 'true';
+        showToast(ok ? 'Conta da Shopee conectada com sucesso!' : 'Não foi possível conectar a conta da Shopee.', ok ? 'success' : 'error');
+        window.history.replaceState({}, document.title, window.location.pathname);
+        setTimeout(() => {
+            const btnSettings = document.querySelector('[data-view="view-settings"]');
+            if (btnSettings) btnSettings.click();
+        }, 500);
+    }
+    if (urlParams.has('amazon_ads_connected')) {
+        const ok = urlParams.get('amazon_ads_connected') === 'true';
+        showToast(ok ? 'Anúncios da Amazon conectados com sucesso!' : 'Não foi possível conectar os anúncios da Amazon.', ok ? 'success' : 'error');
+        window.history.replaceState({}, document.title, window.location.pathname);
+        setTimeout(() => {
+            const btnSettings = document.querySelector('[data-view="view-settings"]');
+            if (btnSettings) btnSettings.click();
+        }, 500);
+    }
     if (window.location.hash === '#view-reviews') {
         setTimeout(() => {
             const btnReviews = document.querySelector('[data-view="view-reviews"]');
@@ -386,8 +479,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }, 500);
     }
-    // Aceita link direto pra uma sub-aba específica: #view-promotions/soon,
-    // #view-promotions/ended ou #view-promotions/lightning (senão abre em "active").
+    // Aceita link direto pra uma sub-aba específica: #view-promotions/ended ou
+    // #view-promotions/lightning (senão abre em "active").
     if (window.location.hash.indexOf('#view-promotions') === 0) {
         const subTab = window.location.hash.split('/')[1];
         setTimeout(() => {
@@ -409,6 +502,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         window.history.replaceState({}, document.title, window.location.pathname);
     }
 
+    // Link de "esqueci minha senha": o Supabase já abriu a sessão pelo token
+    // do link, então sem isto a pessoa cairia direto no app sem nunca
+    // escolher a senha nova — e continuaria sem saber qual é.
+    const veioDeRecuperacao = /type=recovery/.test(window.__authRedirectHash || '');
+    if (state.currentUser && veioDeRecuperacao) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    // Link de e-mail vencido ou já usado: o Supabase devolve error_code no
+    // endereço e a pessoa caía no login sem saber o que houve.
+    const linkVencido = /error_code=otp_expired|error=access_denied/.test(window.__authRedirectHash || '');
+
     // Quem chega por link de confirmação/recuperação (ou com #login) espera
     // a tela de login, não a página de apresentação. Se a confirmação deu
     // certo o app abre direto; isso cobre o caso em que ela falhou.
@@ -421,6 +526,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     registerEventListeners();
     registerAuthEventListeners();
     registerSubscriptionEventListeners();
+    if (state.currentUser && veioDeRecuperacao) openRecoveryModal();
+    if (linkVencido) {
+        showAuthAlert(document.getElementById('login-alert'), 'error',
+            'Esse link de e-mail venceu ou já foi usado. Para trocar a senha, peça um novo em "Esqueci minha senha".');
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
     fetchDollarRate();
     preloadOfficialNcmDatabase();
     renderHomeDashboard();
@@ -812,6 +923,648 @@ function registerEventListeners() {
         });
     }
 
+    // ==========================================================
+    // IMPORTAÇÃO POR NF-e (XML)
+    //
+    // A NF-e traz cada item em <det><prod>, com nome, NCM, quantidade e preço
+    // unitário em campos próprios — extração exata, sem heurística e sem IA.
+    // Preço vem em REAIS; o simulador trabalha em dólar, então a conversão usa
+    // a cotação que o usuário informa (a taxa da operação real quase nunca é a
+    // do dia). Peso não existe por item na NF-e, então fica em branco.
+    // ==========================================================
+    const inputNfeXml = document.getElementById('input-nfe-xml');
+    const nfeCambioBox = document.getElementById('nfe-cambio-box');
+    const inputNfeCambio = document.getElementById('input-nfe-cambio');
+    const nfeAchadosEl = document.getElementById('nfe-achados');
+    const btnNfeUsarCotacao = document.getElementById('btn-nfe-usar-cotacao');
+    const btnNfeConfirmar = document.getElementById('btn-nfe-confirmar');
+    const btnNfeCancelar = document.getElementById('btn-nfe-cancelar');
+
+    // Itens lidos das notas, aguardando a cotação para virarem produtos.
+    let itensDaNfe = [];
+
+    // getElementsByTagNameNS('*', ...) em vez de getElementsByTagName: a NF-e
+    // usa o namespace http://www.portalfiscal.inf.br/nfe e alguns emissores
+    // ainda mandam o XML com prefixo. Buscar ignorando o namespace pega os dois.
+    const tagTexto = (el, nome) => {
+        if (!el) return '';
+        const achado = el.getElementsByTagNameNS('*', nome)[0];
+        return achado ? String(achado.textContent || '').trim() : '';
+    };
+
+    // O NCM já define as alíquotas de II/IPI no regime "Importação Formal", via
+    // getProductTaxRates(). O que ele NÃO fazia era acionar as isenções: a
+    // importação marcava tudo como 'taxable', então livro e medicamento vindos
+    // da nota perdiam a imunidade e eram tributados como qualquer produto.
+    //
+    // Livros, jornais e periódicos: imunidade do art. 150, VI, "d" da
+    // Constituição — capítulo 49, posições 4901 a 4904.
+    // Medicamentos: posições 3003 e 3004, isentos de II (o ICMS continua).
+    // Código usado quando o NCM da origem não serve. Precisa existir na tabela,
+    // senão o cálculo do regime formal não teria de onde tirar alíquota.
+    const NCM_PADRAO = '65050099';
+
+    // Diagnóstico do NCM: diz QUAL código falhou e POR QUÊ, em vez de só contar
+    // quantos. NCM errado não quebra a importação — o produto entra com alíquota
+    // genérica e o custo sai errado sem nenhum aviso, que é o pior dos casos.
+    function diagnosticarNcm(bruto) {
+        const digitos = String(bruto == null ? '' : bruto).replace(/\D/g, '');
+
+        if (!digitos) {
+            return { ncm: NCM_PADRAO, problema: 'ausente', bruto: '',
+                explicacao: 'A linha não trouxe nenhum código.' };
+        }
+        if (digitos.length < 8) {
+            return { ncm: NCM_PADRAO, problema: 'incompleto', bruto: digitos,
+                explicacao: `Tem ${digitos.length} dígito(s). O HS Code internacional usa 6 e o NCM brasileiro usa 8 — os dois últimos são classificação nacional, que o fornecedor estrangeiro não tem como preencher.` };
+        }
+        if (digitos.length > 8) {
+            return { ncm: NCM_PADRAO, problema: 'longo', bruto: digitos,
+                explicacao: `Tem ${digitos.length} dígitos, mais que os 8 do NCM. Costuma ser código interno do fornecedor na mesma coluna.` };
+        }
+
+        const achado = (typeof lookupLocalNcm === 'function') ? lookupLocalNcm(digitos) : null;
+        if (!achado) {
+            // Mantém o código do arquivo: ele pode estar certo e só faltar na
+            // nossa tabela. Trocar pelo padrão esconderia o dado de origem.
+            return { ncm: digitos, problema: 'desconhecido', bruto: digitos,
+                explicacao: 'Tem 8 dígitos, mas não consta na tabela oficial TEC/TIPI. Confira a digitação — o cálculo vai usar alíquota genérica.' };
+        }
+        return { ncm: digitos, problema: null, bruto: digitos, aliquotas: achado };
+    }
+
+    const ROTULO_PROBLEMA_NCM = {
+        ausente: 'sem NCM',
+        incompleto: 'NCM incompleto',
+        longo: 'NCM longo demais',
+        desconhecido: 'NCM fora da tabela oficial',
+    };
+
+    // Agrupa por tipo de problema para a lista não virar uma parede de linhas
+    // repetindo a mesma explicação em invoice de 58 itens.
+    function relatorioNcm(itens) {
+        const grupos = new Map();
+        itens.forEach((item) => {
+            if (!item.ncmProblema) return;
+            if (!grupos.has(item.ncmProblema)) {
+                grupos.set(item.ncmProblema, { explicacao: item.ncmExplicacao, produtos: [] });
+            }
+            grupos.get(item.ncmProblema).produtos.push({ nome: item.nome, bruto: item.ncmBruto });
+        });
+        if (!grupos.size) return '';
+
+        const total = itens.filter((i) => i.ncmProblema).length;
+        const blocos = [...grupos.entries()].map(([tipo, dados]) => {
+            const lista = dados.produtos.slice(0, 6).map((p) =>
+                `<li><code>${escapeHtml(p.bruto || '—')}</code> ${escapeHtml(p.nome.slice(0, 40))}</li>`
+            ).join('');
+            const resto = dados.produtos.length > 6 ? `<li>… e mais ${dados.produtos.length - 6}</li>` : '';
+            return `<div class="ncm-problema">
+                        <strong>${ROTULO_PROBLEMA_NCM[tipo] || tipo} — ${dados.produtos.length} item(ns)</strong>
+                        <p>${escapeHtml(dados.explicacao)}</p>
+                        <ul>${lista}${resto}</ul>
+                    </div>`;
+        }).join('');
+
+        return `<div class="ncm-problemas-box">
+                    <strong class="ncm-problemas-titulo">⚠ ${total} item(ns) com problema no NCM</strong>
+                    ${blocos}
+                    <p class="ncm-problemas-rodape">Eles serão importados assim mesmo, com alíquota genérica. Corrija o NCM de cada um na lista de produtos para o cálculo ficar correto.</p>
+                </div>`;
+    }
+
+    function tributacaoPorNcm(ncm) {
+        if (/^490[1234]/.test(ncm)) return 'exempt-books';
+        if (/^300[34]/.test(ncm)) return 'exempt-meds';
+        return 'taxable';
+    }
+
+    function lerItensDaNfe(xmlTexto, nomeArquivo) {
+        const doc = new DOMParser().parseFromString(xmlTexto, 'application/xml');
+        if (doc.getElementsByTagName('parsererror').length) {
+            throw new Error(`${nomeArquivo}: arquivo não é um XML válido.`);
+        }
+
+        const dets = doc.getElementsByTagNameNS('*', 'det');
+        if (!dets.length) {
+            throw new Error(`${nomeArquivo}: nenhum item encontrado — confira se é o XML da NF-e, e não o DANFE em PDF.`);
+        }
+
+        const itens = [];
+        for (const det of dets) {
+            const prod = det.getElementsByTagNameNS('*', 'prod')[0];
+            if (!prod) continue;
+
+            const nome = tagTexto(prod, 'xProd');
+            const quantidade = parseFloat(tagTexto(prod, 'qCom'));
+            const precoBRL = parseFloat(tagTexto(prod, 'vUnCom'));
+            // Só os dígitos: alguns emissores mandam o NCM formatado.
+            const ncm = tagTexto(prod, 'NCM').replace(/\D/g, '');
+            // infAdProd é irmão de prod e costuma trazer a descrição longa,
+            // que serve melhor para a invoice do que o nome curto.
+            const descricao = tagTexto(det, 'infAdProd') || nome;
+
+            if (!nome || !Number.isFinite(quantidade) || quantidade <= 0 || !Number.isFinite(precoBRL) || precoBRL <= 0) {
+                continue;
+            }
+
+            const diag = diagnosticarNcm(ncm);
+            itens.push({
+                nome,
+                // A NF-e permite quantidade fracionada; o simulador trabalha com
+                // unidades inteiras, então arredonda para cima para não sumir
+                // com item de 0,5 caixa.
+                quantidade: Math.max(1, Math.ceil(quantidade)),
+                precoBRL,
+                ncm: diag.ncm,
+                descricao,
+                tributacao: tributacaoPorNcm(diag.ncm),
+                ncmProblema: diag.problema,
+                ncmExplicacao: diag.explicacao || '',
+                ncmBruto: diag.bruto,
+                aliquotas: diag.aliquotas || null,
+            });
+        }
+
+        if (!itens.length) {
+            throw new Error(`${nomeArquivo}: os itens da nota estão sem nome, quantidade ou preço válidos.`);
+        }
+        return itens;
+    }
+
+    const mostrarStatusImportacao = (classe, html) => {
+        if (!bulkStatusEl) return;
+        bulkStatusEl.classList.remove('hidden');
+        bulkStatusEl.className = `ncm-preview ${classe}`;
+        bulkStatusEl.innerHTML = `<div>${html}</div>`;
+    };
+
+    const fecharCaixaNfe = () => {
+        itensDaNfe = [];
+        if (nfeCambioBox) nfeCambioBox.classList.add('hidden');
+        if (inputNfeXml) inputNfeXml.value = '';
+    };
+
+    if (inputNfeXml) {
+        inputNfeXml.addEventListener('change', async () => {
+            const arquivos = Array.from(inputNfeXml.files || []);
+            if (!arquivos.length) return;
+
+            const lidos = [];
+            const falhas = [];
+
+            for (const arquivo of arquivos) {
+                try {
+                    const texto = await arquivo.text();
+                    lidos.push(...lerItensDaNfe(texto, arquivo.name));
+                } catch (erro) {
+                    falhas.push(erro.message);
+                }
+            }
+
+            if (!lidos.length) {
+                mostrarStatusImportacao('warning', falhas.join('<br>') || 'Nenhum item encontrado nas notas enviadas.');
+                fecharCaixaNfe();
+                return;
+            }
+
+            itensDaNfe = lidos;
+
+            const totalBRL = lidos.reduce((soma, i) => soma + i.precoBRL * i.quantidade, 0);
+            const comAliquota = lidos.filter((i) => i.aliquotas).length;
+            const livros = lidos.filter((i) => i.tributacao === 'exempt-books').length;
+            const remedios = lidos.filter((i) => i.tributacao === 'exempt-meds').length;
+
+            if (nfeAchadosEl) {
+                const isentos = [
+                    livros ? `${livros} livro(s)` : '',
+                    remedios ? `${remedios} medicamento(s)` : '',
+                ].filter(Boolean).join(' e ');
+
+                nfeAchadosEl.innerHTML =
+                    `<strong>${lidos.length} produto(s)</strong> encontrado(s) em ${arquivos.length} nota(s), `
+                    + `somando <strong>${formatCurrency(totalBRL, 'BRL')}</strong>.`
+                    // Torna visível que o NCM da nota foi reconhecido na tabela
+                    // oficial — é dele que saem as alíquotas do regime formal.
+                    + `<br>NCM reconhecido na tabela TEC/TIPI em <strong>${comAliquota} de ${lidos.length}</strong> item(ns).`
+                    + relatorioNcm(lidos)
+                    // Mudança de tributação mexe no imposto, então nunca acontece
+                    // em silêncio: se algum item virou isento, o usuário lê aqui
+                    // antes de confirmar.
+                    + (isentos ? `<br>${isentos} identificado(s) pelo NCM e marcado(s) como <strong>isento(s)</strong>.` : '')
+                    + (falhas.length ? `<br><span class="nfe-falha">${falhas.length} arquivo(s) ignorado(s).</span>` : '');
+            }
+
+            // Pré-preenche com a cotação que o app já busca, mas deixa editável:
+            // é ela que o usuário mais provavelmente quer ajustar.
+            if (inputNfeCambio && !inputNfeCambio.value) {
+                inputNfeCambio.value = Number(state.exchangeRate || 0).toFixed(4);
+            }
+            if (nfeCambioBox) nfeCambioBox.classList.remove('hidden');
+            if (bulkStatusEl) bulkStatusEl.classList.add('hidden');
+            if (inputNfeCambio) inputNfeCambio.focus();
+        });
+    }
+
+    if (btnNfeUsarCotacao) {
+        btnNfeUsarCotacao.addEventListener('click', () => {
+            if (inputNfeCambio) inputNfeCambio.value = Number(state.exchangeRate || 0).toFixed(4);
+        });
+    }
+
+    if (btnNfeCancelar) {
+        btnNfeCancelar.addEventListener('click', fecharCaixaNfe);
+    }
+
+    if (btnNfeConfirmar) {
+        btnNfeConfirmar.addEventListener('click', () => {
+            const cambio = parseFloat(String(inputNfeCambio && inputNfeCambio.value).replace(',', '.'));
+            if (!Number.isFinite(cambio) || cambio <= 0) {
+                showToast('Informe a cotação usada para converter a nota.', 'error');
+                if (inputNfeCambio) inputNfeCambio.focus();
+                return;
+            }
+            if (!itensDaNfe.length) {
+                fecharCaixaNfe();
+                return;
+            }
+
+            itensDaNfe.forEach((item, indice) => {
+                // Duas casas é o que o formulário mostra e como se pensa preço em
+                // dólar. Mas item barato dividido por ~5 pode zerar no
+                // arredondamento, e produto de graça quebraria o rateio — nesse
+                // caso guarda quatro casas.
+                const bruto = item.precoBRL / cambio;
+                const precoUSD = bruto >= 0.005 ? Math.round(bruto * 100) / 100 : Math.round(bruto * 10000) / 10000;
+
+                state.products.push({
+                    id: Date.now() + indice,
+                    name: item.nome,
+                    qty: item.quantidade,
+                    unitPrice: precoUSD,
+                    unitWeight: 0,
+                    taxation: item.tributacao,
+                    description: item.descricao,
+                    ncm: item.ncm,
+                    image: '',
+                });
+            });
+
+            const total = itensDaNfe.length;
+            mostrarStatusImportacao(
+                'success',
+                `${total} produto(s) importado(s) da NF-e, convertidos a R$ ${cambio.toFixed(4)} por dólar. `
+                + 'Confira o peso de cada item — a nota fiscal não informa peso unitário.'
+            );
+            showToast(`${total} produto(s) importado(s) da nota fiscal!`, 'success');
+
+            fecharCaixaNfe();
+            saveState();
+            updateUI();
+        });
+    }
+
+    // ==========================================================
+    // IMPORTAÇÃO POR COMMERCIAL INVOICE (Excel / CSV)
+    //
+    // Diferente da NF-e, a Commercial Invoice não tem formato padrão: cada
+    // fornecedor nomeia as colunas do seu jeito e põe título, endereço e dados
+    // de embarque acima da tabela. Por isso o cabeçalho é procurado, as colunas
+    // são adivinhadas por sinônimos, e o resultado é SEMPRE mostrado para
+    // conferência antes de virar produto — importar com a coluna errada
+    // envenenaria o custo de toda a simulação sem dar nenhum sinal.
+    //
+    // O preço já vem em dólar, então não há conversão. O peso fica em branco.
+    // ==========================================================
+    const inputInvoice = document.getElementById('input-invoice');
+    const invoiceBox = document.getElementById('invoice-box');
+    const invoiceAchadosEl = document.getElementById('invoice-achados');
+    const invoicePreviaEl = document.getElementById('invoice-previa');
+    const btnInvoiceConfirmar = document.getElementById('btn-invoice-confirmar');
+    const btnInvoiceCancelar = document.getElementById('btn-invoice-cancelar');
+    const seletoresInvoice = {
+        nome: document.getElementById('ci-col-nome'),
+        descricao: document.getElementById('ci-col-desc'),
+        qtd: document.getElementById('ci-col-qtd'),
+        preco: document.getElementById('ci-col-preco'),
+        ncm: document.getElementById('ci-col-ncm'),
+    };
+
+    // Linhas da planilha aguardando o mapeamento ser confirmado.
+    let linhasInvoice = [];
+    let cabecalhoInvoiceIdx = -1;
+
+    // Cada lista vai do termo MAIS específico para o mais genérico: a busca por
+    // trecho usa a primeira que casar, então "product name" precisa ser testada
+    // antes de "name", e "unit price" antes de "price".
+    const SINONIMOS_INVOICE = {
+        nome: ['product name', 'productname', 'product', 'commodity', 'goods name', 'goods',
+               'model no', 'model', 'style no', 'style', 'article', 'name',
+               'nome do produto', 'nome', 'produto', 'mercadoria'],
+        descricao: ['product description', 'description of goods', 'item description', 'descriptions',
+                    'description', 'specification', 'specifications', 'specs',
+                    'descricao do produto', 'descricao', 'especificacao'],
+        qtd: ['total qty', "q'ty", 'qty.', 'qty', 'quantity', 'quantities', 'pcs', 'pieces', 'piece',
+              'qtde', 'qtd', 'quantidade', 'unidades'],
+        preco: ['fob unit price', 'unit price usd', 'unit price', 'unitprice', 'u/price', 'u price',
+                'uprice', 'unit cost', 'fob price', 'price usd', 'preco unitario', 'valor unitario',
+                'fob', 'price', 'preco'],
+        ncm: ['h.s. code', 'hs code', 'hscode', 'hs-code', 'hs no', 'customs code', 'tariff code',
+              'tariff', 'codigo ncm', 'ncm', 'hs'],
+    };
+
+    // Duas famílias que jamais podem ser aproveitadas:
+    //
+    // Numeração da linha ("ITEM", "NO."): "item" estava na lista de nome e o
+    // resultado foi produto chamado "1", "2", "3" — a coluna de contagem vencia
+    // a de nome por vir antes na planilha.
+    //
+    // Total da linha ("AMOUNT", "TOTAL"): confundido com preço unitário,
+    // multiplicaria o custo pela quantidade sem nada parecer errado na tela.
+    const NUNCA_APROVEITAR = [
+        'no', 'no.', 'n', 'nr', 'num', 'number', 'item', 'item no', 'item no.', 'items',
+        's/n', 'sn', 'sr no', 'seq', 'sequencia', 'linha', 'line', '#', 'ordem',
+        'amount', 'amount usd', 'total', 'total amount', 'total price', 'total fob',
+        'valor total', 'subtotal', 'sum',
+    ];
+
+    const normalizarCabecalho = (texto) => String(texto == null ? '' : texto)
+        .toLowerCase()
+        .normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .replace(/[^a-z0-9\s\/'.#]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    function classificarCabecalho(texto) {
+        const t = normalizarCabecalho(texto);
+        if (!t || NUNCA_APROVEITAR.includes(t)) return null;
+        for (const [campo, termos] of Object.entries(SINONIMOS_INVOICE)) {
+            if (termos.includes(t)) return campo;
+        }
+        // Só depois da correspondência exata: "unit price (usd)" contém
+        // "unit price", mas "amount" jamais pode virar preço. O mínimo de 4
+        // caracteres evita que "hs" case dentro de qualquer palavra.
+        for (const [campo, termos] of Object.entries(SINONIMOS_INVOICE)) {
+            if (termos.some((termo) => termo.length >= 4 && t.includes(termo))) return campo;
+        }
+        return null;
+    }
+
+    function acharLinhaCabecalho(linhas) {
+        let melhor = { indice: -1, pontos: 0 };
+        for (let i = 0; i < Math.min(linhas.length, 25); i++) {
+            const campos = new Set();
+            for (const celula of linhas[i] || []) {
+                const campo = classificarCabecalho(celula);
+                if (campo) campos.add(campo);
+            }
+            // Exige quantidade ou preço: uma linha só com "description" pode ser
+            // texto solto do cabeçalho da carta, não a tabela de itens.
+            if ((campos.has('qtd') || campos.has('preco')) && campos.size > melhor.pontos) {
+                melhor = { indice: i, pontos: campos.size };
+            }
+        }
+        return melhor.indice;
+    }
+
+    // Número em planilha vem de tudo quanto é jeito: "1,234.56", "1.234,56",
+    // "US$ 12.50", "12,50", ou já como number quando o Excel tipou a célula.
+    function lerNumeroInvoice(valor) {
+        if (typeof valor === 'number') return Number.isFinite(valor) ? valor : NaN;
+        if (valor == null) return NaN;
+
+        let t = String(valor).trim().replace(/[^\d.,\-]/g, '').replace(/(?!^)-/g, '');
+        if (!t || t === '-') return NaN;
+
+        const temPonto = t.includes('.');
+        const temVirgula = t.includes(',');
+
+        if (temPonto && temVirgula) {
+            // O separador decimal é o que aparece por último.
+            const decimal = t.lastIndexOf('.') > t.lastIndexOf(',') ? '.' : ',';
+            const milhar = decimal === '.' ? ',' : '.';
+            t = t.split(milhar).join('').replace(decimal, '.');
+        } else if (temVirgula) {
+            // Vírgula sozinha: decimal ("12,50") ou milhar ("1,234")? Três
+            // dígitos depois e nenhum outro separador indica milhar.
+            const partes = t.split(',');
+            t = (partes.length > 2 || partes[partes.length - 1].length === 3) ? partes.join('') : t.replace(',', '.');
+        } else if (temPonto) {
+            const partes = t.split('.');
+            // Em invoice de fornecedor o ponto é decimal, então só trata como
+            // milhar quando há mais de um.
+            if (partes.length > 2) t = partes.join('');
+        }
+
+        const n = parseFloat(t);
+        return Number.isFinite(n) ? n : NaN;
+    }
+
+    function extrairItensInvoice(linhas, cabecalhoIdx, mapa) {
+        const itens = [];
+        for (let i = cabecalhoIdx + 1; i < linhas.length; i++) {
+            const linha = linhas[i] || [];
+            const bruto = linha.map((c) => String(c == null ? '' : c).trim());
+            if (!bruto.some(Boolean)) continue;
+
+            // Linha de fechamento encerra a tabela: seguir adiante importaria o
+            // somatório como se fosse mais um produto.
+            const primeira = normalizarCabecalho(bruto.find(Boolean) || '');
+            if (/^(total|grand total|subtotal|sum|amount in words|say total)/.test(primeira)) break;
+
+            const celula = (indice) => (indice >= 0 ? String(linha[indice] == null ? '' : linha[indice]).trim() : '');
+
+            // Muitas invoices têm só "DESCRIPTION" e nenhuma coluna de nome. Uma
+            // cobre a outra, nos dois sentidos, para nunca importar produto sem
+            // nome — foi assim que a lista veio cheia de "1", "2", "3".
+            const nome = celula(mapa.nome) || celula(mapa.descricao);
+            const descricao = celula(mapa.descricao) || nome;
+            const qtd = mapa.qtd >= 0 ? lerNumeroInvoice(linha[mapa.qtd]) : NaN;
+            const preco = mapa.preco >= 0 ? lerNumeroInvoice(linha[mapa.preco]) : NaN;
+            if (!nome || !Number.isFinite(qtd) || qtd <= 0 || !Number.isFinite(preco) || preco <= 0) continue;
+
+            const diag = diagnosticarNcm(mapa.ncm >= 0 ? linha[mapa.ncm] : '');
+
+            itens.push({
+                nome,
+                descricao,
+                quantidade: Math.max(1, Math.ceil(qtd)),
+                precoUSD: preco,
+                ncm: diag.ncm,
+                ncmProblema: diag.problema,
+                ncmExplicacao: diag.explicacao || '',
+                ncmBruto: diag.bruto,
+            });
+        }
+        return itens;
+    }
+
+    const fecharCaixaInvoice = () => {
+        linhasInvoice = [];
+        cabecalhoInvoiceIdx = -1;
+        if (invoiceBox) invoiceBox.classList.add('hidden');
+        if (inputInvoice) inputInvoice.value = '';
+    };
+
+    const mapaAtualInvoice = () => ({
+        nome: parseInt(seletoresInvoice.nome.value, 10),
+        descricao: parseInt(seletoresInvoice.descricao.value, 10),
+        qtd: parseInt(seletoresInvoice.qtd.value, 10),
+        preco: parseInt(seletoresInvoice.preco.value, 10),
+        ncm: parseInt(seletoresInvoice.ncm.value, 10),
+    });
+
+    // Redesenha a prévia a cada troca de coluna: é ela que deixa o erro de
+    // mapeamento visível antes de virar custo.
+    function atualizarPreviaInvoice() {
+        if (cabecalhoInvoiceIdx < 0 || !invoicePreviaEl) return;
+        const itens = extrairItensInvoice(linhasInvoice, cabecalhoInvoiceIdx, mapaAtualInvoice());
+
+        if (!itens.length) {
+            invoicePreviaEl.innerHTML = '<span class="nfe-falha">Nenhuma linha válida com esse mapeamento. Confira as colunas.</span>';
+            if (btnInvoiceConfirmar) btnInvoiceConfirmar.disabled = true;
+            return;
+        }
+        if (btnInvoiceConfirmar) btnInvoiceConfirmar.disabled = false;
+
+        const totalUSD = itens.reduce((s, i) => s + i.precoUSD * i.quantidade, 0);
+        const amostra = itens.slice(0, 3).map((i) =>
+            `<tr><td>${escapeHtml(i.nome.slice(0, 34))}</td><td class="text-right">${i.quantidade}</td>`
+            + `<td class="text-right">${formatCurrency(i.precoUSD, 'USD')}</td>`
+            + `<td class="text-right">${i.ncmProblema ? `<span class="nfe-falha">${escapeHtml(i.ncmBruto || '—')}</span>` : i.ncm}</td></tr>`
+        ).join('');
+
+        invoicePreviaEl.innerHTML =
+            `<table class="ci-tabela"><thead><tr><th>Produto</th><th class="text-right">Qtd</th>`
+            + `<th class="text-right">Unit.</th><th class="text-right">NCM</th></tr></thead><tbody>${amostra}</tbody></table>`
+            + `<p class="ci-resumo"><strong>${itens.length} item(ns)</strong>, total ${formatCurrency(totalUSD, 'USD')}.`
+            + (itens.length > 3 ? ` Mostrando os 3 primeiros.` : '')
+            + `</p>`
+            + relatorioNcm(itens);
+    }
+
+    if (inputInvoice) {
+        inputInvoice.addEventListener('change', async () => {
+            const arquivo = inputInvoice.files && inputInvoice.files[0];
+            if (!arquivo) return;
+
+            if (typeof XLSX === 'undefined') {
+                mostrarStatusImportacao('warning', 'A biblioteca de planilhas não carregou. Recarregue a página e tente de novo.');
+                fecharCaixaInvoice();
+                return;
+            }
+
+            try {
+                const buffer = await arquivo.arrayBuffer();
+                const pasta = XLSX.read(buffer, { type: 'array' });
+                const aba = pasta.Sheets[pasta.SheetNames[0]];
+                // header:1 devolve matriz de linhas, que é o que permite procurar
+                // o cabeçalho em vez de assumir que ele está na primeira linha.
+                linhasInvoice = XLSX.utils.sheet_to_json(aba, { header: 1, raw: true, defval: '' });
+            } catch (erro) {
+                console.error('Erro ao ler a Commercial Invoice:', erro);
+                mostrarStatusImportacao('warning', 'Não consegui ler este arquivo. Envie a invoice em .xlsx, .xls ou .csv.');
+                fecharCaixaInvoice();
+                return;
+            }
+
+            cabecalhoInvoiceIdx = acharLinhaCabecalho(linhasInvoice);
+            if (cabecalhoInvoiceIdx < 0) {
+                mostrarStatusImportacao('warning',
+                    'Não encontrei a tabela de itens nesta planilha. Ela precisa ter uma linha de cabeçalho com colunas de quantidade e preço unitário.');
+                fecharCaixaInvoice();
+                return;
+            }
+
+            const cabecalho = linhasInvoice[cabecalhoInvoiceIdx] || [];
+            const sugerido = { nome: -1, descricao: -1, qtd: -1, preco: -1, ncm: -1 };
+            cabecalho.forEach((celula, indice) => {
+                const campo = classificarCabecalho(celula);
+                if (campo && sugerido[campo] === -1) sugerido[campo] = indice;
+            });
+
+            // Preenche os seletores com todas as colunas da planilha, para o
+            // usuário corrigir o que a adivinhação errou.
+            Object.entries(seletoresInvoice).forEach(([campo, seletor]) => {
+                if (!seletor) return;
+                const opcoes = ['<option value="-1">— não usar —</option>'];
+                cabecalho.forEach((celula, indice) => {
+                    const rotulo = String(celula || '').trim() || `Coluna ${indice + 1}`;
+                    opcoes.push(`<option value="${indice}">${escapeHtml(rotulo)}</option>`);
+                });
+                seletor.innerHTML = opcoes.join('');
+                seletor.value = String(sugerido[campo]);
+                seletor.onchange = atualizarPreviaInvoice;
+            });
+
+            // Nome e descrição se cobrem: só avisa que falta quando as DUAS
+            // ficaram sem coluna, que é o caso em que o produto entraria anônimo.
+            const naoDetectadas = Object.entries(sugerido)
+                .filter(([campo, v]) => {
+                    if (v !== -1) return false;
+                    if (campo === 'nome') return sugerido.descricao === -1;
+                    if (campo === 'descricao') return sugerido.nome === -1;
+                    return true;
+                })
+                .map(([k]) => k);
+            const rotulos = {
+                nome: 'nome do produto',
+                descricao: 'descrição',
+                qtd: 'quantidade',
+                preco: 'preço unitário',
+                ncm: 'NCM',
+            };
+            if (invoiceAchadosEl) {
+                invoiceAchadosEl.innerHTML =
+                    `Cabeçalho encontrado na <strong>linha ${cabecalhoInvoiceIdx + 1}</strong> de <em>${escapeHtml(arquivo.name)}</em>.`
+                    + (naoDetectadas.length
+                        ? `<br><span class="nfe-falha">Não identifiquei: ${naoDetectadas.map((c) => rotulos[c]).join(', ')}. Escolha a coluna abaixo.</span>`
+                        : '<br>Todas as colunas foram identificadas — confira antes de importar.');
+            }
+
+            if (invoiceBox) invoiceBox.classList.remove('hidden');
+            if (bulkStatusEl) bulkStatusEl.classList.add('hidden');
+            atualizarPreviaInvoice();
+        });
+    }
+
+    if (btnInvoiceCancelar) btnInvoiceCancelar.addEventListener('click', fecharCaixaInvoice);
+
+    if (btnInvoiceConfirmar) {
+        btnInvoiceConfirmar.addEventListener('click', () => {
+            const itens = extrairItensInvoice(linhasInvoice, cabecalhoInvoiceIdx, mapaAtualInvoice());
+            if (!itens.length) {
+                showToast('Nenhum item válido com esse mapeamento de colunas.', 'error');
+                return;
+            }
+
+            itens.forEach((item, indice) => {
+                state.products.push({
+                    id: Date.now() + indice,
+                    name: item.nome,
+                    qty: item.quantidade,
+                    // Já em dólar: a Commercial Invoice é a fatura do fornecedor
+                    // estrangeiro, então não há conversão a fazer.
+                    unitPrice: item.precoUSD,
+                    unitWeight: 0,
+                    taxation: tributacaoPorNcm(item.ncm),
+                    description: item.descricao,
+                    ncm: item.ncm,
+                    image: '',
+                });
+            });
+
+            mostrarStatusImportacao('success',
+                `${itens.length} produto(s) importado(s) da Commercial Invoice, com preço em dólar. `
+                + 'Confira o peso de cada item — a invoice não traz peso unitário.');
+            showToast(`${itens.length} produto(s) importado(s) da invoice!`, 'success');
+
+            fecharCaixaInvoice();
+            saveState();
+            updateUI();
+        });
+    }
+
     // Clean all button
     document.getElementById('btn-clear-all').addEventListener('click', async () => {
         const ok = await showConfirm('Tem certeza de que deseja apagar todos os produtos e zerar as configurações?', { title: 'Limpar tudo', confirmText: 'Limpar', danger: true });
@@ -1149,19 +1902,28 @@ async function fetchIbptTaxEstimate(cleanNcm) {
     return null;
 }
 
-function getProductTaxRates(ncmCode) {
+// `s` é o estado de onde vêm os caches de NCM. Sem ele, o da calculadora
+// aberta; o relatório do histórico passa o do lote salvo.
+function getProductTaxRates(ncmCode, s = state) {
     const cleanNcm = ncmCode ? ncmCode.toString().replace(/[^0-9]/g, '') : '';
     // Busca na base local de NCMs (de ncm_db.js)
     if (typeof lookupLocalNcm === 'function') {
         const localData = lookupLocalNcm(cleanNcm);
         if (localData) {
             return {
-                name: localData.name,
+                // A tabela oficial (TEC/TIPI) não guarda descrição — são ~10.500
+                // NCMs e isso quadruplicaria o arquivo. A descrição vem da
+                // nomenclatura do Siscomex, que o app já baixa pro ncmCache.
+                name: localData.name
+                    || (s.ncmCache && s.ncmCache[cleanNcm])
+                    || `NCM ${cleanNcm}`,
                 ii: localData.ii,
                 ipi: localData.ipi,
                 pis: localData.pis,
                 cofins: localData.cofins,
-                source: 'local'
+                // Ambos são alíquota real; 'tec-tipi' só registra que veio da
+                // tabela oficial e não da curadoria manual.
+                source: localData.origem === 'oficial' ? 'tec-tipi' : 'local'
             };
         }
     }
@@ -1169,10 +1931,10 @@ function getProductTaxRates(ncmCode) {
     // Estimativa do IBPT (populada de forma assíncrona por fetchIbptTaxEstimate,
     // disparada pelas telas de preview de NCM). Aplicada como II para refletir
     // o custo total aproximado, já que o IBPT não discrimina por tributo.
-    if (state.ncmRateEstimateCache && state.ncmRateEstimateCache[cleanNcm] != null) {
+    if (s.ncmRateEstimateCache && s.ncmRateEstimateCache[cleanNcm] != null) {
         return {
-            name: (state.ncmCache && state.ncmCache[cleanNcm]) || 'NCM fora da base curada (estimativa IBPT)',
-            ii: state.ncmRateEstimateCache[cleanNcm],
+            name: (s.ncmCache && s.ncmCache[cleanNcm]) || 'NCM fora da base curada (estimativa IBPT)',
+            ii: s.ncmRateEstimateCache[cleanNcm],
             ipi: 0,
             pis: 0,
             cofins: 0,
@@ -1181,9 +1943,9 @@ function getProductTaxRates(ncmCode) {
     }
 
     // Busca na base cacheada online pesquisada anteriormente
-    if (state.ncmCache && state.ncmCache[cleanNcm]) {
+    if (s.ncmCache && s.ncmCache[cleanNcm]) {
         return {
-            name: state.ncmCache[cleanNcm],
+            name: s.ncmCache[cleanNcm],
             ii: 0,
             ipi: 0,
             pis: 0,
@@ -1203,7 +1965,34 @@ function getProductTaxRates(ncmCode) {
     };
 }
 
-function calculateItemTaxes(itemVABRL, itemFeesBRL, ncm, taxation, totalVAUSD, totalTaxableOfficialVABRL, totalWeight, itemWeight, totalOfficialVABRL, qty, totalQty) {
+// O campo `source` de getProductTaxRates distingue alíquota REAL de ausência de
+// dado, e até aqui nada no app lia esse campo:
+//
+//   'local'         -> base curada do ncm_db.js, alíquotas de verdade
+//   'ibpt-estimate' -> estimativa da API do IBPT
+//   'online'        -> base do Siscomex: traz SÓ a descrição do NCM, sem alíquota
+//   'fallback'      -> código não encontrado em lugar nenhum
+//
+// Nos dois últimos casos getProductTaxRates devolve II/IPI/PIS/COFINS = 0, e a
+// tabela exibia "0.0%" — visualmente idêntico a um produto legitimamente
+// isento. No caso 'online' era pior: a descrição do NCM aparecia correta (são
+// ~9300 códigos oficiais), passando a impressão de que o código tinha sido
+// reconhecido E as alíquotas conferidas. O usuário decidia importar vendo um
+// custo sem II, IPI, PIS e COFINS.
+function ratesAreUnknown(rates) {
+    return !rates || rates.source === 'online' || rates.source === 'fallback';
+}
+
+// Devolve o percentual formatado, ou "n/d" quando não existe alíquota cadastrada.
+function formatRatePercent(rates, value, digits) {
+    if (ratesAreUnknown(rates)) return 'n/d';
+    return `${Number(value || 0).toFixed(digits)}%`;
+}
+
+// `s` é o estado do lote: regime, alíquotas, câmbio. Sem ele, o da
+// calculadora aberta. Antes a função só lia o global, e por isso só sabia
+// calcular o lote que estivesse carregado na tela.
+function calculateItemTaxes(itemVABRL, itemFeesBRL, ncm, taxation, totalVAUSD, totalTaxableOfficialVABRL, totalWeight, itemWeight, totalOfficialVABRL, qty, totalQty, s = state) {
     let iiBRL = 0;
     let ipiBRL = 0;
     let pisBRL = 0;
@@ -1211,9 +2000,9 @@ function calculateItemTaxes(itemVABRL, itemFeesBRL, ncm, taxation, totalVAUSD, t
     let icmsBRL = 0;
     let ratesUsed = null;
 
-    const icmsRatePercent = state.icmsRate / 100;
+    const icmsRatePercent = s.icmsRate / 100;
 
-    if (state.taxMode === 'auto') {
+    if (s.taxMode === 'auto') {
         if (taxation === 'exempt-books') {
             return { iiBRL: 0, ipiBRL: 0, pisBRL: 0, cofinsBRL: 0, icmsBRL: 0, ratesUsed: null };
         } else if (taxation === 'exempt-meds') {
@@ -1222,8 +2011,8 @@ function calculateItemTaxes(itemVABRL, itemFeesBRL, ncm, taxation, totalVAUSD, t
             return { iiBRL: 0, ipiBRL: 0, pisBRL: 0, cofinsBRL: 0, icmsBRL: icmsBRL, ratesUsed: null };
         }
 
-        if (state.taxRegime === 'remessa-conforme') {
-            const exchangeFactor = (state.currency === 'BRL' ? 1 : state.exchangeRate);
+        if (s.taxRegime === 'remessa-conforme') {
+            const exchangeFactor = (s.currency === 'BRL' ? 1 : s.exchangeRate);
             if (totalVAUSD <= 50) {
                 iiBRL = itemVABRL * 0.20;
             } else {
@@ -1233,22 +2022,22 @@ function calculateItemTaxes(itemVABRL, itemFeesBRL, ncm, taxation, totalVAUSD, t
             }
             const baseICMS = (itemVABRL + iiBRL) / (1 - icmsRatePercent);
             icmsBRL = baseICMS * icmsRatePercent;
-        } else if (state.taxRegime === 'regra-geral') {
+        } else if (s.taxRegime === 'regra-geral') {
             iiBRL = itemVABRL * 0.60;
             const baseICMS = (itemVABRL + iiBRL) / (1 - icmsRatePercent);
             icmsBRL = baseICMS * icmsRatePercent;
-        } else if (state.taxRegime === 'apenas-icms') {
+        } else if (s.taxRegime === 'apenas-icms') {
             iiBRL = 0;
             const baseICMS = itemVABRL / (1 - icmsRatePercent);
             icmsBRL = baseICMS * icmsRatePercent;
-        } else if (state.taxRegime === 'personalizado') {
-            const customIIRatePercent = state.customII / 100;
-            const customICMSRatePercent = state.customICMS / 100;
+        } else if (s.taxRegime === 'personalizado') {
+            const customIIRatePercent = s.customII / 100;
+            const customICMSRatePercent = s.customICMS / 100;
             iiBRL = itemVABRL * customIIRatePercent;
             const baseICMS = (itemVABRL + iiBRL) / (1 - customICMSRatePercent);
             icmsBRL = baseICMS * customICMSRatePercent;
-        } else if (state.taxRegime === 'importacao-formal') {
-            const rates = getProductTaxRates(ncm);
+        } else if (s.taxRegime === 'importacao-formal') {
+            const rates = getProductTaxRates(ncm, s);
             ratesUsed = rates;
             iiBRL = itemVABRL * (rates.ii / 100);
             ipiBRL = (itemVABRL + iiBRL) * (rates.ipi / 100);
@@ -1260,15 +2049,15 @@ function calculateItemTaxes(itemVABRL, itemFeesBRL, ncm, taxation, totalVAUSD, t
     } else {
         // Manual mode
         let taxShare = 0;
-        if (state.taxSplit === 'weight' && totalWeight > 0) {
+        if (s.taxSplit === 'weight' && totalWeight > 0) {
             taxShare = itemWeight / totalWeight;
         } else if (totalOfficialVABRL > 0) {
             taxShare = itemVABRL / totalOfficialVABRL;
         } else {
             taxShare = qty / totalQty;
         }
-        iiBRL = state.manualII * taxShare;
-        icmsBRL = state.manualICMS * taxShare;
+        iiBRL = s.manualII * taxShare;
+        icmsBRL = s.manualICMS * taxShare;
     }
 
     return { iiBRL, ipiBRL, pisBRL, cofinsBRL, icmsBRL, ratesUsed };
@@ -1406,6 +2195,163 @@ function goToLanding() {
 }
 
 // MAIN CALCULATION & UI RE-RENDER
+// A conta da calculadora, sem tela nenhuma: câmbio, rateio de frete, seguro e
+// despesas, impostos por item e custo final. O updateUI desenha a partir
+// dela, e o relatório "Ver" do histórico de importação também — uma conta
+// só, para as duas telas nunca discordarem de um imposto. Recebe o estado
+// do lote em vez de ler o global, por isso calcula um lote salvo sem
+// mexer no que está aberto na calculadora.
+function calcularLote(s) {
+    const produtos = s.products || [];
+
+    // Câmbio efetivo
+    const spread = s.exchangeMode === 'complete' ? (s.spread || 0) : 0;
+    const iof = s.exchangeMode === 'complete' ? (s.iof || 0) : 0;
+    const effectiveRate = s.exchangeRate * (1 + spread / 100) * (1 + iof / 100);
+
+    // 1. Calculate Totals for package
+    const totalQty = produtos.reduce((acc, p) => acc + p.qty, 0);
+    const totalWeight = produtos.reduce((acc, p) => acc + (p.unitWeight * p.qty), 0);
+    
+    const factorEffectiveBRL = s.currency === 'BRL' ? 1 : effectiveRate;
+    const factorOfficialBRL = s.currency === 'BRL' ? 1 : s.exchangeRate;
+    
+    const totalFobForeign = produtos.reduce((acc, p) => acc + (p.unitPrice * p.qty), 0);
+    const totalFobBRL = totalFobForeign * factorEffectiveBRL; // Actual money spent
+    const totalFobOfficialBRL = totalFobForeign * factorOfficialBRL; // Declared for taxes
+    
+    // 2. RUN DISTRIBUTION MATHEMATICS
+    const freightBRL = s.freightInBRL ? s.freight : s.freight * factorEffectiveBRL;
+    const insuranceBRL = s.insuranceInBRL ? s.insurance : s.insurance * factorEffectiveBRL;
+    const feesBRL = s.feesInBRL ? s.fees : s.fees * factorEffectiveBRL;
+    
+    // For official tax calculation (PTAX without spread/iof)
+    const freightOfficialBRL = s.freightInBRL ? s.freight : s.freight * factorOfficialBRL;
+    const insuranceOfficialBRL = s.insuranceInBRL ? s.insurance : s.insurance * factorOfficialBRL;
+    
+    // Pre-calculate shares
+    let itemsCalculation = produtos.map(p => {
+        const itemFobForeign = p.unitPrice * p.qty;
+        const itemFobBRL = itemFobForeign * factorEffectiveBRL;
+        const itemFobOfficialBRL = itemFobForeign * factorOfficialBRL;
+        const itemWeightTotal = p.unitWeight * p.qty;
+        
+        // Freight apportionment share
+        let freightShare = 0;
+        if (s.freightSplit === 'weight' && totalWeight > 0) {
+            freightShare = itemWeightTotal / totalWeight;
+        } else if (totalFobBRL > 0) {
+            freightShare = itemFobBRL / totalFobBRL;
+        } else {
+            freightShare = p.qty / totalQty;
+        }
+        
+        // Insurance apportionment share
+        let insuranceShare = 0;
+        if (s.insuranceSplit === 'weight' && totalWeight > 0) {
+            insuranceShare = itemWeightTotal / totalWeight;
+        } else if (totalFobBRL > 0) {
+            insuranceShare = itemFobBRL / totalFobBRL;
+        } else {
+            insuranceShare = p.qty / totalQty;
+        }
+        
+        // Fees apportionment share
+        let feesShare = 0;
+        if (s.feesSplit === 'quantity' && totalQty > 0) {
+            feesShare = p.qty / totalQty;
+        } else if (s.feesSplit === 'weight' && totalWeight > 0) {
+            feesShare = itemWeightTotal / totalWeight;
+        } else if (totalFobBRL > 0) {
+            feesShare = itemFobBRL / totalFobBRL;
+        } else {
+            feesShare = 1 / produtos.length;
+        }
+        
+        // Actual costs paid by user
+        const itemFreightBRL = freightBRL * freightShare;
+        const itemInsuranceBRL = insuranceBRL * insuranceShare;
+        const itemFeesBRL = feesBRL * feesShare;
+        
+        // Official values for tax base
+        const itemFreightOfficialBRL = freightOfficialBRL * freightShare;
+        const itemInsuranceOfficialBRL = insuranceOfficialBRL * insuranceShare;
+        const itemVABRL = itemFobOfficialBRL + itemFreightOfficialBRL + itemInsuranceOfficialBRL; // Declared Customs Value (PTAX)
+        
+        return {
+            product: p,
+            fobForeign: itemFobForeign,
+            fobBRL: itemFobBRL,
+            weightTotal: itemWeightTotal,
+            freightBRL: itemFreightBRL,
+            insuranceBRL: itemInsuranceBRL,
+            feesBRL: itemFeesBRL,
+            vaBRL: itemVABRL, // Official tax base VA in R$
+            iiBRL: 0,
+            icmsBRL: 0
+        };
+    });
+    
+    // Calculate total VA (Valores Aduaneiros) BRL (Official)
+    const totalOfficialVABRL = itemsCalculation.reduce((acc, item) => acc + item.vaBRL, 0);
+    
+    // Sum of taxable items VA (for pro-rating the $20 discount in Remessa Conforme)
+    const totalTaxableOfficialVABRL = itemsCalculation
+        .filter(item => (item.product.taxation || 'taxable') === 'taxable')
+        .reduce((acc, item) => acc + item.vaBRL, 0);
+        
+    // Apply Taxes
+    let totalIIBRL = 0;
+    let totalICMSBRL = 0;
+    
+    const totalVAUSD = s.currency === 'USD' 
+        ? totalOfficialVABRL / s.exchangeRate 
+        : totalOfficialVABRL / 5.50;
+        
+    itemsCalculation.forEach(item => {
+        const itemWeight = item.product.unitWeight * item.product.qty;
+        const taxResults = calculateItemTaxes(
+            item.vaBRL, 
+            item.feesBRL, 
+            item.product.ncm, 
+            item.product.taxation || 'taxable', 
+            totalVAUSD, 
+            totalTaxableOfficialVABRL, 
+            totalWeight, 
+            itemWeight, 
+            totalOfficialVABRL, 
+            item.product.qty, 
+            totalQty,
+            s
+        );
+        
+        item.iiBRL = taxResults.iiBRL;
+        item.ipiBRL = taxResults.ipiBRL;
+        item.pisBRL = taxResults.pisBRL;
+        item.cofinsBRL = taxResults.cofinsBRL;
+        item.icmsBRL = taxResults.icmsBRL;
+        item.formalRatesUsed = taxResults.ratesUsed;
+        
+        totalIIBRL += item.iiBRL;
+        totalICMSBRL += item.icmsBRL;
+    });
+
+    // Custo final de cada item: o que sai do bolso, com câmbio efetivo, rateios
+    // e impostos. Mesma soma que a tabela de resultados sempre fez.
+    itemsCalculation.forEach(item => {
+        item.custoTotalBRL = item.fobBRL + item.freightBRL + item.insuranceBRL + item.feesBRL + item.iiBRL + item.icmsBRL + (item.ipiBRL || 0) + (item.pisBRL || 0) + (item.cofinsBRL || 0);
+        item.custoUnitBRL = item.custoTotalBRL / item.product.qty;
+    });
+    
+    return {
+        effectiveRate, totalQty, totalWeight, factorEffectiveBRL, factorOfficialBRL,
+        totalFobForeign, totalFobBRL, totalFobOfficialBRL,
+        freightBRL, insuranceBRL, feesBRL, freightOfficialBRL, insuranceOfficialBRL,
+        itemsCalculation, totalOfficialVABRL, totalTaxableOfficialVABRL, totalVAUSD,
+        totalIIBRL, totalICMSBRL,
+    };
+}
+
 function updateUI() {
     const landingContainer = document.getElementById('landing-container');
     const authContainer = document.getElementById('auth-container');
@@ -1441,7 +2387,13 @@ function updateUI() {
         // Dynamically adjust paywall text based on expiration
         const paywallTitle = paywallScreen.querySelector('.auth-header h2');
         const paywallDesc = paywallScreen.querySelector('.auth-header p');
-        if (state.currentUser && state.currentUser.subscriptionExpiresAt && Date.now() >= state.currentUser.subscriptionExpiresAt) {
+        // A coluna vem do banco como subscription_expires_at, em string ISO. O
+        // código lia subscriptionExpiresAt e comparava com um timestamp, então
+        // a condição nunca era verdadeira e quem teve assinatura vencida via a
+        // mensagem de teste grátis.
+        const rawExpiry = state.currentUser && (state.currentUser.subscription_expires_at || state.currentUser.subscriptionExpiresAt);
+        const expiryTime = rawExpiry ? new Date(rawExpiry).getTime() : NaN;
+        if (!isNaN(expiryTime) && Date.now() >= expiryTime) {
             if (paywallTitle) paywallTitle.textContent = "Sua Assinatura Expirou";
             if (paywallDesc) paywallDesc.textContent = "Seus 30 dias de acesso terminaram. Renove sua assinatura para continuar usando o simulador.";
         } else {
@@ -1503,10 +2455,10 @@ function updateUI() {
         }
     });
     
-    // Calculate Câmbio Efetivo
-    const spread = state.exchangeMode === 'complete' ? (state.spread || 0) : 0;
-    const iof = state.exchangeMode === 'complete' ? (state.iof || 0) : 0;
-    const effectiveRate = state.exchangeRate * (1 + spread / 100) * (1 + iof / 100);
+    // Câmbio efetivo e o resto da conta saem de calcularLote(), a mesma que o
+    // relatório do histórico usa.
+    const lote = calcularLote(state);
+    const { effectiveRate } = lote;
     
     const displayEffectiveRate = document.getElementById('display-effective-rate');
     const effectiveRateContainer = document.getElementById('effective-rate-container');
@@ -1530,16 +2482,8 @@ function updateUI() {
         }
     }
     
-    // 1. Calculate Totals for package
-    const totalQty = state.products.reduce((acc, p) => acc + p.qty, 0);
-    const totalWeight = state.products.reduce((acc, p) => acc + (p.unitWeight * p.qty), 0);
-    
-    const factorEffectiveBRL = state.currency === 'BRL' ? 1 : effectiveRate;
-    const factorOfficialBRL = state.currency === 'BRL' ? 1 : state.exchangeRate;
-    
-    const totalFobForeign = state.products.reduce((acc, p) => acc + (p.unitPrice * p.qty), 0);
-    const totalFobBRL = totalFobForeign * factorEffectiveBRL; // Actual money spent
-    const totalFobOfficialBRL = totalFobForeign * factorOfficialBRL; // Declared for taxes
+    // 1. Totais do lote, de calcularLote().
+    const { totalQty, totalWeight, factorEffectiveBRL, totalFobForeign, totalFobBRL } = lote;
     
     badgeProductCount.textContent = `${state.products.length} ${state.products.length === 1 ? 'produto' : 'produtos'}`;
     
@@ -1639,120 +2583,8 @@ function updateUI() {
     document.getElementById('total-fob-foreign').textContent = formatCurrency(totalFobForeign, state.currency);
     document.getElementById('total-fob-brl').textContent = `R$ ${totalFobBRL.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
     
-    // 2. RUN DISTRIBUTION MATHEMATICS
-    const freightBRL = state.freightInBRL ? state.freight : state.freight * factorEffectiveBRL;
-    const insuranceBRL = state.insuranceInBRL ? state.insurance : state.insurance * factorEffectiveBRL;
-    const feesBRL = state.feesInBRL ? state.fees : state.fees * factorEffectiveBRL;
-    
-    // For official tax calculation (PTAX without spread/iof)
-    const freightOfficialBRL = state.freightInBRL ? state.freight : state.freight * factorOfficialBRL;
-    const insuranceOfficialBRL = state.insuranceInBRL ? state.insurance : state.insurance * factorOfficialBRL;
-    
-    // Pre-calculate shares
-    let itemsCalculation = state.products.map(p => {
-        const itemFobForeign = p.unitPrice * p.qty;
-        const itemFobBRL = itemFobForeign * factorEffectiveBRL;
-        const itemFobOfficialBRL = itemFobForeign * factorOfficialBRL;
-        const itemWeightTotal = p.unitWeight * p.qty;
-        
-        // Freight apportionment share
-        let freightShare = 0;
-        if (state.freightSplit === 'weight' && totalWeight > 0) {
-            freightShare = itemWeightTotal / totalWeight;
-        } else if (totalFobBRL > 0) {
-            freightShare = itemFobBRL / totalFobBRL;
-        } else {
-            freightShare = p.qty / totalQty;
-        }
-        
-        // Insurance apportionment share
-        let insuranceShare = 0;
-        if (state.insuranceSplit === 'weight' && totalWeight > 0) {
-            insuranceShare = itemWeightTotal / totalWeight;
-        } else if (totalFobBRL > 0) {
-            insuranceShare = itemFobBRL / totalFobBRL;
-        } else {
-            insuranceShare = p.qty / totalQty;
-        }
-        
-        // Fees apportionment share
-        let feesShare = 0;
-        if (state.feesSplit === 'quantity' && totalQty > 0) {
-            feesShare = p.qty / totalQty;
-        } else if (state.feesSplit === 'weight' && totalWeight > 0) {
-            feesShare = itemWeightTotal / totalWeight;
-        } else if (totalFobBRL > 0) {
-            feesShare = itemFobBRL / totalFobBRL;
-        } else {
-            feesShare = 1 / state.products.length;
-        }
-        
-        // Actual costs paid by user
-        const itemFreightBRL = freightBRL * freightShare;
-        const itemInsuranceBRL = insuranceBRL * insuranceShare;
-        const itemFeesBRL = feesBRL * feesShare;
-        
-        // Official values for tax base
-        const itemFreightOfficialBRL = freightOfficialBRL * freightShare;
-        const itemInsuranceOfficialBRL = insuranceOfficialBRL * insuranceShare;
-        const itemVABRL = itemFobOfficialBRL + itemFreightOfficialBRL + itemInsuranceOfficialBRL; // Declared Customs Value (PTAX)
-        
-        return {
-            product: p,
-            fobForeign: itemFobForeign,
-            fobBRL: itemFobBRL,
-            weightTotal: itemWeightTotal,
-            freightBRL: itemFreightBRL,
-            insuranceBRL: itemInsuranceBRL,
-            feesBRL: itemFeesBRL,
-            vaBRL: itemVABRL, // Official tax base VA in R$
-            iiBRL: 0,
-            icmsBRL: 0
-        };
-    });
-    
-    // Calculate total VA (Valores Aduaneiros) BRL (Official)
-    const totalOfficialVABRL = itemsCalculation.reduce((acc, item) => acc + item.vaBRL, 0);
-    
-    // Sum of taxable items VA (for pro-rating the $20 discount in Remessa Conforme)
-    const totalTaxableOfficialVABRL = itemsCalculation
-        .filter(item => (item.product.taxation || 'taxable') === 'taxable')
-        .reduce((acc, item) => acc + item.vaBRL, 0);
-        
-    // Apply Taxes
-    let totalIIBRL = 0;
-    let totalICMSBRL = 0;
-    
-    const totalVAUSD = state.currency === 'USD' 
-        ? totalOfficialVABRL / state.exchangeRate 
-        : totalOfficialVABRL / 5.50;
-        
-    itemsCalculation.forEach(item => {
-        const itemWeight = item.product.unitWeight * item.product.qty;
-        const taxResults = calculateItemTaxes(
-            item.vaBRL, 
-            item.feesBRL, 
-            item.product.ncm, 
-            item.product.taxation || 'taxable', 
-            totalVAUSD, 
-            totalTaxableOfficialVABRL, 
-            totalWeight, 
-            itemWeight, 
-            totalOfficialVABRL, 
-            item.product.qty, 
-            totalQty
-        );
-        
-        item.iiBRL = taxResults.iiBRL;
-        item.ipiBRL = taxResults.ipiBRL;
-        item.pisBRL = taxResults.pisBRL;
-        item.cofinsBRL = taxResults.cofinsBRL;
-        item.icmsBRL = taxResults.icmsBRL;
-        item.formalRatesUsed = taxResults.ratesUsed;
-        
-        totalIIBRL += item.iiBRL;
-        totalICMSBRL += item.icmsBRL;
-    });
+    // 2. A conta toda vem de calcularLote(), chamada no começo da função.
+    const { freightBRL, insuranceBRL, feesBRL, itemsCalculation, totalIIBRL, totalICMSBRL } = lote;
     
     // 3. RENDER RESULTS TABLE
     const tbodyResults = document.getElementById('tbody-results');
@@ -1763,7 +2595,7 @@ function updateUI() {
     let sumResaleProfitBRL = 0;
     
     itemsCalculation.forEach(item => {
-        const itemFinalCostTotalBRL = item.fobBRL + item.freightBRL + item.insuranceBRL + item.feesBRL + item.iiBRL + item.icmsBRL + (item.ipiBRL || 0) + (item.pisBRL || 0) + (item.cofinsBRL || 0);
+        const itemFinalCostTotalBRL = item.custoTotalBRL;
         const itemFinalCostUnitBRL = itemFinalCostTotalBRL / item.product.qty;
         
         // Multiplier factor based on cost paid by user vs FOB converted
@@ -1811,7 +2643,13 @@ function updateUI() {
         }
         
         let taxesCellHtml = '';
-        if (state.taxRegime === 'importacao-formal') {
+        // As alíquotas por NCM só entram no cálculo em modo automático (ver
+        // calculateItemTaxes: o ramo do regime formal está dentro do
+        // `if (state.taxMode === 'auto')`). Antes o quadro detalhado era
+        // desenhado só pelo regime, então em modo manual ele mostrava II, IPI,
+        // PIS, COFINS e ICMS zerados sem dizer por quê — parecia que a base de
+        // NCM não estava funcionando.
+        if (state.taxRegime === 'importacao-formal' && state.taxMode === 'auto') {
             taxesCellHtml = `
                 <div style="font-size:0.68rem; color:var(--text-muted); line-height: 1.35; text-align: right;">
                     II: R$ ${item.iiBRL.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}<br>
@@ -1822,11 +2660,20 @@ function updateUI() {
                 </div>
             `;
         } else {
+            // Regime formal escolhido, mas modo manual ligado: avisa em vez de
+            // exibir zeros, que era o que fazia parecer defeito na base de NCM.
+            const avisoNcmIgnorado = state.taxRegime === 'importacao-formal'
+                ? `<span style="font-size:0.68rem; color:var(--warning); display:block; margin-top:0.25rem; line-height:1.3;">
+                       Alíquotas por NCM não aplicadas: os impostos estão em <strong>modo manual</strong>.
+                   </span>`
+                : '';
+
             taxesCellHtml = `
                 <span style="font-size:0.75rem; color:var(--text-muted); display:block;">
                     II: R$ ${item.iiBRL.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                 </span>
                 ICMS: R$ ${item.icmsBRL.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                ${avisoNcmIgnorado}
             `;
         }
 
@@ -1875,7 +2722,7 @@ function updateUI() {
     const avgMultiplier = totalFobBRL > 0 ? sumFinalCostTotalBRL / totalFobBRL : 1;
     
     const trFoot = document.createElement('tr');
-    trFoot.style.backgroundColor = 'rgba(30, 41, 59, 0.5)';
+    trFoot.style.backgroundColor = 'var(--surface-raised)';
     trFoot.style.fontWeight = '700';
     trFoot.style.borderTop = '2px solid var(--border-color)';
     
@@ -1917,7 +2764,8 @@ function updateUI() {
         let sumCOFINS = 0;
         let sumICMS = 0;
         let sumTotalImpostos = 0;
-        
+        let itensSemAliquota = 0;
+
         itemsCalculation.forEach(item => {
             const rates = item.formalRatesUsed || getProductTaxRates(item.product.ncm);
             const totalItemTaxes = item.iiBRL + item.icmsBRL + (item.ipiBRL || 0) + (item.pisBRL || 0) + (item.cofinsBRL || 0);
@@ -1930,25 +2778,33 @@ function updateUI() {
             sumICMS += item.icmsBRL;
             sumTotalImpostos += totalItemTaxes;
             
+            const semAliquota = ratesAreUnknown(rates);
+            if (semAliquota) itensSemAliquota++;
+
+            const avisoNcm = semAliquota
+                ? ` <span title="Este NCM não tem alíquotas cadastradas. Os impostos federais NÃO foram calculados para este item." style="color:var(--danger); font-weight:700; cursor:help;">⚠</span>`
+                : '';
+
             const tr = document.createElement('tr');
+            if (semAliquota) tr.style.background = 'var(--danger-soft)';
             tr.innerHTML = `
                 <td style="font-weight:600;">${escapeHtml(item.product.name)}</td>
-                <td class="text-center"><span class="ncm-badge">${item.product.ncm || '-'}</span></td>
+                <td class="text-center"><span class="ncm-badge">${item.product.ncm || '-'}</span>${avisoNcm}</td>
                 <td class="text-right">R$ ${item.vaBRL.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                 <td class="text-right">
-                    <span style="font-size:0.75rem; color:var(--text-muted); display:block;">${rates.ii.toFixed(1)}%</span>
+                    <span style="font-size:0.75rem; color:var(--text-muted); display:block;">${formatRatePercent(rates, rates.ii, 1)}</span>
                     R$ ${item.iiBRL.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                 </td>
                 <td class="text-right">
-                    <span style="font-size:0.75rem; color:var(--text-muted); display:block;">${rates.ipi.toFixed(1)}%</span>
+                    <span style="font-size:0.75rem; color:var(--text-muted); display:block;">${formatRatePercent(rates, rates.ipi, 1)}</span>
                     R$ ${(item.ipiBRL || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                 </td>
                 <td class="text-right">
-                    <span style="font-size:0.75rem; color:var(--text-muted); display:block;">${rates.pis.toFixed(2)}%</span>
+                    <span style="font-size:0.75rem; color:var(--text-muted); display:block;">${formatRatePercent(rates, rates.pis, 2)}</span>
                     R$ ${(item.pisBRL || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                 </td>
                 <td class="text-right">
-                    <span style="font-size:0.75rem; color:var(--text-muted); display:block;">${rates.cofins.toFixed(2)}%</span>
+                    <span style="font-size:0.75rem; color:var(--text-muted); display:block;">${formatRatePercent(rates, rates.cofins, 2)}</span>
                     R$ ${(item.cofinsBRL || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                 </td>
                 <td class="text-right">
@@ -1963,7 +2819,7 @@ function updateUI() {
         });
         
         tfootResultsFiscal.innerHTML = `
-            <tr style="background-color: rgba(30, 41, 59, 0.5); font-weight:700; border-top: 2px solid var(--border-color);">
+            <tr style="background-color: var(--surface-raised); font-weight:700; border-top: 2px solid var(--border-color);">
                 <td colspan="2">Totais Consolidados</td>
                 <td class="text-right">R$ ${sumVaBRL.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                 <td class="text-right">R$ ${sumII.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
@@ -1973,6 +2829,19 @@ function updateUI() {
                 <td class="text-right">R$ ${sumICMS.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                 <td class="text-right highlight-col">R$ ${sumTotalImpostos.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
             </tr>
+            ${itensSemAliquota > 0 ? `
+            <tr>
+                <td colspan="9" style="background: var(--danger-soft); border-top: 2px solid var(--danger); padding: 0.85rem 1rem; font-weight:600; line-height:1.5; text-align:left; white-space:normal;">
+                    ⚠ ${itensSemAliquota === 1
+                        ? '1 item está sem alíquotas cadastradas'
+                        : `${itensSemAliquota} itens estão sem alíquotas cadastradas`} (marcado${itensSemAliquota === 1 ? '' : 's'} com ⚠ na coluna NCM).
+                    <span style="display:block; font-weight:400; margin-top:0.35rem;">
+                        Para ${itensSemAliquota === 1 ? 'ele' : 'eles'}, <strong>II, IPI, PIS e COFINS não foram calculados</strong> —
+                        entram como zero nos totais acima. O custo real de importação é maior que o exibido.
+                        Informe as alíquotas manualmente (modo de tributação personalizado) antes de decidir pela compra.
+                    </span>
+                </td>
+            </tr>` : ''}
         `;
     }
     
@@ -2008,11 +2877,11 @@ function updateUI() {
     // 5. DRAW VISUALS
     // Chart A: Donut split
     const donutData = [
-        { name: 'Custo FOB', value: totalFobBRL, color: '#6366f1' },
-        { name: 'Frete', value: freightBRL, color: '#a855f7' },
-        { name: 'Seguro', value: insuranceBRL, color: '#ec4899' },
-        { name: 'Outras Taxas', value: feesBRL, color: '#14b8a6' },
-        { name: 'Impostos', value: totalTaxesBRL, color: '#f59e0b' }
+        { name: 'Custo FOB', value: totalFobBRL, color: 'var(--chart-1)' },
+        { name: 'Frete', value: freightBRL, color: 'var(--chart-2)' },
+        { name: 'Seguro', value: insuranceBRL, color: 'var(--chart-3)' },
+        { name: 'Outras Taxas', value: feesBRL, color: 'var(--chart-4)' },
+        { name: 'Impostos', value: totalTaxesBRL, color: 'var(--chart-5)' }
     ];
     renderDonutChart(donutData);
     
@@ -2021,14 +2890,21 @@ function updateUI() {
     barsContainer.innerHTML = '';
     
     itemsCalculation.forEach(item => {
-        const itemTotal = item.fobBRL + item.freightBRL + item.insuranceBRL + item.feesBRL + item.iiBRL + item.icmsBRL;
+        // IPI, PIS e COFINS precisam entrar aqui. Somando só II e ICMS, este
+        // gráfico mostrava um custo unitário MENOR que o da tabela ao lado, para
+        // o mesmo produto. O erro ficou invisível por muito tempo porque esses
+        // três impostos só existem no regime "Importação Formal" — nos regimes
+        // simplificados eles são sempre zero e as duas contas batiam.
+        const itemTaxes = item.iiBRL + (item.ipiBRL || 0) + (item.pisBRL || 0)
+            + (item.cofinsBRL || 0) + item.icmsBRL;
+        const itemTotal = item.fobBRL + item.freightBRL + item.insuranceBRL + item.feesBRL + itemTaxes;
         if (itemTotal === 0) return;
-        
+
         const pctFOB = (item.fobBRL / itemTotal) * 100;
         const pctFreight = (item.freightBRL / itemTotal) * 100;
         const pctInsurance = (item.insuranceBRL / itemTotal) * 100;
         const pctFees = (item.feesBRL / itemTotal) * 100;
-        const pctTaxes = ((item.iiBRL + item.icmsBRL) / itemTotal) * 100;
+        const pctTaxes = (itemTaxes / itemTotal) * 100;
         
         const barItem = document.createElement('div');
         barItem.className = 'bar-item';
@@ -2049,7 +2925,7 @@ function updateUI() {
                 ${pctFreight > 0 ? `<div class="progress-segment color-freight" style="width: ${pctFreight}%" data-tooltip="Frete: ${pctFreight.toFixed(1)}% (R$ ${item.freightBRL.toFixed(0)})"></div>` : ''}
                 ${pctInsurance > 0 ? `<div class="progress-segment color-insurance" style="width: ${pctInsurance}%" data-tooltip="Seguro: ${pctInsurance.toFixed(1)}% (R$ ${item.insuranceBRL.toFixed(0)})"></div>` : ''}
                 ${pctFees > 0 ? `<div class="progress-segment color-fees" style="width: ${pctFees}%" data-tooltip="Taxas: ${pctFees.toFixed(1)}% (R$ ${item.feesBRL.toFixed(0)})"></div>` : ''}
-                ${pctTaxes > 0 ? `<div class="progress-segment color-taxes" style="width: ${pctTaxes}%" data-tooltip="Impostos: ${pctTaxes.toFixed(1)}% (R$ ${(item.iiBRL + item.icmsBRL).toFixed(0)})"></div>` : ''}
+                ${pctTaxes > 0 ? `<div class="progress-segment color-taxes" style="width: ${pctTaxes}%" data-tooltip="Impostos: ${pctTaxes.toFixed(1)}% (R$ ${itemTaxes.toFixed(0)})"></div>` : ''}
             </div>
         `;
         barsContainer.appendChild(barItem);
@@ -2501,6 +3377,7 @@ function registerAuthEventListeners() {
     const tabRegister = document.getElementById('tab-register');
     const formLogin = document.getElementById('form-login');
     const formRegister = document.getElementById('form-register');
+    const formForgot = document.getElementById('form-forgot');
     const btnLogout = document.getElementById('btn-logout');
 
     // Botões da landing pública que levam pra tela de login/cadastro.
@@ -2518,6 +3395,7 @@ function registerAuthEventListeners() {
             tabRegister.classList.remove('active');
             formLogin.classList.remove('hidden');
             formRegister.classList.add('hidden');
+            if (formForgot) formForgot.classList.add('hidden');
             clearAuthAlerts();
         });
 
@@ -2526,6 +3404,7 @@ function registerAuthEventListeners() {
             tabLogin.classList.remove('active');
             formRegister.classList.remove('hidden');
             formLogin.classList.add('hidden');
+            if (formForgot) formForgot.classList.add('hidden');
             clearAuthAlerts();
         });
     }
@@ -2595,6 +3474,88 @@ function registerAuthEventListeners() {
                 showAuthAlert(alertEl, 'error', 'Erro ao reenviar o e-mail.');
             } finally {
                 resendBtn.disabled = false;
+            }
+        });
+    }
+
+    // Esqueci minha senha
+    const btnForgot = document.getElementById('btn-forgot-password');
+    const btnForgotBack = document.getElementById('btn-forgot-back');
+    if (btnForgot && formForgot && formLogin) {
+        btnForgot.addEventListener('click', () => {
+            // Aproveita o e-mail que a pessoa já digitou no login.
+            document.getElementById('forgot-email').value = document.getElementById('login-email').value.trim();
+            formLogin.classList.add('hidden');
+            if (formRegister) formRegister.classList.add('hidden');
+            formForgot.classList.remove('hidden');
+            clearAuthAlerts();
+            document.getElementById('forgot-email').focus();
+        });
+    }
+    if (btnForgotBack && tabLogin) btnForgotBack.addEventListener('click', () => tabLogin.click());
+
+    if (formForgot) {
+        formForgot.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('forgot-email').value.trim().toLowerCase();
+            const alertEl = document.getElementById('forgot-alert');
+            const botao = formForgot.querySelector('button[type="submit"]');
+            botao.disabled = true;
+            showAuthAlert(alertEl, 'success', 'Enviando...');
+            try {
+                const { error } = await window.db.resetPassword(email);
+                if (error) {
+                    const limite = error.status === 429 || /security purposes|rate limit/i.test(error.message || '');
+                    showAuthAlert(alertEl, 'error', limite
+                        ? 'Você acabou de pedir um link. Espere um minuto e tente de novo.'
+                        : 'Não foi possível enviar agora: ' + error.message);
+                    return;
+                }
+                // A mesma resposta exista a conta ou não: dizer "e-mail não
+                // cadastrado" deixaria qualquer um descobrir quem é cliente.
+                showAuthAlert(alertEl, 'success',
+                    `Se existir uma conta com ${email}, o link chega em alguns minutos. Confira também o spam.`);
+            } catch (err) {
+                showAuthAlert(alertEl, 'error', 'Não foi possível enviar agora. Tente de novo em instantes.');
+            } finally {
+                botao.disabled = false;
+            }
+        });
+    }
+
+    const formNewPassword = document.getElementById('form-new-password');
+    if (formNewPassword) {
+        formNewPassword.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const senha = document.getElementById('new-password').value;
+            const repetida = document.getElementById('new-password-2').value;
+            const alertEl = document.getElementById('new-password-alert');
+            if (senha.length < 6) {
+                showAuthAlert(alertEl, 'error', 'A senha precisa ter pelo menos 6 caracteres.');
+                return;
+            }
+            if (senha !== repetida) {
+                showAuthAlert(alertEl, 'error', 'As duas senhas não são iguais.');
+                return;
+            }
+            const botao = formNewPassword.querySelector('button[type="submit"]');
+            botao.disabled = true;
+            try {
+                const { error } = await window.db.updatePassword(senha);
+                if (error) {
+                    showAuthAlert(alertEl, 'error', /different from the old/i.test(error.message || '')
+                        ? 'A senha nova precisa ser diferente da antiga.'
+                        : 'Não foi possível salvar: ' + error.message);
+                    return;
+                }
+                formNewPassword.reset();
+                alertEl.className = 'auth-alert hidden';
+                document.getElementById('recovery-modal').classList.add('hidden');
+                showToast('Senha alterada. Use a nova senha nos próximos acessos.', 'success', 6000);
+            } catch (err) {
+                showAuthAlert(alertEl, 'error', 'Não foi possível salvar agora. Tente de novo em instantes.');
+            } finally {
+                botao.disabled = false;
             }
         });
     }
@@ -2682,7 +3643,22 @@ function clearAuthAlerts() {
         registerAlert.className = 'auth-alert hidden';
         registerAlert.textContent = '';
     }
+    const forgotAlert = document.getElementById('forgot-alert');
+    if (forgotAlert) {
+        forgotAlert.className = 'auth-alert hidden';
+        forgotAlert.textContent = '';
+    }
     if (resendBtn) resendBtn.classList.add('hidden');
+}
+
+// Janela "Crie sua nova senha", aberta quando a pessoa volta pelo link de
+// recuperação. Não tem "fechar": ela veio justamente trocar a senha.
+function openRecoveryModal() {
+    const modal = document.getElementById('recovery-modal');
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    const campo = document.getElementById('new-password');
+    if (campo) campo.focus();
 }
 
 // Ilustração animada da tela de login: contêiner do logo sem o fundo branco,
@@ -2697,10 +3673,14 @@ function initAuthArt() {
     const ctx = canvas.getContext('2d');
     const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    const TEAL_DEEP = '#0f5c58';
-    const NEON_A = '255,90,140';  // neon pink core
-    const NEON_B = '255,150,60';  // warm orange halo
-    const BLUE = '70,150,255';    // ocean-blue accent mixed into the sparks
+    // Cores da animação do logo, na paleta do design system (ver DESIGN.md):
+    // o núcleo e o halo das fagulhas usam o laranja cargo — que é a cor da
+    // própria seta da marca — e o acento é o aqua. Antes eram rosa neon e azul,
+    // que não existem na paleta.
+    const TEAL_DEEP = '#053A44';  // --aqua-900, o corpo do contêiner
+    const NEON_A = '255,96,0';    // --orange-500, núcleo da fagulha
+    const NEON_B = '255,146,71';  // --orange-300, halo quente
+    const BLUE = '35,211,211';    // --aqua-400, acento nas fagulhas
 
     function dpr() { return Math.max(1, window.devicePixelRatio || 1); }
 
@@ -2870,7 +3850,7 @@ function initAuthArt() {
             ctx.arc(anchor.tip.x, anchor.tip.y, layer[0], 0, Math.PI*2);
             ctx.fill();
         });
-        ctx.fillStyle = 'rgba(255,235,225,0.55)';
+        ctx.fillStyle = 'rgba(255,241,230,0.55)';  // --orange-50, brilho do núcleo
         ctx.shadowColor = `rgba(${NEON_A},0.6)`;
         ctx.shadowBlur = 9;
         ctx.beginPath();
@@ -2925,7 +3905,13 @@ function initAuthArt() {
 // SUBSCRIPTION & TRIAL LOGIC
 // ==========================================
 
-const PAYMENT_LINK = "https://mpago.la/2vWGgwT";
+// Havia aqui um PAYMENT_LINK fixo (mpago.la/...) apontando para uma conta
+// específica do Mercado Pago. Estava declarado e nunca usado — o fluxo real
+// passa por /api/mp-checkout e /api/mp-subscription, que montam a cobrança com
+// o MP_ACCESS_TOKEN da Vercel. Removido de propósito: link de conta cravado no
+// código sobrevive a troca de conta e volta a ser usado por engano, mandando
+// dinheiro para o lugar errado sem ninguém notar. Para trocar a conta que
+// recebe, basta trocar MP_ACCESS_TOKEN e MP_WEBHOOK_SECRET nas env vars.
 
 async function updateUserInLocalStorage(user) {
     try {
@@ -2944,17 +3930,36 @@ async function updateUserInLocalStorage(user) {
 
 function checkSubscriptionStatus(user) {
     if (!user) return { hasAccess: false, isTrial: false, daysRemaining: 0, isSubscribed: false };
-    
-    // Novo padrão: Webhook do Stripe atualiza a coluna is_pro no banco
-    if (user.is_pro) {
-        return { hasAccess: true, isTrial: false, daysRemaining: 30, isSubscribed: true };
+
+    // Dono/admin do app (tabela app_admins) tem acesso infinito — não é
+    // cliente pagante, então nunca cai em trial nem em "assinatura vencida".
+    if (user.is_app_admin) return { hasAccess: true, isTrial: false, daysRemaining: Infinity, isSubscribed: false };
+
+    // Novo padrão: o webhook do Stripe/Mercado Pago atualiza is_pro no banco.
+    // A data em subscription_expires_at PRECISA ser conferida aqui: antes o
+    // is_pro sozinho liberava acesso, e como nada volta ele pra false quando os
+    // 30 dias vencem, um único PIX comprava acesso vitalício.
+    //   - subscription_expires_at nulo  -> assinatura recorrente, vale até cancelar
+    //   - subscription_expires_at com data -> pagamento avulso/PIX de 30 dias
+    // O is_subscribed legado entra na mesma regra.
+    const isPaid = user.is_pro || user.is_subscribed || user.isSubscribed;
+    if (isPaid) {
+        const rawExpiry = user.subscription_expires_at || user.subscriptionExpiresAt;
+        const expiresAt = rawExpiry ? new Date(rawExpiry) : null;
+        const hasValidExpiry = expiresAt && !isNaN(expiresAt.getTime());
+
+        // Data ausente ou ilegível é tratada como "sem vencimento" — na dúvida
+        // não derrubamos o acesso de quem pagou.
+        if (!hasValidExpiry || expiresAt.getTime() > Date.now()) {
+            const daysRemaining = hasValidExpiry
+                ? Math.max(0, Math.ceil((expiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+                : 30;
+            return { hasAccess: true, isTrial: false, daysRemaining, isSubscribed: true };
+        }
+        // Venceu: cai pro trial abaixo, que já estará expirado para uma conta
+        // antiga, resultando em hasAccess: false.
     }
-    
-    // Retrocompatibilidade
-    if (user.is_subscribed || user.isSubscribed) {
-        return { hasAccess: true, isTrial: false, daysRemaining: 30, isSubscribed: true };
-    }
-    
+
     // Trial check (7 days = 604800000 ms) for new accounts
     const createdAt = user.created_at ? new Date(user.created_at).getTime() : Date.now();
     const expiryTime = createdAt + (7 * 24 * 60 * 60 * 1000);
@@ -2980,9 +3985,14 @@ function registerSubscriptionEventListeners() {
 
     // Modal control utility
     const openModal = () => {
-        if (paymentModal) {
-            paymentModal.classList.remove('hidden');
-        }
+        if (!paymentModal) return;
+        paymentModal.classList.remove('hidden');
+        // Reabrir tem que começar limpo: sem isso a mensagem de "cartão
+        // recusado" da tentativa anterior fica na tela por cima do formulário
+        // novo, e o painel de sucesso esconderia os planos pra sempre.
+        limparStatusPagamento();
+        selecionarPlano('mensal');
+        montarCardForm();
     };
 
     // Open Payment Modal
@@ -3009,57 +4019,372 @@ function registerSubscriptionEventListeners() {
         });
     }
 
+    // ======================================================================
+    // PAGAMENTO
+    //
+    // MENSAL: o cartão é tokenizado aqui mesmo pelo MercadoPago.js e o
+    // /api/mp-subscription autoriza a assinatura direto na API do MP. A pessoa
+    // não é redirecionada, não faz login no Mercado Pago e nem precisa ter
+    // conta lá — foi assim que a tela "Seu e-mail não corresponde ao da
+    // assinatura" deixou de ter como acontecer. Antes daqui passava um campo
+    // pedindo o e-mail da conta do MP, que só transferia o erro pro cliente.
+    //
+    // AVULSO: segue redirecionando pro checkout do MP, que é onde o PIX existe.
+    // Esse caminho nunca teve o problema do e-mail.
+    // ======================================================================
     const btnMpCheckout = document.getElementById('btn-mp-checkout');
     const btnMpSubscription = document.getElementById('btn-mp-subscription');
+    const btnMpContinuar = document.getElementById('btn-mp-continuar');
     const mpLoading = document.getElementById('mp-loading');
+    const mpErro = document.getElementById('mp-erro');
+    const formAssinatura = document.getElementById('form-assinatura');
+    const painelAvulso = document.getElementById('painel-avulso');
+    const painelSucesso = document.getElementById('mp-sucesso');
+    const planoMensal = document.getElementById('plano-mensal');
+    const planoAvulso = document.getElementById('plano-avulso');
+    const mpPlanos = document.querySelector('.mp-planos');
 
-    const handleMpClick = async (apiEndpoint, btnElement) => {
-        const session = await window.db.getSession();
-        if (!session || !session.id) {
-            showToast("Você precisa estar logado para assinar o plano.", 'error');
+    // Nomes que o MercadoPago.js usa nos erros de validação, traduzidos pro que
+    // o cliente vê escrito na tela do modal.
+    const CAMPOS_AMIGAVEIS = {
+        cardNumber: 'número do cartão',
+        expirationDate: 'validade',
+        expirationMonth: 'validade',
+        expirationYear: 'validade',
+        securityCode: 'CVV',
+        cardholderName: 'nome impresso no cartão',
+        identificationNumber: 'CPF do titular',
+    };
+
+    let cardForm = null;
+    let montandoCardForm = false;
+    let errosDoCartao = [];
+
+    const limparStatusPagamento = () => {
+        if (mpErro) { mpErro.style.display = 'none'; mpErro.textContent = ''; }
+        if (mpLoading) mpLoading.style.display = 'none';
+        if (painelSucesso) painelSucesso.classList.add('hidden');
+        if (mpPlanos) mpPlanos.classList.remove('hidden');
+    };
+
+    const mostrarErro = (mensagem) => {
+        if (mpLoading) mpLoading.style.display = 'none';
+        if (!mpErro) { showToast(mensagem, 'error'); return; }
+        mpErro.textContent = mensagem;
+        mpErro.style.display = 'block';
+    };
+
+    const mostrarCarregando = (mensagem) => {
+        if (mpErro) mpErro.style.display = 'none';
+        if (!mpLoading) return;
+        mpLoading.textContent = mensagem;
+        mpLoading.style.display = 'block';
+    };
+
+    const selecionarPlano = (plano) => {
+        const mensal = plano !== 'avulso';
+        if (planoMensal) {
+            planoMensal.classList.toggle('ativo', mensal);
+            planoMensal.setAttribute('aria-checked', String(mensal));
+        }
+        if (planoAvulso) {
+            planoAvulso.classList.toggle('ativo', !mensal);
+            planoAvulso.setAttribute('aria-checked', String(!mensal));
+        }
+        if (formAssinatura) formAssinatura.classList.toggle('hidden', !mensal);
+        if (painelAvulso) painelAvulso.classList.toggle('hidden', mensal);
+        if (mpErro) mpErro.style.display = 'none';
+    };
+
+    // Monta o formulário de cartão uma vez só: o SDK sobe iframes e busca tipos
+    // de documento na API do MP, então remontar a cada abertura do modal
+    // piscaria a tela à toa.
+    const montarCardForm = async () => {
+        if (cardForm || montandoCardForm || !formAssinatura) return;
+
+        if (typeof MercadoPago === 'undefined') {
+            mostrarErro('Não foi possível carregar o formulário de cartão. Recarregue a página e tente de novo.');
             return;
         }
-        
-        // UI Feedback
-        if(btnMpCheckout) btnMpCheckout.disabled = true;
-        if(btnMpSubscription) btnMpSubscription.disabled = true;
-        if(mpLoading) mpLoading.style.display = 'block';
-        
+
+        montandoCardForm = true;
         try {
-            const response = await fetch(apiEndpoint, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${session.access_token}`
+            // A public key vem do GET do próprio endpoint de assinatura, e não
+            // de uma constante no bundle: ela continua morando nas env vars da
+            // Vercel, e trocar de conta do MP não exige mexer no app.js.
+            const resposta = await fetch('/api/mp-subscription');
+            const dados = await resposta.json().catch(() => ({}));
+            if (!resposta.ok || !dados.publicKey) throw new Error(dados.error || 'public key indisponível');
+
+            // Os MP Fields são iframes: não herdam nada do nosso CSS, então a
+            // cor do texto tem que ser passada na mão — senão o tema escuro fica
+            // com dígitos pretos em campo escuro.
+            const estiloCampo = {
+                color: getComputedStyle(document.body).color || '#ffffff',
+                'font-size': '16px',
+                placeholderColor: '#8d8d8d',
+            };
+
+            const mp = new MercadoPago(dados.publicKey, { locale: 'pt-BR' });
+
+            cardForm = mp.cardForm({
+                amount: '29.90',
+                iframe: true,
+                form: {
+                    id: 'form-assinatura',
+                    cardNumber: { id: 'form-checkout__cardNumber', placeholder: '0000 0000 0000 0000', style: estiloCampo },
+                    expirationDate: { id: 'form-checkout__expirationDate', placeholder: 'MM/AA', style: estiloCampo },
+                    securityCode: { id: 'form-checkout__securityCode', placeholder: '123', style: estiloCampo },
+                    cardholderName: { id: 'form-checkout__cardholderName', placeholder: 'Como está no cartão' },
+                    identificationType: { id: 'form-checkout__identificationType' },
+                    identificationNumber: { id: 'form-checkout__identificationNumber', placeholder: '000.000.000-00' },
+                    issuer: { id: 'form-checkout__issuer' },
+                    installments: { id: 'form-checkout__installments' },
                 },
-                body: JSON.stringify({ userId: session.id })
+                callbacks: {
+                    onFormMounted: (erro) => {
+                        if (erro) {
+                            console.error('Erro ao montar o CardForm do Mercado Pago:', erro);
+                            mostrarErro('Não foi possível carregar o formulário de cartão. Recarregue a página.');
+                            return;
+                        }
+                        if (btnMpSubscription) {
+                            btnMpSubscription.disabled = false;
+                            btnMpSubscription.textContent = 'Assinar por R$ 29,90/mês';
+                        }
+                    },
+                    onSubmit: (evento) => {
+                        evento.preventDefault();
+                        enviarAssinatura();
+                    },
+                    onValidityChange: (erro, campo) => {
+                        const alvo = document.getElementById('form-checkout__' + campo);
+                        if (alvo) alvo.classList.toggle('mp-field-invalido', Boolean(erro));
+                    },
+                    onError: (erros) => {
+                        // Guarda em vez de exibir: o onError dispara a cada tecla
+                        // enquanto o campo está incompleto, e avisar durante a
+                        // digitação é ruído. Vira mensagem só no submit.
+                        errosDoCartao = Array.isArray(erros) ? erros : [];
+                        console.warn('CardForm do Mercado Pago:', erros);
+                    },
+                },
             });
-            
-            const data = await response.json();
-            
-            if (data.init_point) {
-                window.location.href = data.init_point;
-            } else {
-                showToast('Erro ao gerar link de pagamento: ' + (data.error || 'Erro desconhecido'), 'error');
-                if(btnMpCheckout) btnMpCheckout.disabled = false;
-                if(btnMpSubscription) btnMpSubscription.disabled = false;
-                if(mpLoading) mpLoading.style.display = 'none';
-            }
-        } catch (error) {
-            console.error('Erro na chamada MP:', error);
-            showToast('Erro de conexão ao gerar pagamento.', 'error');
-            if(btnMpCheckout) btnMpCheckout.disabled = false;
-            if(btnMpSubscription) btnMpSubscription.disabled = false;
-            if(mpLoading) mpLoading.style.display = 'none';
+        } catch (erro) {
+            console.error('Falha ao preparar o formulário de cartão:', erro);
+            mostrarErro('Não foi possível carregar o formulário de cartão. Tente de novo em instantes.');
+        } finally {
+            montandoCardForm = false;
         }
     };
 
-    if (btnMpCheckout) {
-        btnMpCheckout.addEventListener('click', () => handleMpClick('/api/mp-checkout', btnMpCheckout));
+    // O CardToken vale um único uso. Depois de qualquer recusa o formulário
+    // precisa ser remontado, senão a segunda tentativa falha sozinha com token
+    // inválido — mesmo que o cartão esteja certo.
+    const remontarCardForm = async () => {
+        if (cardForm && typeof cardForm.unmount === 'function') {
+            try { cardForm.unmount(); } catch (erro) { /* já estava desmontado */ }
+        }
+        cardForm = null;
+        errosDoCartao = [];
+        if (btnMpSubscription) {
+            btnMpSubscription.disabled = true;
+            btnMpSubscription.textContent = 'Carregando formulário seguro...';
+        }
+        await montarCardForm();
+    };
+
+    // Transforma os erros de validação do SDK na lista de campos pra conferir.
+    // A forma exata do objeto de erro varia entre versões do MercadoPago.js, daí
+    // a busca ser feita no texto do erro inteiro em vez de num campo fixo.
+    const descreverErrosDeCampo = () => {
+        const texto = JSON.stringify(errosDoCartao || []);
+        const campos = Object.keys(CAMPOS_AMIGAVEIS)
+            .filter((chave) => texto.includes(chave))
+            .map((chave) => CAMPOS_AMIGAVEIS[chave]);
+        const unicos = [...new Set(campos)];
+        return unicos.length
+            ? `Confira ${unicos.join(', ')} e tente de novo.`
+            : 'Confira os dados do cartão e tente de novo.';
+    };
+
+    const mostrarSucesso = async (jaAssinante) => {
+        if (mpLoading) mpLoading.style.display = 'none';
+        if (mpErro) mpErro.style.display = 'none';
+
+        // Quem já tinha assinatura ativa não foi cobrado de novo — prometer
+        // "próxima cobrança em 30 dias" pra essa pessoa seria mentira.
+        if (jaAssinante && painelSucesso) {
+            const texto = painelSucesso.querySelector('p');
+            if (texto) {
+                texto.textContent = 'Você já tinha uma assinatura ativa no Mercado Pago, '
+                    + 'então não houve nova cobrança. Seu acesso PRO foi restaurado.';
+            }
+        }
+
+        if (formAssinatura) formAssinatura.classList.add('hidden');
+        if (painelAvulso) painelAvulso.classList.add('hidden');
+        if (mpPlanos) mpPlanos.classList.add('hidden');
+        if (painelSucesso) painelSucesso.classList.remove('hidden');
+
+        // O endpoint já gravou is_pro, então recarregar o perfil e rerenderizar
+        // tira o paywall da frente sem a pessoa precisar dar F5. O webhook segue
+        // sendo a fonte da verdade para renovação e cancelamento.
+        await checkAuthSession();
+        updateUI();
+    };
+
+    // O cartão estar autorizado não significa que o dinheiro entrou: o Mercado
+    // Pago processa a primeira fatura depois, de forma assíncrona, e ela pode ser
+    // recusada. Comemorar na autorização foi o que deixou cliente com pagamento
+    // recusado usando o sistema. Agora esperamos o webhook gravar o acesso e
+    // conferimos no perfil — a fonte da verdade é o banco, não a tela.
+    const TENTATIVAS_CONFIRMACAO = 20;
+    const INTERVALO_CONFIRMACAO_MS = 4000;
+
+    const aguardarConfirmacaoDoPagamento = async () => {
+        if (btnMpSubscription) btnMpSubscription.disabled = true;
+        mostrarCarregando('Cartão autorizado. Confirmando o pagamento com o banco — isso leva alguns instantes...');
+
+        for (let tentativa = 0; tentativa < TENTATIVAS_CONFIRMACAO; tentativa++) {
+            await new Promise((resolve) => setTimeout(resolve, INTERVALO_CONFIRMACAO_MS));
+            await checkAuthSession();
+            if (checkSubscriptionStatus(state.currentUser).hasAccess) {
+                await mostrarSucesso(false);
+                return;
+            }
+        }
+
+        // Estourou o tempo sem confirmação. Não liberamos nada por conta própria:
+        // o webhook libera sozinho assim que o MP aprovar, e afirmar que está
+        // ativo sem estar seria repetir exatamente o bug que estamos corrigindo.
+        // O botão segue desabilitado para não criar uma segunda assinatura.
+        mostrarCarregando(
+            'Sua assinatura foi criada e o cartão autorizado, mas o Mercado Pago ainda não confirmou a cobrança. '
+            + 'Assim que confirmar, seu acesso é liberado automaticamente — pode fechar esta janela.'
+        );
+    };
+
+    const enviarAssinatura = async () => {
+        const session = await window.db.getSession();
+        if (!session || !session.id) {
+            mostrarErro('Sua sessão expirou. Faça login de novo para assinar.');
+            return;
+        }
+        if (!cardForm) {
+            mostrarErro('O formulário de cartão ainda não carregou. Aguarde um instante.');
+            return;
+        }
+
+        const dadosCartao = cardForm.getCardFormData();
+        if (!dadosCartao || !dadosCartao.token) {
+            mostrarErro(descreverErrosDeCampo());
+            return;
+        }
+
+        if (btnMpSubscription) btnMpSubscription.disabled = true;
+        mostrarCarregando('Autorizando a assinatura com o banco emissor...');
+
+        try {
+            const resposta = await fetch('/api/mp-subscription', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`,
+                },
+                // O deviceId vem do security.js do Mercado Pago e entra no score
+                // do antifraude deles. Sem ele, cobranças legítimas de R$ 29,90
+                // foram recusadas com cc_rejected_high_risk.
+                body: JSON.stringify({
+                    cardToken: dadosCartao.token,
+                    deviceId: window.MP_DEVICE_SESSION_ID || null,
+                }),
+            });
+            const corpo = await resposta.json().catch(() => ({}));
+
+            if (!resposta.ok || corpo.status !== 'authorized') {
+                mostrarErro(corpo.error || 'Não foi possível autorizar o cartão. Tente outro cartão.');
+                await remontarCardForm();
+                return;
+            }
+
+            // Só mostra "Assinatura ativa" quando o acesso existe de verdade no
+            // banco. Nos outros casos entra a espera pela confirmação do MP.
+            if (corpo.acessoLiberado) {
+                await mostrarSucesso(corpo.jaAssinante === true);
+            } else {
+                await aguardarConfirmacaoDoPagamento();
+            }
+        } catch (erro) {
+            console.error('Erro ao criar a assinatura no Mercado Pago:', erro);
+            mostrarErro('Erro de conexão. Confira sua internet e tente de novo.');
+            await remontarCardForm();
+        } finally {
+            if (btnMpSubscription) btnMpSubscription.disabled = false;
+        }
+    };
+
+    const irParaCheckoutAvulso = async () => {
+        const session = await window.db.getSession();
+        if (!session || !session.id) {
+            mostrarErro('Você precisa estar logado para pagar.');
+            return;
+        }
+
+        if (btnMpCheckout) btnMpCheckout.disabled = true;
+        mostrarCarregando('Gerando link seguro do Mercado Pago...');
+
+        try {
+            const resposta = await fetch('/api/mp-checkout', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`,
+                },
+                body: JSON.stringify({ userId: session.id }),
+            });
+            const corpo = await resposta.json().catch(() => ({}));
+
+            if (corpo.init_point) {
+                window.location.href = corpo.init_point;
+                return;
+            }
+            mostrarErro(corpo.error || 'Não foi possível gerar o link de pagamento.');
+        } catch (erro) {
+            console.error('Erro na chamada do checkout avulso:', erro);
+            mostrarErro('Erro de conexão ao gerar o pagamento.');
+        } finally {
+            if (btnMpCheckout) btnMpCheckout.disabled = false;
+        }
+    };
+
+    // Além de trocar o painel, o clique no mensal tenta montar o formulário.
+    // É a rede de segurança para qualquer caminho que abra o modal sem passar
+    // pelo openModal: o CardForm monta no primeiro clique em vez de deixar o
+    // botão preso em "Carregando formulário seguro...".
+    if (planoMensal) {
+        planoMensal.addEventListener('click', () => {
+            selecionarPlano('mensal');
+            montarCardForm();
+        });
     }
-    
-    if (btnMpSubscription) {
-        btnMpSubscription.addEventListener('click', () => handleMpClick('/api/mp-subscription', btnMpSubscription));
+    if (planoAvulso) planoAvulso.addEventListener('click', () => selecionarPlano('avulso'));
+
+    // O botão de Configurações abre o modal de outro ponto do arquivo e precisa
+    // do mesmo caminho de abertura, senão o formulário de cartão não monta.
+    window.abrirModalPagamento = openModal;
+    if (btnMpCheckout) btnMpCheckout.addEventListener('click', irParaCheckoutAvulso);
+    if (btnMpContinuar) {
+        btnMpContinuar.addEventListener('click', () => {
+            if (paymentModal) paymentModal.classList.add('hidden');
+        });
+    }
+
+    // Rede de segurança: quem envia o formulário é o onSubmit do cardForm, mas
+    // se ele não tiver montado o navegador faria um submit de verdade e
+    // recarregaria a página, perdendo a sessão da tela.
+    if (formAssinatura) {
+        formAssinatura.addEventListener('submit', (evento) => evento.preventDefault());
     }
 }
 
@@ -3080,9 +4405,11 @@ document.addEventListener('DOMContentLoaded', () => {
     initDocumentsModule();
     initFeasibilityModule();
     initHistoryModule();
+    initGtin();
     initReviewsModule();
     initCatalogStatusModule();
     initPromotionsModule();
+    initPrecificacaoMarketplaces();
     startNotificationPolling();
 });
 
@@ -3144,7 +4471,7 @@ function buildThumbnailImg(src, size) {
         placeholder.style.height = px;
         placeholder.style.borderRadius = 'var(--border-radius-md, 8px)';
         placeholder.style.flexShrink = '0';
-        placeholder.style.background = 'var(--secondary)';
+        placeholder.style.background = 'var(--surface-2)';
         placeholder.style.display = 'flex';
         placeholder.style.alignItems = 'center';
         placeholder.style.justifyContent = 'center';
@@ -3153,7 +4480,11 @@ function buildThumbnailImg(src, size) {
     }
 
     const img = document.createElement('img');
-    img.src = src;
+    // Normaliza para https. O backend passou a gravar já em https (secure_thumbnail),
+    // mas as linhas gravadas antes disso continuam com http:// no banco — e a página
+    // é servida em https, então elas viram mixed content e violação de CSP. Converter
+    // aqui cobre o histórico sem precisar migrar dado.
+    img.src = String(src).replace(/^http:\/\//i, 'https://');
     img.alt = '';
     img.style.width = px;
     img.style.height = px;
@@ -3230,7 +4561,7 @@ function buildReviewCard(r) {
     card.appendChild(header);
 
     const highlight = document.createElement('div');
-    highlight.style.background = 'var(--secondary)';
+    highlight.style.background = 'var(--surface-2)';
     highlight.style.borderLeft = '3px solid var(--primary)';
     highlight.style.borderRadius = '6px';
     highlight.style.padding = '0.6rem 0.75rem';
@@ -3316,7 +4647,7 @@ function initReviewsModule() {
 const CATALOG_STATUS_LABELS = {
     winning: { label: 'Ganhando', color: 'var(--success)' },
     sharing_first_place: { label: 'Empatado em 1º', color: 'var(--primary)' },
-    competing: { label: 'Perdendo', color: 'var(--danger, #ef4444)' },
+    competing: { label: 'Perdendo', color: 'var(--danger)' },
     listed: { label: 'Fora da disputa', color: 'var(--text-muted)' },
     not_listed: { label: 'Fora do catálogo', color: 'var(--text-muted)' },
 };
@@ -3353,11 +4684,238 @@ function updateCatalogBadge(count) {
 function buildAlertBanner(text) {
     const banner = document.createElement('p');
     banner.className = 'small';
-    banner.style.color = 'var(--danger, #ef4444)';
+    banner.style.color = 'var(--danger)';
     banner.style.fontWeight = '600';
     banner.style.margin = '0 0 0.5rem 0';
     banner.textContent = `⚠ ${text}`;
     return banner;
+}
+
+// ==========================================
+// MARGEM DOS ANÚNCIOS GANHANDO O CATÁLOGO
+//
+// Ganhar a disputa de catálogo trava o preço: ele é o que faz o anúncio
+// aparecer, não uma escolha livre como num anúncio comum. Este bloco mostra,
+// para cada anúncio na aba "Ganhando", se aquele preço ainda cobre comissão,
+// frete, imposto, o custo do produto e o que se gasta com o anúncio
+// patrocinado dele — antes do vendedor descobrir vendendo no prejuízo.
+//
+// Custo do produto e imposto são OS MESMOS do painel de Patrocinados
+// (window.db.getAdsMargemDados/saveItemCost/saveAdsTax — tabelas ml_item_costs
+// e ml_ads_settings): digitar o custo aqui já deixa ele pronto lá, e vice-versa.
+// ==========================================
+
+const CATALOG_MARGEM_CACHE_KEY = 'impoclick-catalog-margem';
+const CATALOG_MARGEM_CACHE_HORAS = 6;
+
+// Preenchido por carregarMargemCatalogo(): { [ml_item_id]: { preco, comissaoUn,
+// freteUn, adsUn, temAds } }. null enquanto ainda não foi buscado.
+let catalogMargemPorItem = null;
+let catalogMargemCarregando = false;
+// Custo do produto (por MLB) e imposto sobre a venda (%) — compartilhados
+// com o Patrocinados (ml_item_costs / ml_ads_settings). Comissão e frete não
+// entram aqui: vêm prontos do servidor, calculados a partir das vendas reais
+// dos últimos 30 dias sempre que existem (ver resource=catalog-margem).
+let catalogCustoPorItem = {};
+let catalogImpostoPct = 0;
+
+// Reflete o imposto no campo do topo da aba — chamado depois de toda carga,
+// pra tela nunca mostrar um valor desatualizado.
+function sincronizarControlesMargemCatalogo() {
+    const inpImposto = document.getElementById('catalog-imposto-pct');
+    if (inpImposto && document.activeElement !== inpImposto) inpImposto.value = catalogImpostoPct;
+}
+
+function lerCacheMargemCatalogo() {
+    try {
+        const bruto = localStorage.getItem(CATALOG_MARGEM_CACHE_KEY);
+        if (!bruto) return null;
+        const c = JSON.parse(bruto);
+        if (c && Date.now() - c.em < CATALOG_MARGEM_CACHE_HORAS * 3600000) return c.porItem;
+    } catch (e) { /* sem armazenamento ou JSON inválido — busca de novo */ }
+    return null;
+}
+
+function salvarCacheMargemCatalogo(porItem) {
+    try {
+        localStorage.setItem(CATALOG_MARGEM_CACHE_KEY, JSON.stringify({ em: Date.now(), porItem }));
+    } catch (e) { /* sem armazenamento — segue só em memória */ }
+}
+
+// Busca a comissão, o frete e o gasto com anúncio patrocinado reais de cada
+// item "Ganhando", e o custo/imposto salvos em Patrocinados. Cacheado por
+// CATALOG_MARGEM_CACHE_HORAS: o cálculo bate no Mercado Livre por anúncio, e
+// reabrir a aba não deveria refazer tudo de novo.
+async function carregarMargemCatalogo(forcar) {
+    if (!state.currentUser || catalogMargemCarregando) return;
+
+    const custos = await window.db.getAdsMargemDados();
+    if (custos && custos.dados) {
+        catalogCustoPorItem = custos.dados.custos || {};
+        catalogImpostoPct = custos.dados.impostoPct != null ? custos.dados.impostoPct : 0;
+    }
+    sincronizarControlesMargemCatalogo();
+
+    if (!forcar) {
+        const doCache = lerCacheMargemCatalogo();
+        if (doCache) {
+            catalogMargemPorItem = doCache;
+            renderCatalogList(catalogUltimosItens || []);
+            return;
+        }
+    }
+
+    catalogMargemCarregando = true;
+    const statusEl = document.getElementById('catalog-margem-status');
+    const btn = document.getElementById('btn-catalog-margem');
+    if (statusEl) statusEl.textContent = 'Calculando margem nos anúncios ganhando (consulta o Mercado Livre, pode levar um minuto)...';
+    if (btn) btn.disabled = true;
+
+    // Até 60s: por anúncio, o servidor consulta comissão, frete e publicidade.
+    const r = await mlApiFetch('/api/ml-reviews?resource=catalog-margem', 60000);
+    catalogMargemCarregando = false;
+    if (btn) btn.disabled = false;
+
+    if (!r) {
+        if (statusEl) statusEl.textContent = 'Não foi possível calcular a margem agora. Tente de novo em instantes.';
+        return;
+    }
+
+    const porItem = {};
+    for (const it of r.itens || []) porItem[it.mlItemId] = it;
+    catalogMargemPorItem = porItem;
+    salvarCacheMargemCatalogo(porItem);
+
+    if (statusEl) {
+        statusEl.textContent = r.cortado
+            ? `Margem calculada para os ${r.itens.length} anúncios mais recentes ganhando — há mais do que isso, atualize depois de agir nestes.`
+            : (r.itens.length > 0 ? `Margem calculada em ${r.itens.length} anúncio(s) ganhando.` : 'Nenhum anúncio ganhando no momento.');
+    }
+    renderCatalogList(catalogUltimosItens || []);
+}
+
+// Preço, comissão, frete, imposto, custo e ads — tudo o que entra na conta.
+// Devolve null quando falta comissão ou custo: melhor não mostrar um número
+// errado do que arriscar "lucro" onde na real não dá para saber.
+function contaMargemCatalogo(margem, custoUn, impostoPct) {
+    if (!margem || margem.comissaoUn == null || custoUn == null || !(margem.preco > 0)) return null;
+    const imposto = margem.preco * ((impostoPct || 0) / 100);
+    const frete = margem.freteUn || 0;
+    const ads = margem.adsUn || 0;
+    const margemUn = margem.preco - margem.comissaoUn - frete - imposto - custoUn - ads;
+    return { margemUn, margemPct: margemUn / margem.preco, imposto, frete, ads };
+}
+
+// Bloco de margem de UM card do catálogo, só para quem está "Ganhando".
+function buildCatalogMargemBlock(item) {
+    const id = item.ml_item_id;
+    const box = document.createElement('div');
+    box.className = 'catalog-margem';
+    box.style.marginTop = '0.6rem';
+    box.style.paddingTop = '0.6rem';
+    box.style.borderTop = '1px dashed var(--border-color)';
+
+    if (catalogMargemPorItem == null) {
+        // Ainda não buscado: o botão "Calcular margem" no topo da aba resolve.
+        return box;
+    }
+
+    const margem = catalogMargemPorItem[id];
+    if (!margem) {
+        const p = document.createElement('p');
+        p.className = 'small';
+        p.style.color = 'var(--text-muted)';
+        p.textContent = 'Margem não calculada para este anúncio ainda — clique em "Calcular margem" no topo.';
+        box.appendChild(p);
+        return box;
+    }
+
+    const linha = document.createElement('div');
+    linha.style.display = 'flex';
+    linha.style.alignItems = 'center';
+    linha.style.gap = '0.5rem';
+    linha.style.flexWrap = 'wrap';
+
+    const label = document.createElement('label');
+    label.className = 'small';
+    label.style.color = 'var(--text-muted)';
+    label.style.margin = '0';
+    label.textContent = 'Custo do produto (nacionalizado):';
+    label.htmlFor = `catalog-custo-${id}`;
+
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.id = `catalog-custo-${id}`;
+    input.min = '0';
+    input.step = '0.01';
+    input.placeholder = 'R$';
+    input.style.width = '6.5rem';
+    input.style.padding = '0.3rem 0.45rem';
+    const custoAtual = catalogCustoPorItem[id];
+    if (custoAtual != null) input.value = custoAtual;
+
+    const resultado = document.createElement('p');
+    resultado.className = 'small';
+    resultado.style.margin = '0.35rem 0 0';
+    resultado.style.fontWeight = '600';
+
+    const detalhe = document.createElement('p');
+    detalhe.className = 'small';
+    detalhe.style.color = 'var(--text-muted)';
+    detalhe.style.margin = '0.15rem 0 0';
+
+    function redesenhar() {
+        const custoUn = catalogCustoPorItem[id];
+        if (margem.comissaoUn == null) {
+            resultado.style.color = 'var(--text-muted)';
+            resultado.textContent = 'Não foi possível obter a comissão deste anúncio agora.';
+            detalhe.textContent = '';
+            return;
+        }
+        if (custoUn == null) {
+            resultado.style.color = 'var(--text-muted)';
+            resultado.textContent = 'Digite o custo do produto para ver a margem.';
+            detalhe.textContent = '';
+            return;
+        }
+        const c = contaMargemCatalogo(margem, custoUn, catalogImpostoPct);
+        const lucro = c.margemUn >= 0;
+        resultado.style.color = lucro ? 'var(--success)' : 'var(--danger)';
+        resultado.textContent = `${lucro ? 'Lucro' : 'Prejuízo'}: ${formatBRL(Math.abs(c.margemUn))} por unidade (${(c.margemPct * 100).toFixed(1)}%)`;
+        // "(estimado)" quando não há venda recente desse anúncio: o valor vem
+        // da tabela do ML (comissão) ou de uma cotação (frete), não do que
+        // realmente foi cobrado — mesmo rótulo que o painel de Patrocinados usa.
+        const partes = [
+            `Preço: ${formatBRL(margem.preco)}`,
+            `Comissão: ${formatBRL(margem.comissaoUn)}${margem.comissaoFonte === 'tabela' ? ' (estimado)' : ''}`,
+            `Frete: ${formatBRL(c.frete)}${margem.freteFonte === 'tabela' ? ' (estimado)' : ''}`,
+            `Imposto (${catalogImpostoPct}%): ${formatBRL(c.imposto)}`,
+        ];
+        if (margem.temAds) partes.push(`Ads: ${formatBRL(c.ads)}`);
+        detalhe.textContent = partes.join(' · ');
+    }
+
+    input.addEventListener('change', async () => {
+        const v = input.value.trim() === '' ? null : Number(input.value);
+        catalogCustoPorItem[id] = v != null && Number.isFinite(v) ? v : null;
+        redesenhar();
+        // O custo pode tirar ou colocar este anúncio na aba Prejuízo — só ela
+        // precisa recalcular; Ganhando/Perdendo já têm o card certo por cima.
+        renderCatalogPrejuizoTab();
+        try {
+            await window.db.saveItemCost(id, catalogCustoPorItem[id]);
+        } catch (e) {
+            console.error('Erro ao salvar custo do produto:', e);
+        }
+    });
+
+    redesenhar();
+    linha.appendChild(label);
+    linha.appendChild(input);
+    box.appendChild(linha);
+    box.appendChild(resultado);
+    box.appendChild(detalhe);
+    return box;
 }
 
 function buildCatalogCard(item) {
@@ -3374,7 +4932,15 @@ function buildCatalogCard(item) {
 
     titleGroup.appendChild(buildThumbnailImg(item.item_thumbnail));
 
-    const title = document.createElement('strong');
+    // Link pro anúncio no Mercado Livre quando o servidor já mandou o
+    // permalink (ml_catalog_link_sku.sql); sem ele, fica só o texto, como antes.
+    const title = item.permalink ? document.createElement('a') : document.createElement('strong');
+    if (item.permalink) {
+        title.href = item.permalink;
+        title.target = '_blank';
+        title.rel = 'noopener';
+        title.className = 'item-card-title-link';
+    }
     title.textContent = item.item_title || item.ml_item_id;
     titleGroup.appendChild(title);
 
@@ -3401,6 +4967,7 @@ function buildCatalogCard(item) {
     const priceParts = [];
     if (item.current_price != null) priceParts.push(`Seu preço: R$ ${Number(item.current_price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`);
     if (item.status !== 'winning' && item.price_to_win != null) priceParts.push(`Preço pra ganhar: R$ ${Number(item.price_to_win).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`);
+    if (item.seller_sku) priceParts.push(`SKU: ${item.seller_sku}`);
     detailP.textContent = priceParts.join(' · ');
 
     card.appendChild(detailP);
@@ -3434,16 +5001,117 @@ function buildCatalogCard(item) {
         card.appendChild(editLink);
     }
 
+    if (item.status === 'winning') {
+        card.appendChild(buildCatalogMargemBlock(item));
+    }
+
     return card;
 }
 
+// Última lista recebida do servidor — carregarMargemCatalogo() a reusa para
+// redesenhar os cards assim que a margem chega, sem depender de uma nova
+// consulta de status só para isso.
+let catalogUltimosItens = [];
+
 function renderCatalogList(items) {
     const all = items || [];
+    catalogUltimosItens = all;
     const winning = all.filter(i => i.status === 'winning');
     const losing = all.filter(i => i.status !== 'winning');
 
     renderIntoList('catalog-list-winning', 'catalog-empty-winning', winning, buildCatalogCard);
     renderIntoList('catalog-list-losing', 'catalog-empty-losing', losing, buildCatalogCard);
+    renderCatalogPrejuizoTab();
+}
+
+// ==========================================
+// ABA "PREJUÍZO" — dashboard dos anúncios "Ganhando" cujo preço, hoje, não
+// cobre o custo. Escopo de propósito igual ao da margem (só Ganhando, onde o
+// preço é travado pela disputa de catálogo): ligar o mesmo cálculo em
+// "Perdendo" multiplicaria as consultas ao Mercado Livre por verificação.
+// ==========================================
+
+// Anúncios "Ganhando", com margem calculada e custo digitado, cuja conta dá
+// negativa — junto com a conta já feita, pra não recalcular duas vezes.
+function catalogItensComPrejuizo() {
+    if (!catalogMargemPorItem) return [];
+    const achados = [];
+    for (const item of catalogUltimosItens) {
+        if (item.status !== 'winning') continue;
+        const margem = catalogMargemPorItem[item.ml_item_id];
+        const custoUn = catalogCustoPorItem[item.ml_item_id];
+        if (!margem || custoUn == null) continue;
+        const c = contaMargemCatalogo(margem, custoUn, catalogImpostoPct);
+        if (c && c.margemUn < 0) achados.push({ item, margem, c });
+    }
+    // Pior margem primeiro — é o que mais precisa de atenção.
+    achados.sort((a, b) => a.c.margemUn - b.c.margemUn);
+    return achados;
+}
+
+function buildCatalogPrejuizoResumo(achados, totalGanhando, totalComMargemECusto) {
+    const box = document.createElement('div');
+    if (achados.length === 0) {
+        box.innerHTML = '';
+        const p = document.createElement('p');
+        p.className = 'small';
+        p.style.color = 'var(--text-muted)';
+        p.style.margin = '0';
+        p.textContent = totalComMargemECusto > 0
+            ? `Nenhum prejuízo entre os ${totalComMargemECusto} anúncio(s) com margem e custo já calculados.`
+            : 'Calcule a margem e digite o custo dos anúncios em "Ganhando" para este resumo aparecer.';
+        box.appendChild(p);
+        return box;
+    }
+
+    const somaPrejuizo = achados.reduce((acc, a) => acc + Math.abs(a.c.margemUn), 0);
+    const linha = document.createElement('div');
+    linha.style.display = 'flex';
+    linha.style.flexWrap = 'wrap';
+    linha.style.gap = '1.5rem';
+
+    const stat = (rotulo, valor, cor) => {
+        const d = document.createElement('div');
+        const l = document.createElement('div');
+        l.className = 'small';
+        l.style.color = 'var(--text-muted)';
+        l.textContent = rotulo;
+        const v = document.createElement('strong');
+        v.style.display = 'block';
+        v.style.fontSize = '1.15rem';
+        if (cor) v.style.color = cor;
+        v.textContent = valor;
+        d.appendChild(l);
+        d.appendChild(v);
+        return d;
+    };
+    linha.appendChild(stat('Anúncios com prejuízo', `${achados.length} de ${totalComMargemECusto} calculado(s)`, 'var(--danger)'));
+    linha.appendChild(stat('Soma do prejuízo por unidade', formatBRL(somaPrejuizo), 'var(--danger)'));
+    linha.appendChild(stat('Pior caso', `${achados[0].item.item_title || achados[0].item.ml_item_id} (${(achados[0].c.margemPct * 100).toFixed(1)}%)`));
+    box.appendChild(linha);
+    return box;
+}
+
+function renderCatalogPrejuizoTab() {
+    const achados = catalogItensComPrejuizo();
+    const totalGanhando = catalogUltimosItens.filter(i => i.status === 'winning').length;
+    const totalComMargemECusto = catalogMargemPorItem
+        ? catalogUltimosItens.filter(i => i.status === 'winning' && catalogMargemPorItem[i.ml_item_id] && catalogCustoPorItem[i.ml_item_id] != null).length
+        : 0;
+
+    const resumo = document.getElementById('catalog-prejuizo-resumo');
+    if (resumo) {
+        resumo.innerHTML = '';
+        resumo.appendChild(buildCatalogPrejuizoResumo(achados, totalGanhando, totalComMargemECusto));
+    }
+
+    renderIntoList('catalog-list-prejuizo', 'catalog-empty-prejuizo', achados.map(a => a.item), buildCatalogCard);
+
+    const badge = document.getElementById('catalog-prejuizo-badge');
+    if (badge) {
+        badge.textContent = String(achados.length);
+        badge.classList.toggle('hidden', achados.length === 0);
+    }
 }
 
 async function loadCatalogStatus() {
@@ -3476,13 +5144,37 @@ function initCatalogStatusModule() {
         btnMarkAll.addEventListener('click', () => markCatalogRead({ all: true }));
     }
 
+    const btnMargem = document.getElementById('btn-catalog-margem');
+    if (btnMargem) {
+        btnMargem.addEventListener('click', () => carregarMargemCatalogo(true));
+    }
+
+    // Imposto muda só a conta no navegador — sem custo de servidor, então
+    // recalcula na hora, sem precisar buscar a margem de novo.
+    const inpImposto = document.getElementById('catalog-imposto-pct');
+    if (inpImposto) {
+        inpImposto.addEventListener('change', async () => {
+            const pct = Number(inpImposto.value);
+            if (!Number.isFinite(pct) || pct < 0) { inpImposto.value = catalogImpostoPct; return; }
+            catalogImpostoPct = pct;
+            renderCatalogList(catalogUltimosItens || []);
+            try {
+                await window.db.saveAdsTax(pct);
+            } catch (e) {
+                console.error('Erro ao salvar o imposto sobre a venda:', e);
+            }
+        });
+    }
+
     const tabButtons = {
         winning: document.getElementById('catalog-tab-btn-winning'),
         losing: document.getElementById('catalog-tab-btn-losing'),
+        prejuizo: document.getElementById('catalog-tab-btn-prejuizo'),
     };
     const tabPanels = {
         winning: document.getElementById('catalog-tab-winning'),
         losing: document.getElementById('catalog-tab-losing'),
+        prejuizo: document.getElementById('catalog-tab-prejuizo'),
     };
     Object.keys(tabButtons).forEach(key => {
         const btn = tabButtons[key];
@@ -3606,10 +5298,10 @@ function buildPromotionCard(item) {
     const statusSpan = document.createElement('span');
     statusSpan.className = 'item-card-status';
     if (item.status === 'ended') {
-        statusSpan.style.color = saiuAntesDoPrazo ? 'var(--danger, #ef4444)' : 'var(--text-muted)';
+        statusSpan.style.color = saiuAntesDoPrazo ? 'var(--danger)' : 'var(--text-muted)';
         statusSpan.textContent = saiuAntesDoPrazo ? 'Saiu antes do prazo' : 'Terminou';
     } else if (daysLeft != null && daysLeft <= 3) {
-        statusSpan.style.color = 'var(--danger, #ef4444)';
+        statusSpan.style.color = 'var(--danger)';
         statusSpan.textContent = daysLeft <= 0 ? 'Termina hoje' : `Termina em ${daysLeft} dia${daysLeft > 1 ? 's' : ''}`;
     } else {
         statusSpan.style.color = 'var(--success)';
@@ -3672,6 +5364,1441 @@ function buildPromotionPageLink(itemId) {
     link.rel = 'noopener';
     link.textContent = 'Ver anúncio nas promoções';
     return link;
+}
+
+// Campo do preço mínimo: o número que MANDA na automação.
+//
+// Gravado por ANÚNCIO (MLB), em tabela própria. Já esteve em products_catalog,
+// o que obrigava a vincular cada anúncio a um produto cadastrado só para
+// digitar um valor — limitação de armazenamento aparecendo como exigência na
+// tela. Quem quer apenas renovar promoções não quer catalogar nada.
+//
+// Sem preço mínimo, a automação ignora o anúncio. É a trava principal.
+function buildMinPriceInput(mlItemId, valorAtual, aoSalvar) {
+    const wrap = document.createElement('div');
+    wrap.style.marginTop = '0.5rem';
+
+    const linha = document.createElement('div');
+    linha.style.display = 'flex';
+    linha.style.gap = '8px';
+    linha.style.alignItems = 'center';
+
+    const rotulo = document.createElement('span');
+    rotulo.className = 'small';
+    rotulo.style.color = 'var(--text-muted)';
+    rotulo.style.whiteSpace = 'nowrap';
+    rotulo.textContent = 'Exigir no mínimo';
+    linha.appendChild(rotulo);
+
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.step = '0.01';
+    input.min = '0';
+    // Vazio não é "desligado", é o comportamento normal — o placeholder precisa
+    // dizer isso, senão o campo em branco parece pendência.
+    input.placeholder = 'piso automático';
+    input.value = valorAtual != null ? valorAtual : '';
+    input.style.width = '8rem';
+    input.style.padding = '0.45rem 0.6rem';
+    input.style.fontSize = '0.95rem';
+    input.style.borderRadius = 'var(--border-radius-md, 12px)';
+    input.style.border = '1px solid var(--border-color)';
+    input.style.background = 'var(--bg-card)';
+    input.style.color = 'var(--text-primary)';
+    linha.appendChild(input);
+
+    const salvar = document.createElement('button');
+    salvar.className = 'btn btn-primary btn-sm';
+    salvar.textContent = 'Salvar';
+    salvar.style.whiteSpace = 'nowrap';
+    linha.appendChild(salvar);
+
+    salvar.addEventListener('click', async () => {
+        const bruto = input.value.trim();
+        const valor = bruto === '' ? null : Number(bruto);
+        if (valor !== null && (!Number.isFinite(valor) || valor <= 0)) {
+            showToast('Informe um preço mínimo válido.', 'error');
+            return;
+        }
+        salvar.disabled = true;
+        try {
+            await window.db.setPromoItemMinPrice(mlItemId, valor);
+            showToast(valor === null
+                ? 'Exigência removida — este anúncio volta ao piso automático.'
+                : 'Exigência salva. Vale a partir da próxima verificação.', 'success');
+            if (aoSalvar) await aoSalvar();
+        } catch (e) {
+            console.error('Falha ao salvar preço mínimo:', e);
+            showToast('Não foi possível salvar o preço mínimo.', 'error');
+        } finally {
+            salvar.disabled = false;
+        }
+    });
+
+    // Só aparece quando há uma exigência salva. Apagá-la NÃO desliga a
+    // automação no anúncio — devolve o piso automático, que é o que protege
+    // todo mundo por padrão.
+    if (valorAtual != null) {
+        const cancelar = document.createElement('button');
+        cancelar.className = 'btn btn-secondary btn-sm';
+        cancelar.textContent = 'Voltar ao piso automático';
+        cancelar.style.whiteSpace = 'nowrap';
+        linha.appendChild(cancelar);
+
+        cancelar.addEventListener('click', async () => {
+            const ok = await showConfirm(
+                'Este anúncio volta ao piso automático: a automação continua agindo nele, '
+                + 'só que exigindo apenas não receber menos do que ele já deixa hoje.',
+                { title: 'Voltar ao piso automático', confirmText: 'Voltar ao automático' }
+            );
+            if (!ok) return;
+
+            cancelar.disabled = true;
+            salvar.disabled = true;
+            try {
+                await window.db.setPromoItemMinPrice(mlItemId, null);
+                input.value = '';
+                showToast('Anúncio de volta ao piso automático.', 'success');
+                if (aoSalvar) await aoSalvar();
+            } catch (e) {
+                console.error('Falha ao cancelar a automação:', e);
+                showToast('Não foi possível cancelar a automação.', 'error');
+            } finally {
+                cancelar.disabled = false;
+                salvar.disabled = false;
+            }
+        });
+    }
+
+    wrap.appendChild(linha);
+    return wrap;
+}
+
+// ==========================================
+// PRECIFICAÇÃO MARKETPLACES
+//
+// Duas naturezas de dado convivem aqui, e a tela precisa deixar isso claro:
+//
+//   Mercado Livre -> consultado AO VIVO na API (comissão real da categoria).
+//                    É número, não estimativa.
+//   Shopee,
+//   Amazon,
+//   TikTok Shop   -> tabela embutida abaixo, porque nenhuma das três tem API
+//                    pública de tarifas. Envelhece quando eles mudarem os valores.
+// ==========================================
+
+// Tabela oficial vigente desde MARÇO/2026, isolada de propósito: quando a
+// Shopee mudar as taxas, muda-se só este bloco.
+//
+// A data não aparece mais na tela (o usuário achou poluído), então ela vive
+// aqui — ao revisar, confira contra a tabela atual da Shopee.
+//
+// Não modelado: vendedor CPF com mais de 450 pedidos em 90 dias paga R$ 3,00
+// a mais por item. Se isso passar a valer para o usuário, entra como linha.
+const SHOPEE_FAIXAS = [
+    { ate: 7.99, comissao: 50, fixa: 0 },
+    { ate: 79.99, comissao: 20, fixa: 4 },
+    { ate: 99.99, comissao: 14, fixa: 16 },
+    { ate: 199.99, comissao: 14, fixa: 20 },
+    { ate: Infinity, comissao: 14, fixa: 26 },
+];
+
+// Tabela vigente desde 15/07/2026 (reajuste anunciado pelo TikTok Shop),
+// isolada como a de Shopee. O TikTok Shop não tem API pública de tarifas —
+// apurada em reportagens (Duoke, GEcommerce, WireConsultoria), que concordam
+// entre si nesta tabela. Uma quarta fonte (Guru das IAs) tem um exemplo cuja
+// conta só fecha com R$6 de taxa fixa também abaixo de R$50 — ponto isolado,
+// contra três fontes concordantes, então ficou de fora; mas é o número mais
+// provável de estar errado se o TikTok tiver mudado algo depois da apuração.
+// Por isso o aviso na tela pede para o vendedor confirmar A TAXA FIXA no
+// Seller Center antes de decidir preço, não só "conferir tudo" de forma vaga.
+//
+// Não modelado: taxa de saque, imposto retido na fonte e comissão de
+// afiliados (5–30%, definida pelo próprio vendedor — não é tarifa da
+// plataforma). Se algum desses passar a valer para o usuário, entra como linha.
+const TIKTOK_FAIXAS = [
+    { ate: 49.99, comissao: 10, fixa: 4 },
+    { ate: Infinity, comissao: 6, fixa: 6 },
+];
+// Frete Grátis é ADICIONAL à comissão normal, não substitui: é descrito como
+// programa à parte ("segue em 6%, independente do valor do produto"), nunca
+// como uma troca de alíquota — em nenhuma das fontes.
+const TIKTOK_FRETE_GRATIS_PCT = 6;
+
+function shopeeFaixa(preco) {
+    return SHOPEE_FAIXAS.find(function (f) { return preco <= f.ate; }) || SHOPEE_FAIXAS[SHOPEE_FAIXAS.length - 1];
+}
+
+function tiktokFaixa(preco) {
+    return TIKTOK_FAIXAS.find(function (f) { return preco <= f.ate; }) || TIKTOK_FAIXAS[TIKTOK_FAIXAS.length - 1];
+}
+
+function pmkMoeda(v) {
+    return 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// Monta a tabela de resultado de um canal. `linhas` são os descontos.
+// Além de desenhar a tabela, devolve os números — é isso que permite a aba
+// Comparativo montar o ranking sem recalcular nada nem duplicar as regras de
+// cada marketplace.
+function pmkRenderResultado(alvo, dados) {
+    if (!alvo) return null;
+    const preco = dados.preco;
+    const custo = dados.custo;
+
+    // O imposto entra aqui, e não em cada canal: ele incide sobre o preço de
+    // venda igual nos três. Somar em cada calculadora seria repetir a mesma
+    // regra em três lugares, com três chances de divergir.
+    const campoImposto = document.getElementById('pmk-imposto');
+    const impostoPct = campoImposto ? parseFloat(campoImposto.value) || 0 : 0;
+
+    const linhas = dados.linhas.slice();
+    if (impostoPct > 0) {
+        linhas.push({ rotulo: 'Imposto sobre a venda (' + impostoPct + '%)', valor: preco * (impostoPct / 100) });
+    }
+
+    alvo.innerHTML = '';
+
+    const totalTaxas = linhas.reduce(function (s, l) { return s + l.valor; }, 0);
+    const recebe = preco - totalTaxas;
+    const lucro = recebe - custo;
+    const margem = preco > 0 ? (lucro / preco) * 100 : 0;
+
+    const corpo = ['<tr><td>Preço de venda</td><td class="text-right">' + pmkMoeda(preco) + '</td></tr>'];
+    linhas.forEach(function (l) {
+        corpo.push('<tr><td>(−) ' + escapeHtml(l.rotulo) + '</td><td class="text-right" style="color:var(--danger);">'
+            + pmkMoeda(l.valor) + '</td></tr>');
+    });
+    corpo.push('<tr style="font-weight:700;"><td>(=) Você recebe</td><td class="text-right">' + pmkMoeda(recebe) + '</td></tr>');
+    corpo.push('<tr><td>(−) Custo do produto</td><td class="text-right" style="color:var(--danger);">' + pmkMoeda(custo) + '</td></tr>');
+
+    const cor = lucro >= 0 ? 'var(--success)' : 'var(--danger)';
+    corpo.push('<tr style="font-weight:800; border-top:2px solid var(--border-color);">'
+        + '<td>(=) Lucro por unidade</td>'
+        + '<td class="text-right" style="color:' + cor + ';">' + pmkMoeda(lucro)
+        + ' <span style="font-weight:600;">(' + margem.toFixed(1) + '%)</span></td></tr>');
+
+    const tabela = document.createElement('table');
+    tabela.className = 'results-table';
+    tabela.style.width = '100%';
+    tabela.innerHTML = '<tbody>' + corpo.join('') + '</tbody>';
+    alvo.appendChild(tabela);
+
+    if (dados.nota) {
+        const n = document.createElement('p');
+        n.className = 'small';
+        n.style.color = 'var(--text-muted)';
+        n.style.marginTop = '0.6rem';
+        n.textContent = dados.nota;
+        alvo.appendChild(n);
+    }
+    if (dados.aviso) {
+        const a = document.createElement('p');
+        a.className = 'small';
+        a.style.color = 'var(--danger)';
+        a.style.marginTop = '0.4rem';
+        a.textContent = dados.aviso;
+        alvo.appendChild(a);
+    }
+
+    return { preco: preco, custo: custo, taxas: totalTaxas, recebe: recebe, lucro: lucro, margem: margem, linhas: linhas };
+}
+
+function pmkCalcularShopee(preco, custo) {
+    const f = shopeeFaixa(preco);
+    pmkResultados.shopee = pmkRenderResultado(document.getElementById('pmk-shopee-conteudo'), {
+        preco: preco,
+        custo: custo,
+        linhas: [
+            { rotulo: 'Comissão Shopee (' + f.comissao + '%)', valor: preco * (f.comissao / 100) },
+            { rotulo: 'Taxa fixa por item', valor: f.fixa },
+        ],
+        // Sem nota nem aviso: a faixa e o percentual já aparecem nas próprias
+        // linhas do cálculo, e o texto sobre origem da tabela poluía a tela
+        // com informação que não muda a decisão de preço.
+    });
+}
+
+function pmkCalcularTiktok(preco, custo) {
+    const f = tiktokFaixa(preco);
+    const linhas = [
+        { rotulo: 'Comissão TikTok Shop (' + f.comissao + '%)', valor: preco * (f.comissao / 100) },
+        { rotulo: 'Taxa fixa por item', valor: f.fixa },
+    ];
+
+    const freteGratis = document.getElementById('pmk-tiktok-frete-gratis');
+    if (freteGratis && freteGratis.checked) {
+        linhas.push({ rotulo: 'Programa de Frete Grátis (' + TIKTOK_FRETE_GRATIS_PCT + '%)', valor: preco * (TIKTOK_FRETE_GRATIS_PCT / 100) });
+    }
+
+    pmkResultados.tiktok = pmkRenderResultado(document.getElementById('pmk-tiktok-conteudo'), {
+        preco: preco,
+        custo: custo,
+        linhas: linhas,
+        nota: preco < 50
+            ? 'Tarifas de reportagens (sem API pública do TikTok Shop). A taxa fixa abaixo de R$ 50 é o número menos certo — uma fonte diverge das demais. Confira no Seller Center.'
+            : 'Tarifas de reportagens (sem API pública do TikTok Shop). Confira no Seller Center antes de decidir o preço.',
+    });
+}
+
+// Tipo de anúncio escolhido na aba do Mercado Livre. Clássico e Premium têm
+// comissões diferentes na MESMA categoria — o Premium cobra mais em troca de
+// parcelamento sem juros, então comparar os dois é decisão de precificação.
+function pmkTipoAnuncio() {
+    const marcado = document.querySelector('input[name="pmk-listing"]:checked');
+    return marcado ? marcado.value : 'gold_special';
+}
+
+// Guarda o último cálculo para o seletor poder refazer só a aba do ML sem
+// exigir que o usuário clique em Calcular de novo.
+let pmkUltimo = null;
+
+// Resultado de cada canal, preenchido conforme cada aba calcula. A aba
+// Comparativo lê daqui — assim as regras de cada marketplace ficam num lugar
+// só e o ranking nunca diverge do que as abas individuais mostram.
+const pmkResultados = { ml: null, shopee: null, amazon: null, tiktok: null };
+
+async function pmkCalcularML(preco, custo) {
+    const alvo = document.getElementById('pmk-ml-conteudo');
+    if (!alvo) return;
+    alvo.innerHTML = '<p class="small">Consultando tarifa e frete reais na sua conta do Mercado Livre...</p>';
+
+    const valor = function (id) {
+        const el = document.getElementById(id);
+        return el ? parseFloat(el.value) || 0 : 0;
+    };
+
+    const campoNome = document.getElementById('pmk-nome');
+    const nomeProduto = campoNome ? (campoNome.value || '').trim() : '';
+
+    // ── Comissão: vem da CATEGORIA, descoberta pelo nome do produto ────────
+    let feePct = null;
+    let taxaFixa = 0;
+    let categoriaNome = null;
+    if (nomeProduto) {
+        const cat = await mlApiFetch('/api/ml-market?action=category&q=' + encodeURIComponent(nomeProduto));
+        if (cat && cat.categoryId) {
+            categoriaNome = cat.categoryName;
+            // billableWeight vai junto: sem ele o ML avisa que a taxa fixa
+            // calculada não bate com a cobrada de verdade.
+            const pesoParam = valor('pmk-peso') > 0 ? '&billableWeight=' + valor('pmk-peso') : '';
+            const tarifa = await mlApiFetch('/api/ml-market?action=fee&price=' + encodeURIComponent(preco)
+                + '&category=' + encodeURIComponent(cat.categoryId)
+                + '&listingType=' + encodeURIComponent(pmkTipoAnuncio()) + pesoParam);
+            if (tarifa && typeof tarifa.percentageFee === 'number') {
+                feePct = tarifa.percentageFee;
+                taxaFixa = typeof tarifa.fixedFee === 'number' ? tarifa.fixedFee : 0;
+            }
+        }
+    }
+    const usouReferencia = feePct === null;
+    if (usouReferencia) feePct = 13;
+
+    // ── Frete: cotado na conta do vendedor, se houver peso e dimensões ─────
+    const peso = valor('pmk-peso');
+    const comp = valor('pmk-comprimento');
+    const larg = valor('pmk-largura');
+    const alt = valor('pmk-altura');
+    const temMedidas = peso > 0 && comp > 0 && larg > 0 && alt > 0;
+
+    let freteCusto = 0;
+    let freteNota = null;
+    if (temMedidas) {
+        const frete = await mlApiFetch('/api/ml-freight?weight=' + peso + '&length=' + comp
+            + '&width=' + larg + '&height=' + alt + '&price=' + encodeURIComponent(preco), 20000);
+        if (frete && typeof frete.cost === 'number') {
+            freteCusto = frete.cost;
+            if (frete.freteGratisObrigatorio) {
+                freteNota = 'Neste preço o Mercado Livre exige frete grátis, então o custo é seu.';
+            } else if (freteCusto === 0) {
+                freteNota = 'Abaixo de R$ 79 o frete não sai do seu bolso: fica com o comprador ou com o Mercado Livre.';
+            }
+            if (frete.discount && frete.discount.rate > 0) {
+                freteNota = (freteNota ? freteNota + ' ' : '')
+                    + 'Já inclui ' + Math.round(frete.discount.rate * 100) + '% de desconto pela sua reputação.';
+            }
+        } else {
+            freteNota = 'Não foi possível cotar o frete agora — o resultado abaixo está sem ele.';
+        }
+    }
+
+    const linhas = [
+        { rotulo: 'Comissão Mercado Livre (' + feePct + '%)', valor: preco * (feePct / 100) },
+    ];
+    // Tarifa por unidade: o ML cobra em itens abaixo do limite de frete grátis.
+    // Vem da própria API (sale_fee_details.fixed_fee), não de estimativa.
+    if (taxaFixa > 0) {
+        linhas.push({ rotulo: 'Tarifa por unidade (item de baixo valor)', valor: taxaFixa });
+    }
+    if (temMedidas) {
+        linhas.push({ rotulo: 'Frete da plataforma', valor: freteCusto });
+    }
+
+    const notas = [];
+    notas.push(usouReferencia
+        ? 'Comissão de referência (13%) — informe o nome do produto para trazer a tarifa exata da categoria.'
+        : 'Tarifa real da categoria "' + categoriaNome + '", consultada agora na API do Mercado Livre.');
+    if (freteNota) notas.push(freteNota);
+    if (!temMedidas) notas.push('Preencha peso e dimensões para incluir o frete real no cálculo.');
+
+    pmkResultados.ml = pmkRenderResultado(alvo, {
+        preco: preco,
+        custo: custo,
+        linhas: linhas,
+        nota: (pmkTipoAnuncio() === 'gold_pro' ? 'Anúncio Premium. ' : 'Anúncio Clássico. ') + notas.join(' '),
+        // Sem aviso sobre modalidade de logística: o cálculo assume sempre
+        // Mercado Envios com entrega em agência (drop_off), que é o padrão do
+        // vendedor. Explicar as exceções de Flex/ME1 aqui só gerava dúvida
+        // sobre um cenário que não é o dele.
+    });
+}
+
+// Comissão da Amazon por categoria — tabela OFICIAL.
+// Fonte: https://venda.amazon.com.br/precos#comissoes-de-venda
+//
+// A Amazon não expõe API pública de tarifas (só dentro do Seller Central,
+// logado), então isto é tabela embutida. Ao revisar, confira na URL acima.
+//
+// `escalonado` existe porque algumas categorias cobram DOIS percentuais na
+// mesma venda: um até certo valor e outro sobre o excedente. Tratar isso como
+// percentual único erraria o cálculo justamente nos produtos mais caros.
+const AMAZON_CATEGORIAS = [
+    { id: 'comidas', nome: 'Comidas e bebidas', pct: 10 },
+    { id: 'pneus', nome: 'Pneus e rodas', pct: 10 },
+    { id: 'tv', nome: 'TV, áudio e cinema em casa', pct: 10 },
+    { id: 'alcoolicas', nome: 'Bebidas alcoólicas', pct: 11 },
+    { id: 'linhabranca', nome: 'Eletrodomésticos de linha branca', pct: 11 },
+    { id: 'celulares', nome: 'Celulares', pct: 11 },
+    { id: 'camera', nome: 'Câmera e fotografia', pct: 11 },
+    { id: 'videogames', nome: 'Videogames e consoles', pct: 11 },
+    { id: 'ferramentas', nome: 'Ferramentas e construção', pct: 11 },
+    { id: 'saude', nome: 'Saúde e cuidados pessoais', pct: 12 },
+    { id: 'industria', nome: 'Indústria e ciência', pct: 12 },
+    { id: 'bebes', nome: 'Produtos para bebês', pct: 12 },
+    { id: 'pets', nome: 'Produtos para animais de estimação', pct: 12 },
+    { id: 'eletroportateis', nome: 'Eletroportáteis de cuidado pessoal', pct: 12 },
+    { id: 'cozinha', nome: 'Cozinha', pct: 12 },
+    { id: 'jardim', nome: 'Jardim e piscina', pct: 12 },
+    { id: 'brinquedos', nome: 'Brinquedos e jogos', pct: 12 },
+    { id: 'pc', nome: 'PC', pct: 12 },
+    { id: 'casa', nome: 'Casa', pct: 12 },
+    { id: 'esportes', nome: 'Esportes, aventura e lazer', pct: 12 },
+    { id: 'instrumentos', nome: 'Instrumentos musicais e acessórios', pct: 12 },
+    { id: 'eletronicosport', nome: 'Eletrônicos portáteis', pct: 13 },
+    { id: 'beleza', nome: 'Beleza', pct: 13 },
+    { id: 'relogios', nome: 'Relógios', pct: 13 },
+    { id: 'papelaria', nome: 'Papelaria e escritório', pct: 13 },
+    { id: 'belezaluxo', nome: 'Beleza de luxo', pct: 14 },
+    { id: 'bagagem', nome: 'Bagagem e acessórios de viagem', pct: 14 },
+    { id: 'roupas', nome: 'Roupas e acessórios', pct: 14 },
+    { id: 'calcados', nome: 'Calçados, bolsas e óculos escuros', pct: 14 },
+    { id: 'joias', nome: 'Joias', pct: 14 },
+    { id: 'livros', nome: 'Livros', pct: 15 },
+    { id: 'video', nome: 'Vídeo e DVD', pct: 15 },
+    { id: 'musica', nome: 'Música (CDs, LPs)', pct: 15 },
+    { id: 'acessorios', nome: 'Acessórios para eletrônicos e PC', escalonado: { ate: 100, pctAte: 15, pctAcima: 10 } },
+    { id: 'moveis', nome: 'Móveis', escalonado: { ate: 200, pctAte: 15, pctAcima: 10 } },
+    { id: 'outras', nome: 'Demais categorias', pct: 15 },
+];
+
+// Piso de comissão. A Amazon informa R$ 1,00 na maioria das categorias e
+// R$ 2,00 em algumas específicas — sem a lista de quais, fica no valor geral.
+const AMAZON_COMISSAO_MINIMA = 1;
+
+// Plano Individual cobra por item; o Profissional troca por mensalidade fixa
+// (grátis no primeiro ano, R$ 19/mês a partir do 13º), que não entra no custo
+// unitário porque se dilui no volume.
+const AMAZON_TAXA_INDIVIDUAL = 2;
+
+// Tarifas de envio da Amazon — FBA e DBA.
+// Fonte: https://venda.amazon.com.br/cresca/fba (tabela vigente desde 01/08/2025)
+//
+// A grade do FBA cruza PESO × FAIXA DE PREÇO. Um detalhe que só a tabela
+// visual revela: nas três primeiras faixas (abaixo de R$ 79) a célula é
+// MESCLADA — a tarifa é a mesma para qualquer peso. Ler aquilo como "só vale
+// para 1kg–1,5kg" produziria um valor errado em quase todos os produtos
+// baratos.
+const AMAZON_FAIXAS_PRECO = [
+    { ate: 29.99, rotulo: 'abaixo de R$ 30' },
+    { ate: 49.99, rotulo: 'R$ 30 a 49,99' },
+    { ate: 78.99, rotulo: 'R$ 50 a 78,99' },
+    { ate: 99.99, rotulo: 'R$ 79 a 99,99' },
+    { ate: 119.99, rotulo: 'R$ 100 a 119,99' },
+    { ate: 149.99, rotulo: 'R$ 120 a 149,99' },
+    { ate: 199.99, rotulo: 'R$ 150 a 199,99' },
+    { ate: Infinity, rotulo: 'acima de R$ 200' },
+];
+
+// Abaixo de R$ 79: tarifa única por faixa, sem olhar o peso.
+const FBA_ABAIXO_79 = [5.65, 5.85, 6.05];
+
+// De R$ 79 em diante: peso (limite superior em gramas) × as cinco faixas
+// restantes, na ordem 79-99,99 / 100-119,99 / 120-149,99 / 150-199,99 / 200+.
+const FBA_POR_PESO = [
+    { ate: 100, v: [10.05, 12.05, 14.05, 15.05, 15.55] },
+    { ate: 200, v: [10.45, 12.45, 14.45, 15.45, 16.05] },
+    { ate: 300, v: [10.95, 12.95, 14.95, 15.95, 16.55] },
+    { ate: 400, v: [11.45, 13.45, 15.45, 16.95, 17.15] },
+    { ate: 500, v: [11.95, 13.95, 15.95, 17.05, 17.85] },
+    { ate: 750, v: [12.05, 14.05, 16.05, 18.45, 18.55] },
+    { ate: 1000, v: [12.45, 14.45, 16.45, 19.05, 19.25] },
+    { ate: 1500, v: [12.95, 14.95, 16.95, 19.45, 20.35] },
+    { ate: 2000, v: [13.05, 15.05, 17.05, 19.95, 21.35] },
+    { ate: 3000, v: [14.05, 16.05, 18.05, 20.05, 22.35] },
+    { ate: 4000, v: [15.05, 17.05, 19.05, 21.95, 23.35] },
+    { ate: 5000, v: [16.05, 18.05, 20.05, 22.95, 24.35] },
+    { ate: 6000, v: [24.05, 27.05, 29.05, 30.05, 30.35] },
+    { ate: 7000, v: [25.05, 28.05, 30.05, 31.05, 33.35] },
+    { ate: 8000, v: [26.05, 29.05, 31.05, 32.05, 35.35] },
+    { ate: 9000, v: [27.05, 30.05, 32.05, 33.05, 37.35] },
+    { ate: 10000, v: [35.05, 40.05, 46.05, 51.05, 51.35] },
+];
+
+// Acima de 10 kg soma-se por quilo adicional.
+const FBA_KG_ADICIONAL = [3.05, 3.05, 3.05, 3.50, 3.50];
+
+// Limite do FBA: a tabela vale só para produtos abaixo de 22 kg.
+const FBA_PESO_MAXIMO_G = 22000;
+
+// DBA (Envios pela Amazon): o vendedor embala, a Amazon coleta e entrega.
+//
+// Abaixo de R$ 79 é tarifa única por faixa de preço, sem olhar peso nem origem.
+const DBA_ABAIXO_79 = [4.50, 6.50, 6.75];
+
+// De R$ 79 em diante vira grade peso × preço, como no FBA — mas com valores
+// próprios e, importante, VARIÁVEL POR REGIÃO DE ORIGEM. Esta é a tabela de
+// "SP Capital, demais capitais do Sul e Sudeste, interior do Sul e Sudeste,
+// Centro-Oeste, Norte e Nordeste", que cobre a maior parte dos vendedores.
+//
+// Colunas: 79-99,99 / 100-119,99 / 120-149,99 / 150-199,99.
+// A faixa acima de R$ 200 não veio na tabela consultada — nela o cálculo
+// avisa em vez de estimar.
+const DBA_POR_PESO = [
+    { ate: 250, v: [11.95, 13.95, 15.95, 17.95] },
+    { ate: 500, v: [12.85, 15.00, 17.15, 19.30] },
+    { ate: 1000, v: [13.45, 15.70, 17.95, 20.20] },
+    { ate: 2000, v: [14.00, 16.35, 18.75, 21.10] },
+    { ate: 3000, v: [14.95, 17.45, 19.95, 22.40] },
+    { ate: 4000, v: [16.15, 18.85, 21.55, 24.20] },
+    { ate: 5000, v: [17.00, 19.90, 22.75, 25.60] },
+    { ate: 6000, v: [25.00, 30.00, 34.00, 38.00] },
+    { ate: 7000, v: [26.00, 31.00, 35.00, 39.00] },
+    { ate: 8000, v: [27.00, 32.00, 36.00, 40.00] },
+    { ate: 9000, v: [28.00, 33.00, 37.00, 41.00] },
+    { ate: 10000, v: [39.50, 46.00, 52.75, 59.00] },
+];
+
+const DBA_KG_ADICIONAL = [3.05, 3.05, 3.05, 3.50];
+
+// Acima de R$ 200 a tabela muda de eixo: em vez de faixas de preço, as colunas
+// viram REGIÕES DE ORIGEM do envio.
+const DBA_REGIOES = [
+    { id: 'sp', nome: 'SP - Capital' },
+    { id: 'capitais', nome: 'Outras capitais do Sul e Sudeste' },
+    { id: 'interior', nome: 'Interior do Sul e Sudeste' },
+    { id: 'demais', nome: 'Centro-Oeste, Norte e Nordeste' },
+];
+
+const DBA_ACIMA_200 = [
+    { ate: 250, v: [19.95, 19.95, 20.45, 20.45] },
+    { ate: 500, v: [20.45, 20.45, 20.95, 20.95] },
+    { ate: 1000, v: [21.45, 21.45, 21.95, 21.95] },
+    { ate: 2000, v: [22.95, 22.95, 23.45, 23.45] },
+    { ate: 3000, v: [23.95, 23.95, 24.45, 24.45] },
+    { ate: 4000, v: [25.95, 25.95, 25.95, 25.95] },
+    { ate: 5000, v: [27.95, 27.95, 27.95, 27.95] },
+    { ate: 6000, v: [36.95, 36.95, 36.95, 36.95] },
+    { ate: 7000, v: [39.45, 39.45, 39.45, 39.45] },
+    { ate: 8000, v: [40.45, 40.45, 40.45, 40.45] },
+    { ate: 9000, v: [45.45, 46.95, 46.95, 46.95] },
+    { ate: 10000, v: [59.95, 61.45, 65.95, 65.95] },
+];
+
+const DBA_ACIMA_200_KG_ADICIONAL = 4.00;
+
+// Peso cúbico, conforme o exemplo oficial da Amazon:
+// (comprimento x largura x altura em cm) / 6.000, e a tarifa usa o MAIOR
+// valor entre o peso real e o cúbico. Uma caixa grande e leve é cobrada pelo
+// espaço que ocupa, não pelo que pesa.
+const DBA_DIVISOR_CUBICO = 6000;
+
+function pesoFaturavelDba(pesoRealG, compCm, largCm, altCm) {
+    if (!(compCm > 0 && largCm > 0 && altCm > 0)) return pesoRealG;
+    const cubicoG = (compCm * largCm * altCm / DBA_DIVISOR_CUBICO) * 1000;
+    return Math.max(pesoRealG, cubicoG);
+}
+
+function amazonIndiceFaixaPreco(preco) {
+    for (let i = 0; i < AMAZON_FAIXAS_PRECO.length; i++) {
+        if (preco <= AMAZON_FAIXAS_PRECO[i].ate) return i;
+    }
+    return AMAZON_FAIXAS_PRECO.length - 1;
+}
+
+// Devolve { valor, detalhe } ou { indisponivel, motivo }.
+function amazonTarifaEnvio(modalidade, preco, pesoG) {
+    const idx = amazonIndiceFaixaPreco(preco);
+
+    if (modalidade === 'dba') {
+        if (idx < 3) return { valor: DBA_ABAIXO_79[idx], detalhe: AMAZON_FAIXAS_PRECO[idx].rotulo + ', tarifa única' };
+
+        const colDba = idx - 3;
+
+        // Acima de R$ 200 a grade é por região de origem, não por faixa de preço.
+        if (colDba >= DBA_POR_PESO[0].v.length) {
+            if (!(pesoG > 0)) {
+                return { indisponivel: true, motivo: 'A tarifa do DBA depende do peso — preencha o peso do produto acima.' };
+            }
+            const regiaoSel = document.getElementById('pmk-amz-regiao');
+            const regId = regiaoSel ? regiaoSel.value : 'sp';
+            const colReg = Math.max(0, DBA_REGIOES.findIndex(function (r) { return r.id === regId; }));
+            const nomeReg = DBA_REGIOES[colReg].nome;
+            const kgTxt = (pesoG / 1000).toFixed(2).replace('.', ',') + ' kg';
+
+            const linhaReg = DBA_ACIMA_200.find(function (f) { return pesoG <= f.ate; });
+            if (linhaReg) {
+                return { valor: linhaReg.v[colReg], detalhe: 'acima de R$ 200, ' + kgTxt + ', ' + nomeReg };
+            }
+            const baseReg = DBA_ACIMA_200[DBA_ACIMA_200.length - 1].v[colReg];
+            const extrasReg = Math.ceil((pesoG - 10000) / 1000);
+            return {
+                valor: baseReg + extrasReg * DBA_ACIMA_200_KG_ADICIONAL,
+                detalhe: 'acima de R$ 200, ' + kgTxt + ', ' + nomeReg + ' (' + extrasReg + ' kg adicional' + (extrasReg > 1 ? 'is' : '') + ')',
+            };
+        }
+        if (!(pesoG > 0)) {
+            return { indisponivel: true, motivo: 'A partir de R$ 79 a tarifa do DBA depende do peso — preencha o peso do produto acima.' };
+        }
+
+        const linhaDba = DBA_POR_PESO.find(function (f) { return pesoG <= f.ate; });
+        const kg = (pesoG / 1000).toFixed(2).replace('.', ',') + ' kg';
+        if (linhaDba) {
+            return { valor: linhaDba.v[colDba], detalhe: AMAZON_FAIXAS_PRECO[idx].rotulo + ', ' + kg };
+        }
+        const baseDba = DBA_POR_PESO[DBA_POR_PESO.length - 1].v[colDba];
+        const extras = Math.ceil((pesoG - 10000) / 1000);
+        return {
+            valor: baseDba + extras * DBA_KG_ADICIONAL[colDba],
+            detalhe: AMAZON_FAIXAS_PRECO[idx].rotulo + ', ' + kg + ' (' + extras + ' kg adicional' + (extras > 1 ? 'is' : '') + ')',
+        };
+    }
+
+    // FBA
+    if (idx < 3) return { valor: FBA_ABAIXO_79[idx], detalhe: AMAZON_FAIXAS_PRECO[idx].rotulo + ', tarifa única' };
+
+    if (!(pesoG > 0)) {
+        return { indisponivel: true, motivo: 'A partir de R$ 79 a tarifa do FBA depende do peso — preencha o peso do produto acima.' };
+    }
+    if (pesoG >= FBA_PESO_MAXIMO_G) {
+        return { indisponivel: true, motivo: 'O FBA nesta tabela vale para produtos abaixo de 22 kg.' };
+    }
+
+    const coluna = idx - 3; // as cinco faixas de R$ 79 em diante
+    const linha = FBA_POR_PESO.find(function (f) { return pesoG <= f.ate; });
+
+    if (linha) {
+        return { valor: linha.v[coluna], detalhe: AMAZON_FAIXAS_PRECO[idx].rotulo + ', ' + (pesoG / 1000).toFixed(2).replace('.', ',') + ' kg' };
+    }
+
+    // Acima de 10 kg: base da última faixa + adicional por quilo.
+    const base = FBA_POR_PESO[FBA_POR_PESO.length - 1].v[coluna];
+    const kgExtras = Math.ceil((pesoG - 10000) / 1000);
+    return {
+        valor: base + kgExtras * FBA_KG_ADICIONAL[coluna],
+        detalhe: AMAZON_FAIXAS_PRECO[idx].rotulo + ', ' + (pesoG / 1000).toFixed(2).replace('.', ',') + ' kg ('
+            + kgExtras + ' kg adicional' + (kgExtras > 1 ? 'is' : '') + ')',
+    };
+}
+
+function pmkPreencherCategoriasAmazon() {
+    const sel = document.getElementById('pmk-amz-categoria');
+    if (!sel || sel.options.length > 1) return;
+    AMAZON_CATEGORIAS.forEach(function (c) {
+        const o = document.createElement('option');
+        o.value = c.id;
+        o.textContent = c.escalonado
+            ? c.nome + ' — ' + c.escalonado.pctAte + '% até ' + pmkMoeda(c.escalonado.ate) + ', ' + c.escalonado.pctAcima + '% acima'
+            : c.nome + ' — ' + c.pct + '%';
+        sel.appendChild(o);
+    });
+}
+
+// Devolve { valor, descricao } da comissão, respeitando escalonamento.
+function amazonComissao(cat, preco) {
+    if (!cat.escalonado) {
+        return { valor: preco * (cat.pct / 100), descricao: cat.pct + '%' };
+    }
+    const e = cat.escalonado;
+    const naFaixa = Math.min(preco, e.ate);
+    const excedente = Math.max(0, preco - e.ate);
+    return {
+        valor: naFaixa * (e.pctAte / 100) + excedente * (e.pctAcima / 100),
+        descricao: excedente > 0
+            ? e.pctAte + '% até ' + pmkMoeda(e.ate) + ' + ' + e.pctAcima + '% sobre ' + pmkMoeda(excedente)
+            : e.pctAte + '%',
+    };
+}
+
+function pmkCalcularAmazon(preco, custo) {
+    const alvo = document.getElementById('pmk-amazon-conteudo');
+    if (!alvo) return;
+
+    const sel = document.getElementById('pmk-amz-categoria');
+    const escolhida = sel ? sel.value : '';
+    const cat = AMAZON_CATEGORIAS.find(function (c) { return c.id === escolhida; });
+
+    if (!cat) {
+        alvo.innerHTML = '<p class="helper-text" style="padding:1.5rem 0; text-align:center;">'
+            + 'Escolha a categoria do produto no campo acima para calcular a comissão da Amazon.</p>';
+        return;
+    }
+
+    const com = amazonComissao(cat, preco);
+    let comissao = com.valor;
+    let aplicouMinima = false;
+    if (comissao < AMAZON_COMISSAO_MINIMA) {
+        comissao = AMAZON_COMISSAO_MINIMA;
+        aplicouMinima = true;
+    }
+
+    const planoSel = document.getElementById('pmk-amz-plano');
+    const individual = planoSel ? planoSel.value === 'individual' : false;
+
+    const linhas = [{ rotulo: 'Comissão Amazon (' + com.descricao + ')', valor: comissao }];
+    if (individual) {
+        linhas.push({ rotulo: 'Taxa por item (Plano Individual)', valor: AMAZON_TAXA_INDIVIDUAL });
+    }
+
+    // Envio: reaproveita o peso já informado no bloco de medidas.
+    const envioSel = document.getElementById('pmk-amz-envio');
+    const modalidade = envioSel ? envioSel.value : 'proprio';
+    let avisoEnvio = null;
+
+    if (modalidade !== 'proprio') {
+        const val = function (id) {
+            const e = document.getElementById(id);
+            return e ? parseFloat(e.value) || 0 : 0;
+        };
+        const pesoReal = val('pmk-peso');
+
+        // O DBA cobra pelo MAIOR valor entre peso real e cúbico. Como as
+        // dimensões já estão no formulário, dá para aplicar a regra em vez de
+        // subestimar o frete de caixas grandes e leves.
+        const pesoG = modalidade === 'dba'
+            ? pesoFaturavelDba(pesoReal, val('pmk-comprimento'), val('pmk-largura'), val('pmk-altura'))
+            : pesoReal;
+
+        const envio = amazonTarifaEnvio(modalidade, preco, pesoG);
+        const nomeEnvio = modalidade === 'fba' ? 'FBA' : 'DBA';
+
+        if (envio.indisponivel) {
+            avisoEnvio = envio.motivo;
+        } else {
+            linhas.push({ rotulo: 'Envio ' + nomeEnvio + ' (' + envio.detalhe + ')', valor: envio.valor });
+        }
+    }
+
+    // Só o essencial na tela: a categoria escolhida e, quando ocorrer, o piso
+    // de comissão. As explicações sobre mensalidade e armazenagem foram
+    // retiradas a pedido — não mudam o número, e poluíam o resultado.
+    const notas = [cat.nome + '.'];
+    if (aplicouMinima) notas.push('Aplicada a comissão mínima de ' + pmkMoeda(AMAZON_COMISSAO_MINIMA) + '.');
+
+    pmkResultados.amazon = pmkRenderResultado(alvo, {
+        preco: preco, custo: custo, linhas: linhas,
+        nota: notas.join(' '),
+        aviso: avisoEnvio,
+    });
+}
+
+// Marcador visual de cada canal. SVG embutido em vez do logo oficial: os
+// logos são marca registrada e viriam de host externo, o que o CSP bloqueia.
+// A cor da marca já basta para identificar a coluna de relance.
+const PMK_MARCAS = {
+    ml: { cor: '#FFE600', texto: '#2D3277', letra: 'ML' },
+    shopee: { cor: '#EE4D2D', texto: '#FFFFFF', letra: 'S' },
+    amazon: { cor: '#FF9900', texto: '#232F3E', letra: 'a' },
+    tiktok: { cor: '#000000', texto: '#FFFFFF', letra: 'TT' },
+};
+
+function pmkIcone(chave) {
+    const m = PMK_MARCAS[chave];
+    if (!m) return '';
+    return '<svg width="18" height="18" viewBox="0 0 20 20" style="vertical-align:-4px; margin-right:0.35rem;" aria-hidden="true">'
+        + '<rect width="20" height="20" rx="5" fill="' + m.cor + '"/>'
+        + '<text x="10" y="14" text-anchor="middle" font-size="' + (m.letra.length > 1 ? 8 : 11) + '"'
+        + ' font-weight="800" fill="' + m.texto + '" font-family="system-ui, sans-serif">' + m.letra + '</text>'
+        + '</svg>';
+}
+
+// Aba Comparativo: os três canais lado a lado, ordenados pelo que sobra.
+//
+// Não recalcula nada — lê o que cada aba já apurou (pmkResultados). Duplicar
+// as regras aqui seria criar uma segunda fonte de verdade, e ela divergiria
+// das abas individuais na primeira mudança de tarifa.
+function pmkRenderComparativo() {
+    const alvo = document.getElementById('pmk-comparativo-conteudo');
+    if (!alvo) return;
+    alvo.innerHTML = '';
+
+    if (!pmkUltimo) {
+        alvo.innerHTML = '<p class="helper-text" style="padding:1.5rem 0; text-align:center;">'
+            + 'Informe custo e preço acima e clique em Calcular para comparar os canais.</p>';
+        return;
+    }
+
+    const canais = [
+        { chave: 'ml', nome: 'Mercado Livre', r: pmkResultados.ml },
+        { chave: 'shopee', nome: 'Shopee', r: pmkResultados.shopee },
+        { chave: 'amazon', nome: 'Amazon', r: pmkResultados.amazon },
+        { chave: 'tiktok', nome: 'TikTok Shop', r: pmkResultados.tiktok },
+    ];
+
+    const prontos = canais.filter(function (c) { return c.r; });
+    const faltando = canais.filter(function (c) { return !c.r; });
+
+    if (prontos.length === 0) {
+        alvo.innerHTML = '<p class="helper-text" style="padding:1.5rem 0; text-align:center;">'
+            + 'Nenhum canal calculado ainda.</p>';
+        return;
+    }
+
+    // Melhor retorno primeiro. É o critério que importa: o preço é o mesmo nos
+    // três, o que muda é quanto cada um retém.
+    prontos.sort(function (a, b) { return b.r.lucro - a.r.lucro; });
+    const vencedor = prontos[0];
+
+    const tabela = document.createElement('table');
+    tabela.className = 'results-table';
+    tabela.style.width = '100%';
+
+    const cab = prontos.map(function (c) {
+        const marca = c === vencedor && prontos.length > 1
+            ? ' <span style="font-size:0.7rem; padding:0.1rem 0.4rem; border-radius:999px; background:var(--success-bg); color:var(--success);">MELHOR</span>'
+            : '';
+        return '<th class="text-right" style="white-space:nowrap;">'
+            + pmkIcone(c.chave) + escapeHtml(c.nome) + marca + '</th>';
+    }).join('');
+
+    const linha = function (rotulo, fn, estilo) {
+        return '<tr' + (estilo || '') + '><td>' + rotulo + '</td>'
+            + prontos.map(function (c) { return '<td class="text-right">' + fn(c.r) + '</td>'; }).join('')
+            + '</tr>';
+    };
+
+    const corpo = [
+        linha('Preço de venda', function (r) { return pmkMoeda(r.preco); }),
+        linha('(−) Taxas do canal', function (r) { return '<span style="color:var(--danger);">' + pmkMoeda(r.taxas) + '</span>'; }),
+        linha('(=) Você recebe', function (r) { return pmkMoeda(r.recebe); }, ' style="font-weight:700;"'),
+        linha('(−) Custo do produto', function (r) { return '<span style="color:var(--danger);">' + pmkMoeda(r.custo) + '</span>'; }),
+        linha('(=) Lucro por unidade', function (r) {
+            const cor = r.lucro >= 0 ? 'var(--success)' : 'var(--danger)';
+            return '<span style="color:' + cor + ';">' + pmkMoeda(r.lucro) + '</span>';
+        }, ' style="font-weight:800; border-top:2px solid var(--border-color);"'),
+        linha('Margem', function (r) { return r.margem.toFixed(1) + '%'; }, ' style="font-weight:700;"'),
+    ];
+
+    tabela.innerHTML = '<thead><tr><th></th>' + cab + '</tr></thead><tbody>' + corpo.join('') + '</tbody>';
+    alvo.appendChild(tabela);
+
+    // Diferença em dinheiro entre o melhor e o pior: é o número que responde
+    // "vale a pena mudar de canal?".
+    if (prontos.length > 1) {
+        const pior = prontos[prontos.length - 1];
+        const dif = vencedor.r.lucro - pior.r.lucro;
+        const p = document.createElement('p');
+        p.style.marginTop = '1rem';
+        p.style.fontWeight = '700';
+        p.textContent = vencedor.nome + ' deixa ' + pmkMoeda(dif) + ' a mais por unidade que ' + pior.nome + '.';
+        alvo.appendChild(p);
+    }
+
+    if (faltando.length > 0) {
+        const f = document.createElement('p');
+        f.className = 'helper-text';
+        f.style.marginTop = '0.6rem';
+        f.textContent = 'Fora da comparação: ' + faltando.map(function (c) { return c.nome; }).join(', ')
+            + '. Abra a aba correspondente e complete o que estiver faltando (categoria da Amazon, por exemplo).';
+        alvo.appendChild(f);
+    }
+}
+
+function initPrecificacaoMarketplaces() {
+    const btn = document.getElementById('pmk-calcular');
+    if (!btn) return;
+
+    const abas = {
+        ml: ['pmk-tab-btn-ml', 'pmk-tab-ml'],
+        shopee: ['pmk-tab-btn-shopee', 'pmk-tab-shopee'],
+        amazon: ['pmk-tab-btn-amazon', 'pmk-tab-amazon'],
+        tiktok: ['pmk-tab-btn-tiktok', 'pmk-tab-tiktok'],
+        comparativo: ['pmk-tab-btn-comparativo', 'pmk-tab-comparativo'],
+    };
+
+    Object.keys(abas).forEach(function (chave) {
+        const b = document.getElementById(abas[chave][0]);
+        if (!b) return;
+        b.addEventListener('click', function () {
+            Object.keys(abas).forEach(function (k) {
+                const eb = document.getElementById(abas[k][0]);
+                const ep = document.getElementById(abas[k][1]);
+                if (eb) eb.classList.toggle('active', k === chave);
+                if (ep) ep.classList.toggle('hidden', k !== chave);
+            });
+            // Monta na hora de abrir: assim reflete qualquer troca de
+            // categoria, plano ou tipo de anúncio feita depois do Calcular.
+            if (chave === 'comparativo') pmkRenderComparativo();
+        });
+    });
+
+    btn.addEventListener('click', async function () {
+        const campoCusto = document.getElementById('pmk-custo');
+        const campoPreco = document.getElementById('pmk-preco');
+        const custo = parseFloat(campoCusto ? campoCusto.value : '') || 0;
+        const preco = parseFloat(campoPreco ? campoPreco.value : '') || 0;
+
+        if (preco <= 0) {
+            showToast('Informe o preço de venda desejado.', 'error');
+            return;
+        }
+
+        pmkUltimo = { preco: preco, custo: custo };
+        pmkCalcularShopee(preco, custo);
+        pmkCalcularAmazon(preco, custo);
+        pmkCalcularTiktok(preco, custo);
+        await pmkCalcularML(preco, custo);
+        pmkRenderComparativo();
+    });
+
+    // Trocar Clássico/Premium recalcula na hora, sem reclicar em Calcular.
+    document.querySelectorAll('input[name="pmk-listing"]').forEach(function (r) {
+        r.addEventListener('change', function () {
+            if (!pmkUltimo) return;
+            pmkCalcularML(pmkUltimo.preco, pmkUltimo.custo).then(pmkRenderComparativo);
+        });
+    });
+
+    pmkPreencherCategoriasAmazon();
+
+    // O imposto afeta os quatro canais, então recalcula todos.
+    const campoImposto = document.getElementById('pmk-imposto');
+    if (campoImposto) {
+        campoImposto.addEventListener('change', function () {
+            if (!pmkUltimo) return;
+            pmkCalcularShopee(pmkUltimo.preco, pmkUltimo.custo);
+            pmkCalcularAmazon(pmkUltimo.preco, pmkUltimo.custo);
+            pmkCalcularTiktok(pmkUltimo.preco, pmkUltimo.custo);
+            pmkCalcularML(pmkUltimo.preco, pmkUltimo.custo).then(pmkRenderComparativo);
+        });
+    }
+
+    // Ligar/desligar o Programa de Frete Grátis só muda o TikTok Shop.
+    const freteGratisTiktok = document.getElementById('pmk-tiktok-frete-gratis');
+    if (freteGratisTiktok) {
+        freteGratisTiktok.addEventListener('change', function () {
+            if (!pmkUltimo) return;
+            pmkCalcularTiktok(pmkUltimo.preco, pmkUltimo.custo);
+            pmkRenderComparativo();
+        });
+    }
+
+    // Mesmo comportamento para categoria e plano da Amazon.
+    ['pmk-amz-categoria', 'pmk-amz-plano', 'pmk-amz-envio', 'pmk-amz-regiao'].forEach(function (id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('change', function () {
+            if (!pmkUltimo) return;
+            pmkCalcularAmazon(pmkUltimo.preco, pmkUltimo.custo);
+            pmkRenderComparativo();
+        });
+    });
+}
+
+// ==========================================
+// ABA AUTOMAÇÃO
+//
+// Três blocos: liga/desliga com as travas, a lista de anúncios com o preço
+// mínimo de cada um, e o histórico do que o robô fez — inclusive as decisões
+// de NÃO agir, que são as que explicam por que um anúncio ficou de fora.
+// ==========================================
+
+const brlFmt = (v) => `R$ ${Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+function campoNumero(valor, min, max) {
+    const i = document.createElement('input');
+    i.type = 'number';
+    i.min = String(min);
+    if (max != null) i.max = String(max);
+    i.value = valor;
+    i.style.width = '5rem';
+    i.style.padding = '0.35rem 0.5rem';
+    i.style.borderRadius = 'var(--border-radius-md, 12px)';
+    i.style.border = '1px solid var(--border-color)';
+    i.style.background = 'var(--bg-card)';
+    i.style.color = 'var(--text-primary)';
+    return i;
+}
+
+function linhaOpcao(labelTexto, controle, ajuda) {
+    const linha = document.createElement('div');
+    linha.style.display = 'flex';
+    linha.style.alignItems = 'flex-start';
+    linha.style.gap = '0.6rem';
+    linha.style.marginTop = '0.7rem';
+
+    controle.style.marginTop = '0.15rem';
+    controle.style.flexShrink = '0';
+    linha.appendChild(controle);
+
+    const textos = document.createElement('div');
+    const lb = document.createElement('div');
+    lb.style.fontWeight = '600';
+    lb.textContent = labelTexto;
+    textos.appendChild(lb);
+    if (ajuda) {
+        const h = document.createElement('div');
+        h.className = 'small';
+        h.style.color = 'var(--text-muted)';
+        h.style.marginTop = '0.1rem';
+        h.textContent = ajuda;
+        textos.appendChild(h);
+    }
+    linha.appendChild(textos);
+    return linha;
+}
+
+function renderPromoAutoConfig(cfg) {
+    const alvo = document.getElementById('promo-auto-config');
+    if (!alvo) return;
+    alvo.innerHTML = '';
+
+    const card = document.createElement('section');
+    card.className = 'card';
+
+    const titulo = document.createElement('h4');
+    titulo.style.marginBottom = '0.25rem';
+    titulo.textContent = 'Entrada automática em promoções';
+    card.appendChild(titulo);
+
+    // A regra inteira cabe numa frase, e ela precisa estar na tela: sem isso o
+    // vendedor não tem como saber contra o que a automação está comparando.
+    const regra = document.createElement('p');
+    regra.style.marginTop = '0.5rem';
+    regra.style.padding = '0.7rem 0.85rem';
+    regra.style.borderRadius = 'var(--border-radius-md, 12px)';
+    regra.style.border = '1px solid var(--border-color)';
+    regra.style.background = 'var(--bg-subtle, rgba(148,163,184,0.08))';
+    regra.style.fontWeight = '600';
+    regra.textContent = 'Regra: entra em promoção nos anúncios que estão sem nenhuma e troca a promoção ativa quando outra cobra menos do comprador e deixa mais para você, sempre dentro do período de hoje.';
+    card.appendChild(regra);
+
+    const comoFunciona = document.createElement('p');
+    comoFunciona.className = 'small';
+    comoFunciona.style.color = 'var(--text-muted)';
+    comoFunciona.style.marginTop = '0.5rem';
+    comoFunciona.textContent = 'O preço que você já colocou em cada anúncio é o padrão. A cada convite do '
+        + 'Mercado Livre a automação calcula quanto cai na sua conta hoje (preço em vigor menos tarifa e '
+        + 'frete, mais o que o ML banca) e quanto cairia na promoção. Só entra se for igual ou mais — é o '
+        + 'caso das campanhas cofinanciadas, em que o desconto sai do bolso do Mercado Livre e não do seu. '
+        + 'O Mercado Livre não troca uma promoção pela outra: uma nova entra na fila atrás da ativa e só passa a valer '
+        + 'quando a ativa termina. Por isso, quando a automação acha uma promoção que cobra menos do comprador e deixa '
+        + 'mais para você, que está valendo agora e não acaba antes da atual, ela entra nela e tira a ativa. Sem essa '
+        + 'vantagem o anúncio fica como está, e depois de uma troca ele descansa 24 horas. '
+        + 'Não há nada para preencher: todos os seus anúncios já estão cobertos.';
+    card.appendChild(comoFunciona);
+
+    const chkEnabled = document.createElement('input');
+    chkEnabled.type = 'checkbox';
+    chkEnabled.checked = !!cfg.enabled;
+
+    // Repor o desconto é o comportamento esperado, e linha antiga no banco vem
+    // sem o campo — por isso a ausência conta como ligado, não como desligado.
+    const chkRenovar = document.createElement('input');
+    chkRenovar.type = 'checkbox';
+    chkRenovar.checked = cfg.auto_renew !== false;
+
+    const inpTeto = campoNumero(cfg.max_joins_per_day ?? 10, 1, 200);
+    const inpSubida = campoNumero(cfg.max_price_increase_pct ?? 5, 0, 100);
+    inpSubida.step = '0.5';
+
+    card.appendChild(linhaOpcao('Automação ligada', chkEnabled,
+        'Desligada, nada acontece — as opções abaixo ficam apenas guardadas.'));
+    card.appendChild(linhaOpcao('Repor o desconto quando a promoção vencer', chkRenovar,
+        'Quando uma promoção sua termina e o anúncio volta sozinho ao preço cheio, a automação devolve o mesmo desconto que você já praticava. Você recebe o mesmo de antes — só não fica sem promoção sem perceber.'));
+    card.appendChild(linhaOpcao('Quanto o preço pode subir para o comprador (%)', inpSubida,
+        'Ao entrar numa promoção, o preço de vitrine não passa deste percentual acima do que o comprador paga agora. Nos descontos em que o preço é seu, a automação desce até o limite em vez de usar o sugerido. 0 = nunca sobe. Na troca de uma promoção ativa por outra o preço nunca sobe: ela só troca por uma que cobre menos. Promoções que a própria automação deixou programadas acima desse limite são removidas da fila.'));
+    card.appendChild(linhaOpcao('Máximo de entradas por dia', inpTeto,
+        'Trava contra um convite em massa do Mercado Livre virar dezenas de entradas de uma vez.'));
+
+    const salvar = document.createElement('button');
+    salvar.className = 'btn btn-primary';
+    salvar.style.marginTop = '1rem';
+    salvar.textContent = 'Salvar configuração';
+    salvar.addEventListener('click', async () => {
+        salvar.disabled = true;
+        // Campo vazio volta ao padrão; zero é escolha válida (nunca subir).
+        const subida = inpSubida.value.trim() === '' ? 5 : Number(inpSubida.value);
+        try {
+            const r = await window.db.savePromoAutomation({
+                enabled: chkEnabled.checked,
+                // Deixou de ser uma escolha do vendedor. Quando a regra é
+                // "não receber menos do que já recebo", não há o que autorizar:
+                // uma promoção que não te custa nada nunca precisou de permissão,
+                // e uma que te custa é recusada pela conta, não por esta chave.
+                auto_deal: true,
+                auto_renew: chkRenovar.checked,
+                // Relâmpago fica de fora da automação por decisão do vendedor:
+                // é irreversível uma vez ativa, e ele prefere entrar à mão pela
+                // aba "Podem ter Relâmpago".
+                auto_lightning: false,
+                max_joins_per_day: Math.max(1, Number(inpTeto.value) || 10),
+                max_price_increase_pct: Number.isFinite(subida) ? Math.min(100, Math.max(0, subida)) : 5,
+            });
+            // O upsert devolve o erro em vez de lançar: sem esta checagem a
+            // tela dizia "salva" com o banco recusando.
+            if (r && r.error) {
+                if (/max_price_increase_pct/.test(r.error.message || '')) {
+                    showToast('Falta rodar o supabase/ml_promo_limite_preco.sql no Supabase para guardar o limite de preço.', 'error');
+                    return;
+                }
+                throw r.error;
+            }
+            showToast('Configuração salva.', 'success');
+            loadPromoAutomationTab();
+        } catch (e) {
+            console.error('Falha ao salvar configuração da automação:', e);
+            showToast('Não foi possível salvar a configuração.', 'error');
+        } finally {
+            salvar.disabled = false;
+        }
+    });
+    card.appendChild(salvar);
+
+    alvo.appendChild(card);
+}
+
+// Lista TODOS os anúncios ativos do vendedor — não só os que o Mercado Livre
+// está convidando agora. É aqui que se configura o que a automação pode fazer,
+// anúncio por anúncio: vincular ao produto (de onde sai o custo) e definir o
+// preço mínimo (que é o que manda de fato).
+function renderPromoAutoItems(anuncios, problema, configs, contagem) {
+    const alvo = document.getElementById('promo-auto-items');
+    if (!alvo) return;
+    alvo.innerHTML = '';
+
+    const card = document.createElement('section');
+    card.className = 'card';
+
+    const titulo = document.createElement('h4');
+    titulo.textContent = 'Seus anúncios';
+    card.appendChild(titulo);
+
+    const sub = document.createElement('p');
+    sub.className = 'small';
+    sub.style.color = 'var(--text-muted)';
+    sub.style.marginTop = '0.2rem';
+    sub.textContent = 'Todos já estão protegidos, sem precisar configurar nada: o piso de cada um é quanto '
+        + 'ele deixa hoje. Só mexa aqui se quiser EXIGIR MAIS que isso em algum anúncio específico — por '
+        + 'exemplo, aceitar promoção nele apenas se pagar acima do que paga agora.';
+    card.appendChild(sub);
+
+    // Sem isto, uma lista cortada parece uma lista completa — e o vendedor
+    // conclui que a automação não enxerga anúncios que ele tem.
+    if (contagem) {
+        const nota = document.createElement('p');
+        nota.className = 'small';
+        nota.style.marginTop = '0.4rem';
+        const mostrados = (anuncios || []).length;
+        if (contagem.total > mostrados) {
+            nota.style.color = 'var(--danger)';
+            nota.style.fontWeight = '600';
+            nota.textContent = `Mostrando ${mostrados} de ${contagem.total} anúncios ativos (limite de ${contagem.cap} por consulta). Me avise se precisar de todos.`;
+        } else {
+            nota.style.color = 'var(--text-muted)';
+            nota.textContent = `${mostrados} anúncio${mostrados === 1 ? '' : 's'} ativo${mostrados === 1 ? '' : 's'}. Anúncios pausados ou finalizados não aparecem — eles não participam de promoção.`;
+        }
+        card.appendChild(nota);
+    }
+
+    if (problema) {
+        const erro = document.createElement('p');
+        erro.className = 'small';
+        erro.style.color = 'var(--danger)';
+        erro.style.marginTop = '0.8rem';
+        erro.textContent = problema;
+        card.appendChild(erro);
+        alvo.appendChild(card);
+        return;
+    }
+
+    if (!anuncios || anuncios.length === 0) {
+        const vazio = document.createElement('p');
+        vazio.className = 'small';
+        vazio.style.color = 'var(--text-muted)';
+        vazio.style.marginTop = '0.8rem';
+        vazio.textContent = 'Nenhum anúncio ativo encontrado no Mercado Livre. Confira se a conta está conectada.';
+        card.appendChild(vazio);
+        alvo.appendChild(card);
+        return;
+    }
+
+    const cfgPorItem = configs || {};
+
+    // Já configurados sobem: a lista pode ter dezenas de itens e os que o
+    // vendedor acompanha ficam à mão.
+    const ordenados = [...anuncios].sort((a, b) => {
+        const ca = cfgPorItem[a.ml_item_id], cb = cfgPorItem[b.ml_item_id];
+        const va = ca && ca.min_price != null ? 0 : 1;
+        const vb = cb && cb.min_price != null ? 0 : 1;
+        return va - vb;
+    });
+
+    for (const anuncio of ordenados) {
+        const cfg = cfgPorItem[anuncio.ml_item_id];
+        const minimo = cfg ? cfg.min_price : null;
+
+        const bloco = document.createElement('div');
+        bloco.style.marginTop = '1rem';
+        bloco.style.paddingTop = '0.9rem';
+        bloco.style.borderTop = '1px solid var(--border-color)';
+
+        const cabecalho = document.createElement('div');
+        cabecalho.className = 'item-card-title-group';
+        cabecalho.appendChild(buildThumbnailImg(anuncio.thumbnail, 40));
+        const nome = document.createElement('strong');
+        nome.textContent = anuncio.title || anuncio.ml_item_id;
+        cabecalho.appendChild(nome);
+        bloco.appendChild(cabecalho);
+
+        const situacao = document.createElement('div');
+        situacao.className = 'small';
+        situacao.style.marginTop = '0.25rem';
+        // O piso é o LÍQUIDO, não o preço de vitrine. Mostrar o preço aqui era
+        // o que fazia os números não baterem: o vendedor compara com o que ele
+        // RECEBE, e a tela exibia o que o comprador PAGA. São valores bem
+        // diferentes depois de tarifa e frete.
+        const liquido = cfg ? cfg.current_net : null;
+
+        situacao.style.fontWeight = '700';
+        if (minimo != null) {
+            situacao.style.color = 'var(--warning)';
+            situacao.textContent = `Exigindo receber no mínimo ${brlFmt(minimo)} — acima do piso automático`;
+        } else if (liquido != null) {
+            situacao.style.color = 'var(--success)';
+            situacao.textContent = `✓ Protegido — hoje você recebe ${brlFmt(liquido)} limpo por venda, e a automação não aceita menos que isso`;
+        } else {
+            // Anúncio ainda não visitado pela verificação, ou cuja tarifa/frete
+            // o ML não respondeu. Prometer um número que não existe seria pior
+            // do que dizer que ele ainda vem.
+            situacao.style.color = 'var(--text-muted)';
+            situacao.textContent = '✓ Protegido — o valor que você recebe será calculado na próxima verificação';
+        }
+        bloco.appendChild(situacao);
+
+        if (liquido != null) {
+            const conta = document.createElement('div');
+            conta.className = 'small';
+            conta.style.color = 'var(--text-muted)';
+            conta.style.marginTop = '0.15rem';
+            const vitrine = cfg.current_price != null
+                ? `Vendendo a ${brlFmt(cfg.current_price)} (o preço em vigor, já com a promoção ativa). `
+                : '';
+            conta.textContent = `${vitrine}O valor acima já desconta tarifa e frete e soma o que o Mercado Livre banca. Calculado ${timeAgoPrecise(cfg.current_net_at)}.`;
+            bloco.appendChild(conta);
+        }
+
+        // O desconto guardado é o que a reposição devolve quando a promoção
+        // vencer. Mostrar deixa claro que existe uma memória — e qual é ela.
+        const guardado = cfg ? cfg.last_deal_price : null;
+        if (guardado != null) {
+            const memoria = document.createElement('div');
+            memoria.className = 'small';
+            memoria.style.color = 'var(--text-muted)';
+            memoria.style.marginTop = '0.15rem';
+            memoria.textContent = `Desconto guardado: ${brlFmt(guardado)} — se a promoção vencer, a automação repõe esse preço.`;
+            bloco.appendChild(memoria);
+        }
+
+        bloco.appendChild(buildMinPriceInput(anuncio.ml_item_id, minimo, loadPromoAutomationTab));
+
+        card.appendChild(bloco);
+    }
+
+    alvo.appendChild(card);
+}
+
+// Quantas ações de cada grupo a aba de automação busca. Serve também para o
+// contador da aba mostrar "30+" em vez de fingir que 30 é o total.
+const PROMO_HISTORY_LIMIT = 30;
+
+// Aba aberta no histórico da automação. Fica fora da função porque a tela é
+// redesenhada depois de salvar um piso, e voltar sempre para a primeira aba
+// tiraria o vendedor do que ele estava lendo. `null` = ainda não escolheu.
+let promoHistoryTab = null;
+
+function buildPromoActionRow(a, primeira) {
+    const cores = {
+        joined: ['var(--success)', 'Entrou'],
+        skipped: ['var(--text-muted)', 'Não entrou'],
+        failed: ['var(--danger)', 'Falhou'],
+    };
+
+    const linha = document.createElement('div');
+    if (!primeira) {
+        linha.style.marginTop = '0.8rem';
+        linha.style.paddingTop = '0.6rem';
+        linha.style.borderTop = '1px solid var(--border-color)';
+    }
+
+    const [cor, rotulo] = cores[a.outcome] || ['var(--text-muted)', a.outcome];
+
+    const cabecalho = document.createElement('div');
+    cabecalho.style.fontWeight = '700';
+    cabecalho.style.color = cor;
+    cabecalho.textContent = `${rotulo}${a.deal_price != null ? ' por ' + brlFmt(a.deal_price) : ''}`;
+    linha.appendChild(cabecalho);
+
+    const detalhe = document.createElement('div');
+    detalhe.className = 'small';
+    detalhe.style.color = 'var(--text-muted)';
+    detalhe.style.marginTop = '0.15rem';
+    detalhe.textContent = `${a.item_title || a.ml_item_id}${a.promotion_type ? ' · ' + a.promotion_type : ''} — ${a.reason || ''}`;
+    linha.appendChild(detalhe);
+
+    const quando = document.createElement('div');
+    quando.className = 'small';
+    quando.style.color = 'var(--text-muted)';
+    quando.style.marginTop = '0.1rem';
+    quando.textContent = timeAgoPrecise(a.created_at);
+    linha.appendChild(quando);
+
+    return linha;
+}
+
+function renderPromoAutoHistory(acoes) {
+    const alvo = document.getElementById('promo-auto-history');
+    if (!alvo) return;
+    alvo.innerHTML = '';
+
+    const card = document.createElement('section');
+    card.className = 'card';
+
+    const titulo = document.createElement('h4');
+    titulo.textContent = 'O que a automação fez';
+    card.appendChild(titulo);
+
+    if (!acoes || acoes.length === 0) {
+        const vazio = document.createElement('p');
+        vazio.className = 'small';
+        vazio.style.color = 'var(--text-muted)';
+        vazio.style.marginTop = '0.5rem';
+        vazio.textContent = 'Nada registrado ainda. As decisões aparecem aqui depois da próxima verificação automática.';
+        card.appendChild(vazio);
+        alvo.appendChild(card);
+        return;
+    }
+
+    // Com um supabase_client.js antigo em cache, o filtro por resultado é
+    // ignorado e as duas buscas devolvem as mesmas linhas.
+    const vistos = new Set();
+    const unicas = acoes.filter(a => !vistos.has(a.id) && vistos.add(a.id));
+    const recentes = (x, y) => new Date(y.created_at) - new Date(x.created_at);
+
+    const abas = [
+        {
+            id: 'aprovados',
+            rotulo: 'Aprovados',
+            lista: unicas.filter(a => a.outcome === 'joined').sort(recentes),
+            vazio: 'A automação ainda não colocou nenhum anúncio em promoção.',
+        },
+        {
+            id: 'nao-aprovados',
+            rotulo: 'Não aprovados',
+            lista: unicas.filter(a => a.outcome !== 'joined').sort(recentes),
+            vazio: 'Nenhuma promoção recusada nas verificações recentes.',
+        },
+    ];
+
+    // Primeira visita: abre onde tem conteúdo, com os aprovados na frente.
+    if (!abas.some(aba => aba.id === promoHistoryTab)) {
+        promoHistoryTab = abas[0].lista.length ? abas[0].id : abas[1].id;
+    }
+
+    const barra = document.createElement('div');
+    barra.className = 'results-tab-bar';
+    barra.setAttribute('role', 'tablist');
+    barra.style.marginTop = '0.75rem';
+
+    const painel = document.createElement('div');
+    painel.setAttribute('role', 'tabpanel');
+
+    const botoes = abas.map(aba => {
+        const botao = document.createElement('button');
+        botao.type = 'button';
+        botao.className = 'results-tab-btn';
+        botao.setAttribute('role', 'tab');
+        const qtd = aba.lista.length >= PROMO_HISTORY_LIMIT ? `${PROMO_HISTORY_LIMIT}+` : aba.lista.length;
+        botao.textContent = `${aba.rotulo} (${qtd})`;
+        botao.addEventListener('click', () => {
+            promoHistoryTab = aba.id;
+            desenhar();
+        });
+        barra.appendChild(botao);
+        return botao;
+    });
+
+    function desenhar() {
+        abas.forEach((aba, i) => {
+            const ativa = aba.id === promoHistoryTab;
+            botoes[i].classList.toggle('active', ativa);
+            botoes[i].setAttribute('aria-selected', ativa ? 'true' : 'false');
+        });
+
+        const atual = abas.find(aba => aba.id === promoHistoryTab);
+        painel.innerHTML = '';
+
+        if (atual.lista.length === 0) {
+            const vazio = document.createElement('p');
+            vazio.className = 'small';
+            vazio.style.color = 'var(--text-muted)';
+            vazio.textContent = atual.vazio;
+            painel.appendChild(vazio);
+            return;
+        }
+
+        atual.lista.forEach((a, i) => painel.appendChild(buildPromoActionRow(a, i === 0)));
+    }
+
+    card.appendChild(barra);
+    card.appendChild(painel);
+    desenhar();
+
+    alvo.appendChild(card);
+}
+
+async function loadPromoAutomationTab() {
+    if (!state.currentUser) return;
+    try {
+        const [cfg, aprovadas, recusadas, listagem, configs] = await Promise.all([
+            window.db.getPromoAutomation(),
+            window.db.getPromoActions(PROMO_HISTORY_LIMIT, ['joined']),
+            window.db.getPromoActions(PROMO_HISTORY_LIMIT, ['skipped', 'failed']),
+            mlApiFetch('/api/ml-reviews?resource=listings', 25000),
+            window.db.getPromoItemConfigs(),
+        ]);
+
+        renderPromoAutoConfig(cfg || {});
+        renderPromoAutoItems(
+            listagem ? listagem.items : null,
+            listagem ? null : 'Não foi possível consultar seus anúncios no Mercado Livre agora. Verifique a conexão da conta e tente de novo.',
+            configs,
+            listagem ? { total: listagem.total, cap: listagem.cap } : null
+        );
+        renderPromoAutoHistory([...aprovadas, ...recusadas]);
+    } catch (e) {
+        console.error('Falha ao carregar a aba de automação:', e);
+        showToast('Não foi possível carregar a automação.', 'error');
+    }
 }
 
 function buildLightningCandidateCard(item) {
@@ -3904,20 +7031,15 @@ function updateAdsBadge(count) {
     }
 }
 
-const TEN_DAYS_MS = 10 * 86400000;
-
-// As 4 abas são mutuamente exclusivas: "Vencem em 10 dias" é tirada de dentro de
-// "Ativas" (não aparece nas duas), e "Podem ter Relâmpago" vem de uma lista à parte
-// (ml_lightning_candidates, marcada com kind: 'lightning_candidate'), não misturada
-// com promoções reais.
+// As 3 abas são mutuamente exclusivas: "Podem ter Relâmpago" vem de uma lista
+// à parte (ml_lightning_candidates, marcada com kind: 'lightning_candidate'),
+// não misturada com promoções reais.
 function renderPromotionsTabs(items) {
     const all = items || [];
     const promotions = all.filter(i => i.kind === 'promotion');
     const lightning = all.filter(i => i.kind === 'lightning_candidate');
 
-    const soon = promotions.filter(i => i.status === 'active' && i.finish_date && (new Date(i.finish_date).getTime() - Date.now()) <= TEN_DAYS_MS);
-    const soonIds = new Set(soon.map(i => i.id));
-    const active = promotions.filter(i => i.status === 'active' && !soonIds.has(i.id));
+    const active = promotions.filter(i => i.status === 'active');
 
     // Cada linha é um par anúncio × promoção, então o mesmo anúncio pode ter
     // uma promoção encerrada e outra rodando. Nesse caso ele não é um anúncio
@@ -3929,16 +7051,15 @@ function renderPromotionsTabs(items) {
     );
     const ended = promotions.filter(i => i.status === 'ended' && !itensComPromocaoAtiva.has(i.ml_item_id));
 
-    // Ativas/Vencem em 10 dias: mais urgente (menos dias restantes) primeiro.
+    // Ativas: mais urgente (menos dias restantes) primeiro — assim a que está
+    // prestes a vencer aparece no topo, mesmo sem uma aba própria para ela.
     // Inativas: a que terminou por último primeiro (mais relevante que uma de meses atrás).
     const byFinishDateAsc = (a, b) => new Date(a.finish_date || 0) - new Date(b.finish_date || 0);
     const byUpdatedAtDesc = (a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0);
     active.sort(byFinishDateAsc);
-    soon.sort(byFinishDateAsc);
     ended.sort(byUpdatedAtDesc);
 
     renderIntoList('promo-list-active', 'promo-empty-active', active, buildPromotionCard);
-    renderIntoList('promo-list-soon', 'promo-empty-soon', soon, buildPromotionCard);
     renderIntoList('promo-list-ended', 'promo-empty-ended', ended, buildPromotionCard);
     renderIntoList('promo-list-lightning', 'promo-empty-lightning', lightning, buildLightningCandidateCard);
 }
@@ -3948,6 +7069,7 @@ async function loadPromotionsStatus() {
         updatePromotionsBadge(0);
         return;
     }
+
     const data = await mlApiFetch('/api/ml-reviews?resource=promotions');
     updatePromotionsBadge(data ? data.unreadCount : 0);
     renderPromotionsTabs(data ? data.items : []);
@@ -3982,15 +7104,15 @@ function initPromotionsModule() {
 
     const tabButtons = {
         active: document.getElementById('promo-tab-btn-active'),
-        soon: document.getElementById('promo-tab-btn-soon'),
         ended: document.getElementById('promo-tab-btn-ended'),
         lightning: document.getElementById('promo-tab-btn-lightning'),
+        auto: document.getElementById('promo-tab-btn-auto'),
     };
     const tabPanels = {
         active: document.getElementById('promo-tab-active'),
-        soon: document.getElementById('promo-tab-soon'),
         ended: document.getElementById('promo-tab-ended'),
         lightning: document.getElementById('promo-tab-lightning'),
+        auto: document.getElementById('promo-tab-auto'),
     };
     Object.keys(tabButtons).forEach(key => {
         const btn = tabButtons[key];
@@ -4002,6 +7124,10 @@ function initPromotionsModule() {
                 tabButtons[k].classList.toggle('active', isActive);
                 tabPanels[k].classList.toggle('hidden', !isActive);
             });
+            // A aba de automação lê configuração e histórico do banco, então
+            // carrega sob demanda — não faz sentido buscar isso em toda visita
+            // à tela de promoções.
+            if (key === 'auto') loadPromoAutomationTab();
         });
     });
 }
@@ -4023,6 +7149,21 @@ const VIEW_HEADER_META = {
         title: 'Histórico de Importação',
         subtitle: 'Reabra lotes salvos anteriormente',
         icon: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>'
+    },
+    'view-lote': {
+        title: 'Lote salvo',
+        subtitle: 'Custos, tributos e memória de cálculo',
+        icon: '<path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/>'
+    },
+    'view-shipping': {
+        title: 'Navio - Container',
+        subtitle: 'Acompanhe o navio no mapa e as etapas do embarque',
+        icon: '<path d="M2 21c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1 .6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M19.38 20A11.6 11.6 0 0 0 21 14l-9-4-9 4c0 2.9.94 5.34 2.81 7.76"/><path d="M19 13V7a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v6"/><path d="M12 10v4"/><path d="M12 2v3"/>'
+    },
+    'view-pricing': {
+        title: 'Precificação Marketplaces',
+        subtitle: 'Quanto sobra em cada canal depois das taxas',
+        icon: '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
     },
     'view-feasibility': {
         title: 'Viabilidade de Importação',
@@ -4079,10 +7220,25 @@ const VIEW_HEADER_META = {
         subtitle: 'Prazo de término e oportunidades de Oferta Relâmpago',
         icon: '<path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>'
     },
+    'view-gtin': {
+        title: 'Gerador de EAN',
+        subtitle: 'Códigos com dígito verificador válido para teste e validação de cadastro',
+        icon: '<path d="M3 5v14"/><path d="M8 5v14"/><path d="M12 5v14"/><path d="M17 5v14"/><path d="M21 5v14"/>'
+    },
     'view-ads': {
         title: 'Patrocinados',
-        subtitle: 'Anúncios que não estão rodando em Product Ads',
+        subtitle: 'Margem depois dos anúncios e o que ajustar em cada um',
         icon: '<path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>'
+    },
+    'view-ml-painel': {
+        title: 'Painel do Mercado Livre',
+        subtitle: 'Vendas, reputação e o que precisa de você hoje',
+        icon: '<path d="M3 3v18h18"/><path d="m7 15 4-5 4 3 5-7"/>'
+    },
+    'view-admin': {
+        title: 'Cadastros',
+        subtitle: 'Quem criou conta, quem usa e quem assina',
+        icon: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>'
     }
 };
 
@@ -4103,12 +7259,65 @@ function updateHeaderForView(viewId) {
 document.addEventListener('click', (e) => {
     if (e.target && e.target.id === 'btn-viab-connect-ml') {
         e.preventDefault();
-        const url = (state.currentUser && state.currentUser.id)
-            ? `/api/ml-auth?userId=${state.currentUser.id}`
-            : '/api/ml-auth';
-        window.location.href = url;
+        conectarMercadoLivre();
     }
 });
+
+// Leva ao login do Mercado Livre. Global de propósito: o aviso de conta não
+// conectada das abas do Mercado Livre (ml-conexao.js) chama por aqui.
+//
+// A URL vem do servidor por um fetch com o token da sessão, e não por uma
+// navegação direta: assim o servidor sabe QUEM está conectando (não confia num
+// userId da URL) e grava, na mesma resposta, o cookie que amarra o fluxo a este
+// navegador. Ver api/_ml-oauth.js.
+let conectandoShopee = false;
+async function conectarShopee() {
+    if (conectandoShopee) return;
+    conectandoShopee = true;
+    try {
+        const r = await mlApiFetch('/api/ml-auth?provider=shopee');
+        if (r && r.url) {
+            window.location.href = r.url;
+            return;
+        }
+        showToast('Não foi possível iniciar a conexão com a Shopee. Entre de novo no Impoclick e tente outra vez.', 'error');
+    } finally {
+        conectandoShopee = false;
+    }
+}
+
+let conectandoAmazonAds = false;
+async function conectarAmazonAds() {
+    if (conectandoAmazonAds) return;
+    conectandoAmazonAds = true;
+    try {
+        const r = await mlApiFetch('/api/ml-auth?provider=amazon-ads');
+        if (r && r.url) {
+            window.location.href = r.url;
+            return;
+        }
+        showToast('Não foi possível iniciar a conexão com os anúncios da Amazon. Entre de novo no Impoclick e tente outra vez.', 'error');
+    } finally {
+        conectandoAmazonAds = false;
+    }
+}
+
+let conectandoMercadoLivre = false;
+async function conectarMercadoLivre() {
+    if (conectandoMercadoLivre) return;
+    conectandoMercadoLivre = true;
+    try {
+        const r = await mlApiFetch('/api/ml-auth');
+        if (r && r.url) {
+            window.location.href = r.url;
+            return;
+        }
+        showToast('Não foi possível iniciar a conexão com o Mercado Livre. Entre de novo no Impoclick e tente outra vez.', 'error');
+    } finally {
+        // Se a navegação começou, a página descarrega; se falhou, libera o botão.
+        conectandoMercadoLivre = false;
+    }
+}
 
 // 1. MENU ROUTING & DROPDOWN ACCORDION
 function initDashboardNavigation() {
@@ -4175,21 +7384,36 @@ function initDashboardNavigation() {
         if (activeBtn) {
             activeBtn.classList.add('active');
             
-            // If it is a subitem, ensure the parent dropdown is open
-            if (activeBtn.classList.contains('nav-subitem')) {
-                const group = activeBtn.closest('.nav-dropdown-group');
-                if (group) {
-                    group.classList.add('open');
-                    const groupToggle = group.querySelector('.nav-dropdown-toggle');
-                    if (groupToggle) groupToggle.classList.add('active');
-                }
-            } else {
-                document.querySelectorAll('.nav-dropdown-toggle').forEach(toggle => {
-                    toggle.classList.remove('active');
-                });
-            }
+            // Abre o subgrupo que contém a tela ativa. Sem isso, entrar em
+            // Promoções pela home deixaria "Monitoramento" fechado e o item
+            // marcado como ativo invisível.
+            const grupoAtivo = activeBtn.closest('.nav-dropdown-group');
+            document.querySelectorAll('.nav-dropdown-group').forEach(g => {
+                const toggle = g.querySelector('.nav-subgroup-toggle');
+                const contem = g === grupoAtivo;
+                if (toggle) toggle.classList.toggle('contem-ativo', contem);
+                if (contem) abrirSubgrupo(g, true);
+            });
+
+            document.querySelectorAll('.nav-dropdown-toggle').forEach(t => {
+                t.classList.toggle('active', !!grupoAtivo && grupoAtivo.contains(t));
+            });
         }
+
+        // Aviso genérico de troca de tela, para telas que vivem em módulo
+        // próprio (navio.js) se montarem sem entrar na cadeia de ifs abaixo.
+        document.dispatchEvent(new CustomEvent('impoclick:tela', { detail: { id: targetViewId } }));
     };
+
+    // Bind dos subgrupos recolhíveis (Documentos, Monitoramento).
+    document.querySelectorAll('.nav-subgroup-toggle').forEach(botao => {
+        botao.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const grupo = botao.closest('.nav-dropdown-group');
+            if (grupo) abrirSubgrupo(grupo, !grupo.classList.contains('open'));
+        });
+    });
+    restaurarSubgrupos();
 
     // Bind click to nav items
     document.querySelectorAll('[data-view]').forEach(btn => {
@@ -4212,6 +7436,7 @@ function initDashboardNavigation() {
             if (viewId === 'view-catalog') {
                 loadCatalogStatus();
                 loadCheckStatus();
+                carregarMargemCatalogo(false);
             }
             if (viewId === 'view-promotions') {
                 loadPromotionsStatus();
@@ -4560,13 +7785,13 @@ function initDocumentsModule() {
                 uploader.addEventListener('dragenter', (e) => {
                     e.preventDefault();
                     uploader.style.borderColor = 'var(--primary)';
-                    uploader.style.backgroundColor = 'rgba(79, 70, 229, 0.08)';
+                    uploader.style.backgroundColor = 'var(--accent-soft)';
                 });
 
                 uploader.addEventListener('dragover', (e) => {
                     e.preventDefault();
                     uploader.style.borderColor = 'var(--primary)';
-                    uploader.style.backgroundColor = 'rgba(79, 70, 229, 0.08)';
+                    uploader.style.backgroundColor = 'var(--accent-soft)';
                 });
 
                 uploader.addEventListener('dragleave', () => {
@@ -4735,13 +7960,13 @@ function initDocumentsModule() {
                 uploader.addEventListener('dragenter', (e) => {
                     e.preventDefault();
                     uploader.style.borderColor = 'var(--primary)';
-                    uploader.style.backgroundColor = 'rgba(79, 70, 229, 0.08)';
+                    uploader.style.backgroundColor = 'var(--accent-soft)';
                 });
 
                 uploader.addEventListener('dragover', (e) => {
                     e.preventDefault();
                     uploader.style.borderColor = 'var(--primary)';
-                    uploader.style.backgroundColor = 'rgba(79, 70, 229, 0.08)';
+                    uploader.style.backgroundColor = 'var(--accent-soft)';
                 });
 
                 uploader.addEventListener('dragleave', () => {
@@ -4911,20 +8136,41 @@ function initDocumentsModule() {
 
 // Backend online (Vercel) que gerencia os tokens OAuth do Mercado Livre
 // para o usuário atualmente logado.
-async function mlApiFetch(path) {
+//
+// `opts` é opcional e aditivo (method/body) — painéis que só fazem GET
+// (a maioria) continuam chamando com só path+timeoutMs, sem mudar nada.
+async function mlApiFetch(path, timeoutMs, opts) {
     if (!state.currentUser) return null;
-    
+
     try {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 6000); // Mercado Livre pode demorar
+        // 6s cobre as consultas que leem do nosso banco. Chamadas que batem ao
+        // vivo na API do ML e paginam (listar todos os anúncios, por exemplo)
+        // precisam de mais tempo — quem chama informa quanto.
+        const timeout = setTimeout(() => controller.abort(), timeoutMs || 6000);
         const resp = await fetch(path, {
+            method: (opts && opts.method) || 'GET',
             headers: {
                 'user-token': state.currentUser.id,
                 'Authorization': `Bearer ${state.currentUser.access_token}`,
+                ...((opts && opts.body) ? { 'Content-Type': 'application/json' } : {}),
             },
+            body: opts && opts.body,
+            cache: 'no-store',
             signal: controller.signal
         });
         clearTimeout(timeout);
+        // 402 = o servidor recusou por plano vencido. Essa é a checagem que
+        // vale (a do front é só aparência), então refletimos no estado local e
+        // deixamos o updateUI abrir o paywall — antes isso caía no `return null`
+        // abaixo e o recurso sumia da tela sem nenhuma explicação.
+        if (resp.status === 402) {
+            state.currentUser.is_pro = false;
+            state.currentUser.is_subscribed = false;
+            state.currentUser.isSubscribed = false;
+            updateUI();
+            return null;
+        }
         if (!resp.ok) return null;
         return await resp.json();
     } catch (err) {
@@ -5063,12 +8309,10 @@ function initFeasibilityModule() {
     const tabButtons = {
         simples: document.getElementById('viab-tab-btn-simples'),
         formal: document.getElementById('viab-tab-btn-formal'),
-        mercado: document.getElementById('viab-tab-btn-mercado'),
     };
     const tabPanels = {
         simples: panelSimples,
         formal: document.getElementById('viab-tab-formal'),
-        mercado: document.getElementById('viab-tab-mercado'),
     };
     Object.keys(tabButtons).forEach(key => {
         const btn = tabButtons[key];
@@ -5080,7 +8324,6 @@ function initFeasibilityModule() {
                 tabButtons[k].classList.toggle('active', isActive);
                 tabPanels[k].classList.toggle('hidden', !isActive);
             });
-            if (key === 'mercado') renderMercado();
         });
     });
 
@@ -5130,7 +8373,6 @@ function initFeasibilityModule() {
         if (memTfoot) {
             memTfoot.innerHTML = `<tr style="font-weight:700;"><td colspan="2">Custo Total do Lote</td><td class="text-right">${brl(r.totalCost)}</td></tr>`;
         }
-        renderMercado();
     }
     ['simp-f-value', 'simp-f-freight', 'simp-f-qty', 'simp-f-exchange', 'simp-f-icms'].forEach(id => {
         const el = document.getElementById(id);
@@ -5161,21 +8403,38 @@ function initFeasibilityModule() {
 
         const tbody = document.getElementById('formal-r-memory-tbody');
         const tfoot = document.getElementById('formal-r-memory-tfoot');
+        // Mesmo tratamento da tabela de rateio: quando o NCM não tem alíquota
+        // cadastrada, os federais saem zerados e isso PRECISA aparecer — esta é
+        // a tela em que a pessoa decide se compra ou não.
+        const semAliquota = ratesAreUnknown(r.rates);
+        const pct = (v, d = 1) => formatRatePercent(r.rates, v, d);
+
         if (tbody) {
             tbody.innerHTML = `
                 <tr><td>Valor Aduaneiro (Produto + Frete)</td><td class="text-right">—</td><td class="text-right">${brl(r.vaBRL)}</td></tr>
-                <tr><td>Imposto de Importação (II)</td><td class="text-right">${r.rates.ii}%</td><td class="text-right">${brl(r.iiBRL)}</td></tr>
-                <tr><td>IPI</td><td class="text-right">${r.rates.ipi}%</td><td class="text-right">${brl(r.ipiBRL)}</td></tr>
-                <tr><td>PIS</td><td class="text-right">${r.rates.pis}%</td><td class="text-right">${brl(r.pisBRL)}</td></tr>
-                <tr><td>COFINS</td><td class="text-right">${r.rates.cofins}%</td><td class="text-right">${brl(r.cofinsBRL)}</td></tr>
+                <tr><td>Imposto de Importação (II)</td><td class="text-right">${pct(r.rates.ii)}</td><td class="text-right">${brl(r.iiBRL)}</td></tr>
+                <tr><td>IPI</td><td class="text-right">${pct(r.rates.ipi)}</td><td class="text-right">${brl(r.ipiBRL)}</td></tr>
+                <tr><td>PIS</td><td class="text-right">${pct(r.rates.pis, 2)}</td><td class="text-right">${brl(r.pisBRL)}</td></tr>
+                <tr><td>COFINS</td><td class="text-right">${pct(r.rates.cofins, 2)}</td><td class="text-right">${brl(r.cofinsBRL)}</td></tr>
                 <tr><td>ICMS</td><td class="text-right">${icmsPct}%</td><td class="text-right">${brl(r.icmsBRL)}</td></tr>
                 ${otherFeesBRL > 0 ? `<tr><td>Outras Despesas Aduaneiras</td><td class="text-right">—</td><td class="text-right">${brl(otherFeesBRL)}</td></tr>` : ''}
             `;
         }
         if (tfoot) {
-            tfoot.innerHTML = `<tr style="font-weight:700;"><td colspan="2">Custo Total do Lote</td><td class="text-right">${brl(r.totalCost)}</td></tr>`;
+            tfoot.innerHTML = `
+                <tr style="font-weight:700;"><td colspan="2">Custo Total do Lote</td><td class="text-right">${brl(r.totalCost)}</td></tr>
+                ${semAliquota ? `
+                <tr>
+                    <td colspan="3" style="background: var(--danger-soft); border-top: 2px solid var(--danger); padding: 0.85rem 1rem; font-weight:600; line-height:1.5; text-align:left; white-space:normal;">
+                        ⚠ Este NCM não tem alíquotas cadastradas.
+                        <span style="display:block; font-weight:400; margin-top:0.35rem;">
+                            <strong>II, IPI, PIS e COFINS entraram como zero</strong> no custo total acima — o custo
+                            real será maior. Informe as alíquotas manualmente antes de decidir pela compra.
+                        </span>
+                    </td>
+                </tr>` : ''}
+            `;
         }
-        renderMercado();
     }
 
     async function updateNcmPreview() {
@@ -5270,235 +8529,8 @@ function initFeasibilityModule() {
     // (Removido, status agora é gerenciado pelo syncSettingsUI no topo da aba)
 
     // --- Detecção de categoria real pelo nome do produto ---
-    const mktQueryInput = document.getElementById('mkt-f-query');
-    const mktCategoryInfoEl = document.getElementById('mkt-category-info');
 
-    async function detectCategory() {
-        const query = (mktQueryInput ? mktQueryInput.value : '').trim();
-        if (!mktCategoryInfoEl) return;
-        if (!query) {
-            mktCategoryInfoEl.classList.add('hidden');
-            resolvedCategoryId = null;
-            resolvedCategoryName = null;
-            return;
-        }
 
-        const data = await mlApiFetch(`/api/ml-market?action=category&q=${encodeURIComponent(query)}`);
-        mktCategoryInfoEl.classList.remove('hidden');
-        if (data && data.categoryId) {
-            resolvedCategoryId = data.categoryId;
-            resolvedCategoryName = data.categoryName;
-            mktCategoryInfoEl.className = 'ncm-preview success';
-            mktCategoryInfoEl.innerHTML = `<div><strong>Categoria detectada:</strong> <span class="ncm-badge">${data.categoryId}</span> ${data.categoryName}</div>`;
-            await updateFeeFromApi();
-        } else {
-            resolvedCategoryId = null;
-            resolvedCategoryName = null;
-            mktCategoryInfoEl.className = 'ncm-preview warning';
-            mktCategoryInfoEl.innerHTML = `<div>Não foi possível detectar a categoria automaticamente (servidor local indisponível ou termo não reconhecido) — ajuste a Taxa de Venda ML manualmente.</div>`;
-        }
-    }
-    if (mktQueryInput) mktQueryInput.addEventListener('blur', detectCategory);
-
-    // --- Taxa de venda real (categoria + preço) ---
-    async function updateFeeFromApi() {
-        const feeInput = document.getElementById('mkt-f-fee');
-        const feeNote = document.getElementById('mkt-f-fee-note');
-        if (!resolvedCategoryId) return;
-        // O preço só serve pra API achar a faixa/tipo de anúncio certo; enquanto o
-        // usuário não preenche o preço do mais vendido, usa um valor de referência
-        // para já trazer a taxa assim que a categoria for detectada.
-        const price = num('mkt-f-price') || 100;
-
-        const data = await mlApiFetch(`/api/ml-market?action=fee&price=${encodeURIComponent(price)}&category=${encodeURIComponent(resolvedCategoryId)}`);
-        if (data && feeInput) {
-            feeInput.value = data.percentageFee;
-            if (feeNote) feeNote.textContent = `Taxa real da API para "${resolvedCategoryName}", anúncio ${data.listingTypeName}: ${data.percentageFee}%.`;
-            renderMercado();
-        }
-    }
-    const mktPriceInput = document.getElementById('mkt-f-price');
-    if (mktPriceInput) mktPriceInput.addEventListener('blur', updateFeeFromApi);
-
-    // --- Buscar mais vendidos: abre o site real + mostra o produto #1 do ranking via API ---
-    const mktSearchBtn = document.getElementById('mkt-btn-search');
-    const mktBestSellerInfoEl = document.getElementById('mkt-bestseller-info');
-    if (mktSearchBtn) {
-        mktSearchBtn.addEventListener('click', async () => {
-            const query = (mktQueryInput ? mktQueryInput.value : '').trim();
-            if (!query) {
-                showToast('Informe o nome/tipo do produto para pesquisar.', 'error');
-                return;
-            }
-            const url = 'https://lista.mercadolivre.com.br/' + encodeURIComponent(query);
-            window.open(url, '_blank', 'noopener');
-
-            if (!mktBestSellerInfoEl) return;
-            if (!resolvedCategoryId) {
-                mktBestSellerInfoEl.classList.remove('hidden');
-                mktBestSellerInfoEl.className = 'ncm-preview warning';
-                mktBestSellerInfoEl.innerHTML = '<div>Saia do campo "Nome / Tipo do Produto" para detectar a categoria antes de buscar o ranking real.</div>';
-                return;
-            }
-            mktBestSellerInfoEl.classList.remove('hidden');
-            mktBestSellerInfoEl.className = 'ncm-preview warning';
-            mktBestSellerInfoEl.innerHTML = '<div>Consultando o ranking de mais vendidos...</div>';
-
-            const data = await mlApiFetch(`/api/ml-market?action=bestseller&category=${encodeURIComponent(resolvedCategoryId)}`);
-            if (data && data.id) {
-                mktBestSellerInfoEl.className = 'ncm-preview success';
-                mktBestSellerInfoEl.innerHTML = `
-                    <div><strong>#1 mais vendido em ${resolvedCategoryName}:</strong> ${data.name || data.id}</div>
-                    <div style="font-size:0.72rem; color:var(--text-muted); margin-top:0.25rem;">
-                        <a href="${data.permalink}" target="_blank" rel="noopener" style="color:var(--primary);">Abrir página do produto ↗</a> — confira o preço atual e cole no campo abaixo (a API não libera preço de outros vendedores para este app).
-                    </div>`;
-            } else {
-                mktBestSellerInfoEl.className = 'ncm-preview warning';
-                mktBestSellerInfoEl.innerHTML = '<div>Não foi possível consultar o ranking real agora (servidor local indisponível). Use a busca aberta ao lado para conferir manualmente.</div>';
-            }
-        });
-    }
-
-    // --- Frete real por peso/dimensão (com fallback para a tabela de referência local) ---
-    async function updateWeightEstimate() {
-        const weightG = num('mkt-f-weight');
-        const lengthCm = num('mkt-f-length');
-        const widthCm = num('mkt-f-width');
-        const heightCm = num('mkt-f-height');
-        const price = num('mkt-f-price');
-
-        const noteEl = document.getElementById('mkt-r-weight-note');
-        const freightInput = document.getElementById('mkt-f-platform-freight');
-
-        if (weightG <= 0 && (lengthCm <= 0 || widthCm <= 0 || heightCm <= 0)) {
-            if (noteEl) noteEl.innerHTML = '';
-            return;
-        }
-
-        // Tenta o valor real via API (precisa de um preço de venda para simular a cobrança)
-        if (price > 0) {
-            const data = await mlApiFetch(
-                `/api/ml-freight?weight=${weightG}&length=${lengthCm}&width=${widthCm}&height=${heightCm}&price=${price}`
-            );
-            if (data && typeof data.cost === 'number') {
-                if (noteEl) {
-                    const discountInfo = data.discount && data.discount.rate > 0
-                        ? ` Já inclui um desconto de <strong>${(data.discount.rate * 100).toFixed(0)}%</strong> pela reputação/nível da sua conta (sem desconto seria ${brl(data.discount.promoted_amount)}).`
-                        : '';
-                    noteEl.innerHTML = `🟢 Peso faturável (API): <strong>${fmtGrams(data.billableWeightG)}</strong> → frete real cobrado pelo Mercado Livre: <strong>${brl(data.cost)}</strong>.${discountInfo}`;
-                }
-                if (freightInput) freightInput.value = data.cost.toFixed(2);
-                renderMercado();
-                return;
-            }
-        }
-
-        // Fallback: estimativa local por peso cubado + tabela de referência
-        const est = estimatePlatformFreight(weightG, lengthCm, widthCm, heightCm);
-        if (noteEl) {
-            if (est.billableWeightG <= 0) {
-                noteEl.innerHTML = '';
-            } else if (est.overMax) {
-                noteEl.innerHTML = `Peso cubado: <strong>${fmtGrams(est.volumetricWeightG)}</strong> | Peso faturável: <strong>${fmtGrams(est.billableWeightG)}</strong> — acima da nossa tabela de referência (30kg). Informe o frete manualmente abaixo.`;
-            } else {
-                noteEl.innerHTML = `💡 Estimativa local (servidor indisponível ou sem preço informado) — Peso faturável: <strong>${fmtGrams(est.billableWeightG)}</strong> → frete de referência: <strong>${brl(est.cost)}</strong>.`;
-            }
-        }
-        if (freightInput && est.billableWeightG > 0 && !est.overMax) {
-            freightInput.value = est.cost.toFixed(2);
-        }
-        renderMercado();
-    }
-    ['mkt-f-weight', 'mkt-f-length', 'mkt-f-width', 'mkt-f-height'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.addEventListener('input', updateWeightEstimate);
-    });
-    if (mktPriceInput) mktPriceInput.addEventListener('blur', updateWeightEstimate);
-
-    function renderMercado() {
-        const sourceRadio = document.querySelector('input[name="mkt-cost-source"]:checked');
-        const source = sourceRadio ? sourceRadio.value : 'simples';
-
-        const refSimplesEl = document.getElementById('mkt-ref-simples');
-        const refFormalEl = document.getElementById('mkt-ref-formal');
-        if (refSimplesEl && !simplesRefTouched) refSimplesEl.value = lastSimpUnitCost.toFixed(2);
-        if (refFormalEl && !formalRefTouched) refFormalEl.value = lastFormalUnitCost.toFixed(2);
-
-        const refCost = source === 'formal' ? num('mkt-ref-formal') : num('mkt-ref-simples');
-
-        const price = num('mkt-f-price');
-        const feePct = num('mkt-f-fee', 13);
-        const platformFreight = num('mkt-f-platform-freight');
-        const feeAmount = price * (feePct / 100);
-        const netRevenue = price - feeAmount - platformFreight;
-        const diff = netRevenue - refCost;
-        const marginPct = price > 0 ? (diff / price) * 100 : 0;
-
-        const memTbody = document.getElementById('mkt-r-memory-tbody');
-        const memTfoot = document.getElementById('mkt-r-memory-tfoot');
-        if (memTbody) {
-            memTbody.innerHTML = `
-                <tr><td>Preço de Venda (Concorrente)</td><td class="text-right">${brl(price)}</td></tr>
-                <tr><td>(-) Taxa de Venda Mercado Livre (${feePct}%)</td><td class="text-right">${brl(feeAmount)}</td></tr>
-                <tr><td>(-) Frete da Plataforma</td><td class="text-right">${brl(platformFreight)}</td></tr>
-                <tr><td style="font-weight:600;">(=) Receita Líquida</td><td class="text-right" style="font-weight:600;">${brl(netRevenue)}</td></tr>
-                <tr><td>(-) Seu Custo Final de Importação</td><td class="text-right">${brl(refCost)}</td></tr>
-            `;
-        }
-        if (memTfoot) {
-            memTfoot.innerHTML = `<tr style="font-weight:700;"><td>(=) Resultado Líquido por Unidade</td><td class="text-right" style="color:${diff >= 0 ? 'var(--success)' : 'var(--danger)'};">${brl(diff)}</td></tr>`;
-        }
-
-        const verdictEl = document.getElementById('mkt-r-verdict');
-        const detailEl = document.getElementById('mkt-r-detail');
-        if (!verdictEl || !detailEl) return;
-
-        if (price <= 0 || refCost <= 0) {
-            verdictEl.textContent = '—';
-            verdictEl.style.color = 'var(--text-muted)';
-            detailEl.textContent = 'Preencha o custo final (nas abas Simplificada/Formal) e o preço do concorrente para ver o resultado.';
-            return;
-        }
-
-        if (diff <= 0) {
-            verdictEl.textContent = 'NÃO COMPENSA';
-            verdictEl.style.color = 'var(--danger)';
-            detailEl.textContent = `Vendendo a ${brl(price)}, descontando a taxa do Mercado Livre e o frete da plataforma, faltariam ${brl(Math.abs(diff))} para cobrir seu custo final — prejuízo estimado.`;
-        } else if (marginPct < 15) {
-            verdictEl.textContent = 'MARGEM APERTADA — ANALISAR';
-            verdictEl.style.color = 'var(--warning)';
-            detailEl.textContent = `Sobraria ${brl(diff)} líquidos por unidade (${marginPct.toFixed(1)}% do preço de venda) após taxa ML, frete da plataforma e seu custo final — margem baixa, avalie outros custos antes de importar.`;
-        } else {
-            verdictEl.textContent = 'COMPENSA';
-            verdictEl.style.color = 'var(--success)';
-            detailEl.textContent = `Sobraria ${brl(diff)} líquidos por unidade (${marginPct.toFixed(1)}% do preço de venda) após taxa ML, frete da plataforma e seu custo final.`;
-        }
-    }
-
-    document.querySelectorAll('input[name="mkt-cost-source"]').forEach(el => {
-        el.addEventListener('change', renderMercado);
-    });
-    ['mkt-f-price', 'mkt-f-fee', 'mkt-f-platform-freight'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.addEventListener('input', renderMercado);
-    });
-
-    const refSimplesInput = document.getElementById('mkt-ref-simples');
-    const refFormalInput = document.getElementById('mkt-ref-formal');
-    if (refSimplesInput) {
-        refSimplesInput.addEventListener('input', () => {
-            simplesRefTouched = true;
-            renderMercado();
-        });
-    }
-    if (refFormalInput) {
-        refFormalInput.addEventListener('input', () => {
-            formalRefTouched = true;
-            renderMercado();
-        });
-    }
-
-    renderMercado();
 }
 
 // 6. IMPORTS HISTORY (SAVE & LOAD) MODULE
@@ -5747,7 +8779,8 @@ async function renderHistoryTable() {
             <td>R$ ${(item.fobBRL || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
             <td>R$ ${(item.totalBRL || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
             <td style="text-align: center; display: flex; gap: 0.5rem; justify-content: center;">
-                <button class="btn btn-primary btn-sm" onclick="loadSavedImport(${item.id})">Carregar</button>
+                <button class="btn btn-primary btn-sm" onclick="verLoteSalvo(${item.id})" title="Ver custos, gráficos e memória de cálculo">Ver</button>
+                <button class="btn btn-secondary btn-sm" onclick="loadSavedImport(${item.id})" title="Abrir na calculadora para editar">Editar</button>
                 <button class="btn btn-danger btn-sm" onclick="deleteSavedImport(${item.id})">Excluir</button>
             </td>
         `;
@@ -5775,24 +8808,49 @@ async function deleteSavedImport(id) {
     }
 }
 
-async function loadSavedImport(id) {
-    let item = null;
-    
+// Um lote salvo, venha do Supabase (logado) ou do navegador. Editar e Ver
+// usam a mesma busca.
+async function buscarLoteSalvo(id) {
     if (state.currentUser) {
         try {
             const spData = await window.db.getHistory();
             const row = spData.find(i => i.id === id);
-            if (row) {
-                item = { name: row.name, stateData: row.state_data };
-            }
+            if (row) return { name: row.name, stateData: row.state_data, createdAt: row.created_at };
         } catch(e) {}
-    } else {
-        let historyList = [];
-        try {
-            historyList = JSON.parse(localStorage.getItem('import_rateio_history')) || [];
-        } catch(e) {}
-        item = historyList.find(i => i.id === id);
+        return null;
     }
+    let historyList = [];
+    try {
+        historyList = JSON.parse(localStorage.getItem('import_rateio_history')) || [];
+    } catch(e) {}
+    const local = historyList.find(i => i.id === id);
+    return local ? { name: local.name, stateData: local.stateData, createdAt: local.id } : null;
+}
+
+// Abre o lote só para conferir: gráficos, custos e memória de cálculo, sem
+// tocar no que está na calculadora. Quem desenha é lote.js, ao ouvir o
+// evento; aqui só entram os dados e a conta, que é a mesma do updateUI.
+async function verLoteSalvo(id) {
+    const item = await buscarLoteSalvo(id);
+    if (!item || !item.stateData) {
+        showToast('Não foi possível abrir este lote.', 'error');
+        return;
+    }
+    const estado = { ...ESTADO_PADRAO, ...item.stateData };
+    document.querySelectorAll('.view-panel').forEach(panel => panel.classList.add('hidden'));
+    document.getElementById('view-lote').classList.remove('hidden');
+    document.querySelectorAll('.nav-item, .nav-subitem').forEach(btn => btn.classList.remove('active'));
+    const itemMenu = document.querySelector('[data-view="view-imports"]');
+    if (itemMenu) itemMenu.classList.add('active');
+    updateHeaderForView('view-lote');
+    window.scrollTo({ top: 0 });
+    document.dispatchEvent(new CustomEvent('impoclick:ver-lote', { detail: {
+        id, nome: item.name, criadoEm: item.createdAt, estado, calculo: calcularLote(estado),
+    } }));
+}
+
+async function loadSavedImport(id) {
+    const item = await buscarLoteSalvo(id);
     
     if (item && item.stateData) {
         if (await showConfirm(`Deseja carregar a importação "${item.name}" na calculadora? Isso substituirá seus dados atuais.`, { title: 'Carregar lote' })) {
@@ -5914,10 +8972,7 @@ function syncSettingsUI() {
     if (btnConnectMl && statusTextMl) {
         btnConnectMl.addEventListener('click', (e) => {
             e.preventDefault();
-            const url = (state.currentUser && state.currentUser.id)
-                ? `/api/ml-auth?userId=${state.currentUser.id}`
-                : '/api/ml-auth';
-            window.location.href = url;
+            conectarMercadoLivre();
         });
 
         if (btnDisconnectMl) {
@@ -5962,6 +9017,139 @@ function syncSettingsUI() {
         });
     }
 
+    // Status da Amazon. Hoje é um app PRIVADO na SP-API (só a conta principal
+    // do Impoclick está autoautorizada — ver api/_amazon-helper.js), então não
+    // existe botão de "Conectar" aqui ainda: só mostramos o status e, se já
+    // estiver conectado, o botão de desconectar.
+    const btnDisconnectAmazon = document.getElementById('btn-disconnect-amazon');
+    const statusTextAmazon = document.getElementById('amazon-connection-status');
+    if (statusTextAmazon) {
+        if (btnDisconnectAmazon) {
+            btnDisconnectAmazon.addEventListener('click', async (e) => {
+                e.preventDefault();
+                if (!state.currentUser) return;
+                if (!await showConfirm('Desconectar a conta da Amazon?', { title: 'Desconectar Amazon', confirmText: 'Desconectar', danger: true })) return;
+
+                btnDisconnectAmazon.disabled = true;
+                try {
+                    await fetch('/api/ml-status?provider=amazon', {
+                        method: 'POST',
+                        headers: { 'user-token': state.currentUser.id, 'Authorization': `Bearer ${state.currentUser.access_token}` }
+                    });
+                } catch (err) {
+                    console.error('Erro ao desconectar Amazon:', err);
+                }
+                btnDisconnectAmazon.disabled = false;
+                syncSettingsUI();
+            });
+        }
+
+        mlApiFetch('/api/ml-status?provider=amazon').then(res => {
+            if (res && res.connected) {
+                statusTextAmazon.textContent = 'Conectado';
+                statusTextAmazon.style.color = 'var(--success)';
+                if (btnDisconnectAmazon) btnDisconnectAmazon.classList.remove('hidden');
+            } else {
+                statusTextAmazon.textContent = 'Ainda não disponível para todas as contas';
+                statusTextAmazon.style.color = 'var(--text-muted)';
+                if (btnDisconnectAmazon) btnDisconnectAmazon.classList.add('hidden');
+            }
+        });
+    }
+
+    // Status da conexão com a Shopee.
+    const btnConnectShopee = document.getElementById('btn-connect-shopee');
+    const btnDisconnectShopee = document.getElementById('btn-disconnect-shopee');
+    const statusTextShopee = document.getElementById('shopee-connection-status');
+    if (statusTextShopee) {
+        if (btnConnectShopee) {
+            btnConnectShopee.addEventListener('click', (e) => {
+                e.preventDefault();
+                conectarShopee();
+            });
+        }
+        if (btnDisconnectShopee) {
+            btnDisconnectShopee.addEventListener('click', async (e) => {
+                e.preventDefault();
+                if (!state.currentUser) return;
+                if (!await showConfirm('Desconectar sua conta da Shopee?', { title: 'Desconectar Shopee', confirmText: 'Desconectar', danger: true })) return;
+
+                btnDisconnectShopee.disabled = true;
+                try {
+                    await fetch('/api/ml-status?provider=shopee', {
+                        method: 'POST',
+                        headers: { 'user-token': state.currentUser.id, 'Authorization': `Bearer ${state.currentUser.access_token}` }
+                    });
+                } catch (err) {
+                    console.error('Erro ao desconectar Shopee:', err);
+                }
+                btnDisconnectShopee.disabled = false;
+                syncSettingsUI();
+            });
+        }
+
+        mlApiFetch('/api/ml-status?provider=shopee').then(res => {
+            if (res && res.connected) {
+                statusTextShopee.textContent = res.shopName ? `Conectado como: ${res.shopName}` : 'Conectado';
+                statusTextShopee.style.color = 'var(--success)';
+                if (btnConnectShopee) btnConnectShopee.classList.add('hidden');
+                if (btnDisconnectShopee) btnDisconnectShopee.classList.remove('hidden');
+            } else {
+                statusTextShopee.textContent = 'Não conectado';
+                statusTextShopee.style.color = 'var(--text-muted)';
+                if (btnConnectShopee) btnConnectShopee.classList.remove('hidden');
+                if (btnDisconnectShopee) btnDisconnectShopee.classList.add('hidden');
+            }
+        });
+    }
+
+    // Status dos anúncios da Amazon (Patrocinados) — conexão separada da
+    // SP-API acima, OAuth com redirect de verdade (ver conectarAmazonAds).
+    const btnConnectAmazonAds = document.getElementById('btn-connect-amazon-ads');
+    const btnDisconnectAmazonAds = document.getElementById('btn-disconnect-amazon-ads');
+    const statusTextAmazonAds = document.getElementById('amazon-ads-connection-status');
+    if (statusTextAmazonAds) {
+        if (btnConnectAmazonAds) {
+            btnConnectAmazonAds.addEventListener('click', (e) => {
+                e.preventDefault();
+                conectarAmazonAds();
+            });
+        }
+        if (btnDisconnectAmazonAds) {
+            btnDisconnectAmazonAds.addEventListener('click', async (e) => {
+                e.preventDefault();
+                if (!state.currentUser) return;
+                if (!await showConfirm('Desconectar os anúncios da Amazon? O histórico de gastos salvo será apagado.', { title: 'Desconectar Amazon Ads', confirmText: 'Desconectar', danger: true })) return;
+
+                btnDisconnectAmazonAds.disabled = true;
+                try {
+                    await fetch('/api/ml-status?provider=amazon-ads', {
+                        method: 'POST',
+                        headers: { 'user-token': state.currentUser.id, 'Authorization': `Bearer ${state.currentUser.access_token}` }
+                    });
+                } catch (err) {
+                    console.error('Erro ao desconectar Amazon Ads:', err);
+                }
+                btnDisconnectAmazonAds.disabled = false;
+                syncSettingsUI();
+            });
+        }
+
+        mlApiFetch('/api/ml-status?provider=amazon-ads').then(res => {
+            if (res && res.connected) {
+                statusTextAmazonAds.textContent = 'Conectado';
+                statusTextAmazonAds.style.color = 'var(--success)';
+                if (btnConnectAmazonAds) btnConnectAmazonAds.classList.add('hidden');
+                if (btnDisconnectAmazonAds) btnDisconnectAmazonAds.classList.remove('hidden');
+            } else {
+                statusTextAmazonAds.textContent = 'Não conectado';
+                statusTextAmazonAds.style.color = 'var(--text-muted)';
+                if (btnConnectAmazonAds) btnConnectAmazonAds.classList.remove('hidden');
+                if (btnDisconnectAmazonAds) btnDisconnectAmazonAds.classList.add('hidden');
+            }
+        });
+    }
+
     syncViabMlStatus();
 
     btnLight.onclick = () => {
@@ -5991,9 +9179,77 @@ function syncSettingsUI() {
     };
     
     document.getElementById('btn-open-payment-settings').onclick = () => {
+        // Precisa passar pelo abrirModalPagamento e não só tirar o .hidden: é
+        // ele que monta o formulário de cartão. Abrindo na mão, o modal aparecia
+        // com os campos vazios e o botão preso em "Carregando formulário
+        // seguro...", porque o CardForm nunca chegava a ser montado.
+        if (typeof window.abrirModalPagamento === 'function') {
+            window.abrirModalPagamento();
+            return;
+        }
         const paymentModal = document.getElementById('payment-modal');
         if (paymentModal) paymentModal.classList.remove('hidden');
     };
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// GERADOR DE EAN
+//
+// Gera códigos com dígito verificador válido para exercitar cadastro,
+// importação de planilha e validação de fluxo — o mesmo uso que as ferramentas
+// públicas do tipo declaram.
+//
+// Para VENDER, o código legítimo vem da GS1: um número gerado aqui pode já
+// pertencer a uma empresa registrada, e o Mercado Livre valida o GTIN enviado.
+// ─────────────────────────────────────────────────────────────────────────
 
+function gtinDigitoVerificador(semDigito) {
+    let soma = 0;
+    for (let i = semDigito.length - 1, peso = 3; i >= 0; i--, peso = peso === 3 ? 1 : 3) {
+        soma += Number(semDigito[i]) * peso;
+    }
+    return (10 - (soma % 10)) % 10;
+}
+
+function gtinGerarTeste() {
+    const alvo = document.getElementById('gtin-teste-saida');
+    if (!alvo) return;
+
+    const qtd = Math.min(500, Math.max(1, parseInt(document.getElementById('gtin-teste-qtd').value, 10) || 1));
+    const tamanho = parseInt(document.getElementById('gtin-teste-formato').value, 10) || 13;
+
+    // O prefixo só se aplica ao EAN-13: UPC-A é numeração dos EUA e o EAN-8
+    // tem alocação própria, curta demais para prefixo de país.
+    const prefixo = tamanho === 13 ? '789' : '';
+
+    const codigos = [];
+    const usados = new Set();
+    while (codigos.length < qtd) {
+        let base = prefixo;
+        while (base.length < tamanho - 1) base += Math.floor(Math.random() * 10);
+        if (usados.has(base)) continue;
+        usados.add(base);
+        codigos.push(base + gtinDigitoVerificador(base));
+    }
+
+    const linhas = codigos.map((c, i) => '<div class="gtin-linha">'
+        + '<span class="gtin-marca" style="color:var(--text-muted);">' + (i + 1) + '</span>'
+        + '<div><strong class="gtin-codigo">' + c + '</strong></div>'
+        + '</div>').join('');
+
+    alvo.innerHTML = linhas
+        + '<button type="button" class="btn btn-secondary" id="gtin-btn-copiar-teste" style="margin-top:1rem;">Copiar todos</button>';
+
+    const botao = document.getElementById('gtin-btn-copiar-teste');
+    botao.addEventListener('click', () => {
+        navigator.clipboard.writeText(codigos.join('\n')).then(() => {
+            botao.textContent = 'Copiado';
+            setTimeout(() => { botao.textContent = 'Copiar todos'; }, 1800);
+        });
+    });
+}
+
+function initGtin() {
+    const botao = document.getElementById('gtin-btn-teste');
+    if (botao) botao.addEventListener('click', gtinGerarTeste);
+}

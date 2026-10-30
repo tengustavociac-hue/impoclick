@@ -1,0 +1,18 @@
+name: Checar gasto de anúncios da Amazon
+
+on:
+  schedule:
+    # A cada hora: o relatório da Amazon pode levar até 3h para ficar pronto,
+    # então uma rodada por hora é o bastante para pedir e depois conferir sem
+    # gastar execuções à toa (ver _amazon-ads-helper.js).
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Chamar endpoint de checagem
+        run: |
+          curl -sf -X POST "https://www.impoclick.com.br/api/ml-status?provider=amazon-ads" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}"

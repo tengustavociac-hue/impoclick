@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<!-- @template name="Painel do importador" description="Tela de app Impoclick: topo com navegação em pílulas, rail lateral e grade de cards de métrica." -->
+<helmet><script src="./ds-base.js"></script></helmet>
+<div style="min-height:100vh;background:var(--surface-page);font-family:var(--font-sans)">
+<header style="display:flex;align-items:center;gap:20px;height:64px;padding:0 24px;background:var(--veil-light);backdrop-filter:saturate(140%) blur(18px);border-bottom:1px solid var(--border-subtle);position:sticky;top:0;z-index:40">
+<div style="display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px;color:var(--text-title);letter-spacing:-0.015em"><img src="../../assets/logo-impoclick.png" alt="" style="width:28px;height:28px;display:block">Impoclick</div>
+<div style="flex:1"></div>
+<x-import component-from-global-scope="ImpoclickDesignSystem_ec37fd.NavPills" items="{{ navItems }}" value="Painel" hint-size="380px,42px"></x-import>
+<div style="flex:1"></div>
+<div style="display:flex;align-items:center;gap:8px">
+<x-import component-from-global-scope="ImpoclickDesignSystem_ec37fd.IconButton" icon="search" label="Buscar" size="sm" hint-size="32px,32px"></x-import>
+<x-import component-from-global-scope="ImpoclickDesignSystem_ec37fd.IconButton" icon="notifications" label="Avisos" size="sm" hint-size="32px,32px"></x-import>
+<x-import component-from-global-scope="ImpoclickDesignSystem_ec37fd.Avatar" name="Rafael Lima" size="sm" hint-size="32px,32px"></x-import>
+</div>
+</header>
+<div style="display:flex;align-items:stretch;min-height:calc(100vh - 64px)">
+<x-import component-from-global-scope="ImpoclickDesignSystem_ec37fd.SideNav" items="{{ navRail }}" value="painel" hint-size="248px,100%"></x-import>
+<main style="flex:1;min-width:0;padding:28px 32px 48px">
+<div style="max-width:1240px;margin:0 auto;display:flex;flex-direction:column;gap:20px">
+<div style="display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap">
+<div>
+<div style="font-size:13px;color:var(--text-muted);font-weight:500">Terça, 16 de setembro</div>
+<h1 style="font-size:30px;margin-top:4px;letter-spacing:-0.02em">Olá, Rafael</h1>
+</div>
+<x-import component-from-global-scope="ImpoclickDesignSystem_ec37fd.Button" variant="primary" icon-left="add" hint-size="180px,42px">Nova importação</x-import>
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;align-items:stretch">
+<x-import component-from-global-scope="ImpoclickDesignSystem_ec37fd.Card" variant="accent" eyebrow="Valor em trânsito" hint-size="100%,190px">
+<x-import component-from-global-scope="ImpoclickDesignSystem_ec37fd.Stat" prefix="US$" value="1.284.600" fraction=",00" delta="+12,4%" delta-note="vs. mês anterior" size="lg" hint-size="100%,120px"></x-import>
+</x-import>
+<x-import component-from-global-scope="ImpoclickDesignSystem_ec37fd.Card" eyebrow="Contêineres" title="Ocupação do plano" hint-size="100%,190px">
+<x-import component-from-global-scope="ImpoclickDesignSystem_ec37fd.Stat" value="18" fraction="/ 40" size="md" hint-size="100%,60px"></x-import>
+<div style="margin-top:18px">
+<x-import component-from-global-scope="ImpoclickDesignSystem_ec37fd.ProgressBar" label="Uso mensal" value-text="45%" value="{{ usage }}" max="{{ usageMax }}" hint-size="100%,40px"></x-import>
+</div>
+</x-import>
+<x-import component-from-global-scope="ImpoclickDesignSystem_ec37fd.Card" eyebrow="IMP-2481" title="Shenzhen → Santos" hint-size="100%,190px">
+<x-import component-from-global-scope="ImpoclickDesignSystem_ec37fd.Timeline" steps="{{ steps }}" hint-size="100%,130px"></x-import>
+</x-import>
+</div>
+<x-import component-from-global-scope="ImpoclickDesignSystem_ec37fd.Card" eyebrow="Operação" title="Importações abertas" hint-size="100%,260px">
+<x-import component-from-global-scope="ImpoclickDesignSystem_ec37fd.DataTable" columns="{{ columns }}" rows="{{ rows }}" hint-size="100%,200px"></x-import>
+</x-import>
+</div>
+</main>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const B = window.ImpoclickDesignSystem_ec37fd && window.ImpoclickDesignSystem_ec37fd.Badge;
+    return {
+      navItems: ['Painel', 'Importações', 'Cotação', 'Custos'],
+      navRail: [
+        { group: 'Operação' },
+        { value: 'painel', icon: 'dashboard', label: 'Painel' },
+        { value: 'importacoes', icon: 'inventory_2', label: 'Importações', count: 12 },
+        { value: 'rastreio', icon: 'directions_boat', label: 'Rastreio' },
+        { group: 'Financeiro' },
+        { value: 'custos', icon: 'payments', label: 'Custos' },
+        { value: 'docs', icon: 'receipt_long', label: 'Documentos', count: 3 },
+      ],
+      usage: 18,
+      usageMax: 40,
+      steps: [
+        { title: 'Embarcado', date: '07 abr', state: 'done', icon: 'directions_boat' },
+        { title: 'Em trânsito', date: 'prev. 29 abr', state: 'current', icon: 'public' },
+        { title: 'Desembaraço', state: 'todo', icon: 'gavel' },
+      ],
+      columns: [
+        { key: 'id', label: 'Referência', primary: true },
+        { key: 'code', label: 'Contêiner', render: r => React.createElement('span', { className: 'ic-mono' }, r.code) },
+        { key: 'status', label: 'Status', render: r => B ? React.createElement(B, { tone: r.tone, dot: true }, r.status) : r.status },
+        { key: 'eta', label: 'ETA' },
+        { key: 'value', label: 'Valor FOB', align: 'right' },
+      ],
+      rows: [
+        { id: 'IMP-2481', code: 'MSKU 472 118-3', status: 'Em trânsito', tone: 'accent', eta: '29 abr', value: 'US$ 84.200' },
+        { id: 'IMP-2479', code: 'TCLU 883 401-9', status: 'Aguardando DI', tone: 'warning', eta: '18 abr', value: 'US$ 31.980' },
+        { id: 'IMP-2470', code: 'HLXU 210 774-2', status: 'Entregue', tone: 'success', eta: '04 abr', value: 'US$ 112.430' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

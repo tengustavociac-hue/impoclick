@@ -2,13 +2,29 @@
   "name": "impoclick-web",
   "version": "1.0.0",
   "description": "Impoclick com Stripe",
-  "scripts": {},
+  "scripts": {
+    "typecheck": "tsc -p design-system/tsconfig.json && tsc -p tsconfig.site.json",
+    "lint": "oxlint --deny-warnings . && node tools/ds-lint-rules.js --check && node tools/ds-extension-tokens.js --check && designmd lint DESIGN.md && node tools/ds-check-tokens.js",
+    "ds:build": "node tools/ds-build.js",
+    "ds:serve": "node tools/ds-serve.js",
+    "ds:lint-rules": "node tools/ds-lint-rules.js",
+    "ds:check": "npm run typecheck && npm run lint && npm run ds:build",
+    "ds:extension-tokens": "node tools/ds-extension-tokens.js",
+    "ext:pack": "node tools/empacotar-extensao.js"
+  },
   "engines": {
     "node": "24.x"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",
-    "stripe": "^14.14.0",
-    "mercadopago": "^2.0.7"
+    "mercadopago": "^2.0.7",
+    "stripe": "^14.14.0"
+  },
+  "devDependencies": {
+    "@google/design.md": "^0.4.0",
+    "esbuild": "^0.28.2",
+    "oxlint": "^1.83.0",
+    "oxlint-plugin-eslint": "^1.83.0",
+    "typescript": "^7.0.2"
   }
 }

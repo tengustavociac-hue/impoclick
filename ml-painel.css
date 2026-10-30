@@ -1,0 +1,378 @@
+/* Painel do Mercado Livre (ml-painel.js). Só layout: cor, tipografia e raio
+   vêm dos componentes do design system e dos tokens. Medidas fixas são
+   métricas de layout, comentadas. */
+
+#ml-painel-raiz:empty { display: none; }
+
+/* Gráfico de faturamento por dia: uma série só, então uma cor só. As barras
+   ficam em cinza de trilho e o melhor dia recebe o aqua — o mesmo padrão do
+   SparkBars do design system, que é o único destaque do gráfico. */
+.mlp {
+  --mlp-barra: var(--ink-300);
+  --mlp-melhor: var(--aqua-500);
+
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  margin-bottom: var(--space-6);
+}
+
+[data-theme="dark"] .mlp {
+  --mlp-barra: var(--ink-700);
+  --mlp-melhor: color-mix(in srgb, var(--aqua-500) 70%, var(--aqua-600));
+}
+
+.mlp-topo {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.mlp-h {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--text-title-md);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-tight);
+  color: var(--text-title);
+}
+
+.mlp-sub {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.mlp-texto {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+  color: var(--text-muted);
+}
+
+.mlp-nota {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-caption);
+  line-height: var(--leading-relaxed);
+  color: var(--text-muted);
+}
+
+.mlp-detalhe {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  color: var(--text-muted);
+}
+
+/* Métrica: 210px por número — cabe "R$ 123.456,78" e a nota em duas linhas. */
+.mlp-numeros {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: var(--space-4);
+}
+
+/* ── Conta e reputação ──────────────────────────────────────────────── */
+
+.mlp-selos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+/* Métrica: 200px por taxa — rótulo e número na mesma linha. */
+.mlp-taxas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-3) var(--space-5);
+  margin-top: var(--space-5);
+}
+
+.mlp-taxa {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.mlp-taxa strong {
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-title);
+}
+
+/* ── Gráfico ────────────────────────────────────────────────────────── */
+
+/* Métrica: 120px de altura — dá para comparar dias sem dominar a tela. */
+.mlp-grafico {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 120px;
+  margin-top: var(--space-4);
+}
+
+.mlp-barra {
+  display: flex;
+  align-items: flex-end;
+  flex: 1 1 0;
+  height: 100%;
+  min-width: 0;
+}
+
+/* Ponta arredondada só em cima; a base fica na linha de zero. */
+.mlp-barra span {
+  display: block;
+  width: 100%;
+  border-radius: 4px 4px 0 0;
+  background: var(--mlp-barra);
+}
+
+.mlp-barra.is-melhor span { background: var(--mlp-melhor); }
+
+.mlp-grafico-eixo {
+  display: flex;
+  gap: 2px;
+  margin-top: var(--space-2);
+  font-size: var(--text-caption);
+  color: var(--text-muted);
+}
+
+.mlp-grafico-eixo span {
+  flex: 1 1 0;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+/* ── Precisa de você hoje ───────────────────────────────────────────── */
+
+.mlp-tarefas {
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.mlp-tarefas li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: start;
+}
+
+.mlp-tarefa {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--text-title);
+}
+
+.mlp-lista {
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.mlp-lista li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.mlp-lista strong {
+  flex: none;
+  font-weight: var(--weight-semibold);
+  color: var(--text-title);
+}
+
+@media (max-width: 700px) {
+  .mlp-tarefas li { grid-template-columns: auto minmax(0, 1fr); }
+  .mlp-tarefas li > :last-child { grid-column: 2; justify-self: start; }
+  /* Métrica: 90px no celular — trinta barras não cabem legíveis. */
+  .mlp-grafico { height: 90px; }
+}
+
+/* Linha da média do período, atrás das barras. Pontilhada para não ser
+   confundida com dado. */
+.mlp-media {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px dashed var(--border-strong);
+  pointer-events: none;
+}
+
+/* ── Quando a loja vende ────────────────────────────────────────────── */
+
+.mlp-minis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--space-6);
+  margin-top: var(--space-2);
+}
+
+.mlp-h4 {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* Métrica: 70px — alto o bastante para comparar, baixo para caber dois lado a lado. */
+.mlp-mini-barras {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 70px;
+}
+
+.mlp-mini-eixo {
+  display: flex;
+  gap: 2px;
+  margin-top: var(--space-1);
+  font-size: var(--text-micro);
+  color: var(--text-muted);
+}
+
+.mlp-mini-eixo span {
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* ── Listas e links ─────────────────────────────────────────────────── */
+
+.mlp-link {
+  color: var(--text-title);
+  text-decoration: none;
+}
+
+.mlp-link:hover { color: var(--accent); }
+
+.mlp-selos-linha {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.mlp-lista--larga {
+  margin-top: var(--space-4);
+  gap: var(--space-2);
+}
+
+.mlp-lista--larga li {
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+/* ── Carregando ─────────────────────────────────────────────────────── */
+
+.mlp-carregando {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+/* Métrica: 18px, o círculo que gira ao lado do aviso de carregamento. */
+.mlp-girando {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--accent);
+  border-radius: var(--radius-circle);
+  animation: mlp-girar 0.9s linear infinite;
+}
+
+@keyframes mlp-girar { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .mlp-girando { animation: none; }
+}
+
+/* Por que um bloco não apareceu: recolhido, para não competir com os números. */
+.mlp-faltas {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  background: var(--surface-card);
+  padding: var(--space-3) var(--space-5);
+}
+
+.mlp-faltas summary {
+  cursor: pointer;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.mlp-faltas strong {
+  font-weight: var(--weight-regular);
+  color: var(--text-muted);
+  text-align: right;
+}
+
+/* ── Período, custo, lucro e estoque ────────────────────────────────── */
+
+.mlp-acoes {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+/* Segunda linha de uma célula da tabela: o detalhe do número em cima. */
+.mlp-celula-nota {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--text-caption);
+  font-weight: var(--weight-regular);
+  color: var(--text-muted);
+}
+
+/* Métrica: 110px, o campo de custo cabe "1.234,56" na coluna da tabela. */
+.mlp-custo { width: 110px; margin-left: auto; }
+
+.mlp-imposto-linha {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+/* Métrica: 200px, o campo de imposto com a dica numa linha. */
+.mlp-imposto { width: 200px; }
+
+.mlp-imposto-linha .mlp-nota {
+  flex: 1 1 320px;
+  margin: 0;
+}
+
+/* Valor com sinal: a cor reforça o "−" e o aviso de estoque, nunca os substitui.
+   Vem por último e com mais especificidade nas listas e nas notas de célula,
+   que definem a própria cor. */
+.mlp-ruim,
+.mlp-lista strong.mlp-ruim,
+.mlp-celula-nota.mlp-ruim { color: var(--danger); }
+
+.mlp-bom { color: var(--success); }
+

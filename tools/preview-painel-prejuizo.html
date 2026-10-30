@@ -1,0 +1,134 @@
+<!doctype html>
+<!-- Revisão das duas novas tarefas em "Precisa de você hoje" (Painel do ML):
+     catálogo em prejuízo e patrocinados em prejuízo. Abre o index.html real,
+     troca mlApiFetch/window.db por dados de exemplo e pré-carrega os caches
+     de margem que Catálogo e Patrocinados normalmente deixam no localStorage.
+       python -m http.server 4174 --bind 127.0.0.1
+       http://127.0.0.1:4174/tools/preview-painel-prejuizo.html?theme=dark
+     Fora do deploy (tools/). -->
+<html lang="pt-BR"><head><meta charset="utf-8">
+<style>html,body{margin:0;background:#888}iframe{border:0;display:block;width:960px;height:1800px}</style>
+</head>
+<body>
+<iframe id="f" src="../index.html"></iframe>
+<script>
+const p = new URLSearchParams(location.search);
+
+// MLB1 (Catálogo, Ganhando): 15 − 5 (comissão) − 8 (frete) − 0,90 (imposto 6%
+// de 15) − 10 (custo) = −8,90 → prejuízo.
+// MLB2 (Catálogo, Ganhando): 100 − 10 − 5 − 6 − 5 = 74 → lucro, não deve contar.
+const CATALOGO_MARGEM = {
+  MLB1: { preco: 15, comissaoUn: 5, freteUn: 8, adsUn: 0 },
+  MLB2: { preco: 100, comissaoUn: 10, freteUn: 5, adsUn: 0 },
+};
+// MLB3 (Patrocinados): margemUn = 50 − 10 − 5 − 3 (imposto 6% de 50) − 30 (custo) = 2.
+// lucroPosAds = 2×2 unidades − 20 de investimento = −16 → prejuízo.
+const ADS_PAINEL = {
+  ok: true,
+  periodo: { de: '2026-09-01', ate: '2026-09-30', dias: 30 },
+  campanhas: [],
+  anuncios: [{
+    itemId: 'MLB3', campanhaId: null, titulo: 'Anúncio patrocinado em prejuízo', preco: 50,
+    fotoBoa: null, estoqueDiferido: false, recomendado: false,
+    metricas: { investimento: 20, receitaAds: 100, cliques: 10, impressoes: 100, ctr: 0.1, cvr: 0.2,
+      roas: 5, acos: 0.2, tacos: 0.2, unidadesAds: 2, unidadesOrganicas: 0, receitaOrganica: 0 },
+    economia: { precoMedio: 50, comissaoUn: 10, comissaoFonte: 'vendas', freteUn: 5, freteFonte: 'vendas', amostrasFrete: 2, unidadesVendidas: 2 },
+  }],
+};
+
+const RESUMO = {
+  versao: 3,
+  periodo: { de: '2026-09-01', ate: '2026-09-30', dias: 30 },
+  anterior: { de: '2026-08-01', ate: '2026-08-31' },
+  conta: { nickname: 'Loja Teste', reputacao: '5_green', mercadoLider: 'gold', vendasConcluidas: 500, reclamacoes: 0.01, atrasos: 0.02, cancelamentos: 0.01 },
+  vendas: { receita: 5000, unidades: 50, pedidos: 40, ticket: 125, porDia: [{ dia: '2026-09-01', receita: 100 }],
+    porDiaSemana: [1, 2, 3, 4, 5, 6, 7], porHora: new Array(24).fill(1), topItens: [], parcial: false, cancelados: 1,
+    clientes: { total: 30, recorrentes: 5 }, anunciosPara80: 3, anunciosQueVenderam: 10 },
+  comparacao: { receita: 0.1, unidades: 0.1, pedidos: 0.1, ticket: 0.01, receitaAnterior: 4500 },
+  projecao: null,
+  visitas: 1000, conversao: 0.04,
+  anuncios: { ativos: 20, pausados: 1, semVenda: 0, semVendaExemplos: [] },
+  perguntasSemResposta: 0, estoqueEmRisco: [],
+};
+
+const f = document.getElementById('f');
+f.addEventListener('load', () => setTimeout(async () => {
+  const w = f.contentWindow, d = f.contentDocument;
+  d.documentElement.setAttribute('data-theme', p.get('theme') || 'light');
+
+  // Pré-carrega os caches que Catálogo e Patrocinados deixariam no
+  // localStorage depois de calcular a margem lá — é isso que o Painel lê.
+  try {
+    if (!p.get('semcache')) {
+      w.localStorage.setItem('impoclick-catalog-margem', JSON.stringify({ em: Date.now(), porItem: CATALOGO_MARGEM }));
+      w.localStorage.setItem('impoclick-ads-painel', JSON.stringify({ em: Date.now(), painel: ADS_PAINEL }));
+    }
+    w.localStorage.removeItem('impoclick-ml-painel-30');
+  } catch (e) { /* ok */ }
+
+  w.eval('state.currentUser = { id: "u1", name: "Teste", is_pro: true, access_token: "x" };');
+  const chamadas = [];
+  w.mlApiFetch = async (path) => {
+    chamadas.push(path);
+    // Ordem importa: resource=ads-painel e resource=catalog-margem precisam
+    // ser conferidos ANTES dos genéricos resource=ads/resource=catalog
+    // (que um \b sozinho também casaria, por causa do hífen).
+    if (/action=resumo/.test(path)) return JSON.parse(JSON.stringify(RESUMO));
+    if (/resource=catalog-margem/.test(path)) return { itens: Object.entries(CATALOGO_MARGEM).map(([mlItemId, m]) => ({ mlItemId, ...m })), cortado: false };
+    if (/resource=ads-painel/.test(path)) {
+      // semads=0: simula conta sem Product Ads (ok:false, sem_publicidade) —
+      // confere que vira "0, nada pendente" em vez de ficar tentando de novo.
+      if (p.get('semads') === '0') return { ok: false, motivo: 'sem_publicidade' };
+      return JSON.parse(JSON.stringify(ADS_PAINEL));
+    }
+    if (/resource=catalog\b/.test(path)) {
+      return {
+        unreadCount: 0,
+        items: [
+          { id: 1, ml_item_id: 'MLB1', status: 'winning', current_price: 15, item_title: 'Item em prejuízo', is_read: true, updated_at: new Date().toISOString() },
+          { id: 2, ml_item_id: 'MLB2', status: 'winning', current_price: 100, item_title: 'Item com lucro', is_read: true, updated_at: new Date().toISOString() },
+        ],
+      };
+    }
+    if (/resource=promotions/.test(path)) return { unreadCount: 0 };
+    if (/resource=ads\b/.test(path)) return { unreadCount: 0 };
+    return { unreadCount: 0 };
+  };
+  w.db.getAdsMargemDados = async () => ({ dados: { custos: { MLB1: 10, MLB2: 5, MLB3: 30 }, impostoPct: 6 } });
+
+  d.documentElement.classList.add('has-session');
+  const lp = d.getElementById('landing-container'); if (lp) lp.style.display = 'none';
+  for (const id of ['auth-container', 'paywall-screen']) { const el = d.getElementById(id); if (el) el.classList.add('hidden'); }
+  const shell = d.querySelector('.app-container'); if (shell) shell.classList.remove('hidden');
+
+  d.querySelector('[data-view="view-ml-painel"]').click();
+  await new Promise((r) => setTimeout(r, 1500));
+
+  w.scrollTo(0, 0);
+  const tarefas = [...d.querySelectorAll('#ml-painel-raiz .mlp-tarefas > li')];
+  const textoTarefas = tarefas.map((li) => (li.querySelector('.mlp-tarefa') || {}).textContent);
+  const faltas = [...d.querySelectorAll('#ml-painel-raiz .mlp-faltas li')].map((li) => li.textContent.replace(/\s+/g, ' ').trim());
+
+  // Clica "Abrir" na tarefa de catálogo em prejuízo e confere se foi para a
+  // aba Prejuízo do Catálogo (não para "Ganhando").
+  const liCatalogo = tarefas.find((li) => /catálogo em prejuízo/.test(li.querySelector('.mlp-tarefa').textContent));
+  let catalogoAbriu = null;
+  if (liCatalogo) {
+    const botao = [...liCatalogo.querySelectorAll('button')].find((b) => /Abrir/.test(b.textContent));
+    botao.click();
+    await new Promise((r) => setTimeout(r, 150));
+    catalogoAbriu = {
+      viewAtivo: !d.getElementById('view-catalog').classList.contains('hidden'),
+      abaPrejuizoAtiva: d.getElementById('catalog-tab-btn-prejuizo').classList.contains('active'),
+    };
+  }
+
+  document.title = JSON.stringify({
+    totalTarefas: tarefas.length,
+    textoTarefas,
+    faltas,
+    catalogoAbriu,
+  });
+}, 1800));
+</script>
+</body></html>

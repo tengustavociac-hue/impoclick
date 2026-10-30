@@ -1,0 +1,58 @@
+.shp-grid {
+    display: grid;
+    gap: 1rem;
+}
+
+.shp-stats-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+}
+
+.shp-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 7rem;
+}
+
+.shp-stat-label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.shp-stat-valor {
+    font-size: 1.25rem;
+}
+
+.shp-analise {
+    margin-top: 1rem;
+    padding: 0.9rem;
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    background: var(--surface-muted, transparent);
+}
+
+.shp-analise-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+    gap: 0.75rem;
+}
+
+.shp-analise-grid > div {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    font-size: 0.85rem;
+}
+
+.shp-link-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    text-decoration: underline dotted;
+}

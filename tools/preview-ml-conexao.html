@@ -1,0 +1,63 @@
+<!doctype html>
+<!-- Revisão do aviso de conta do Mercado Livre não conectada (ml-conexao.js),
+     sem login: abre o index.html real, troca mlApiFetch e passa pelas quatro
+     abas do Mercado Livre.
+       python -m http.server 4174 --bind 127.0.0.1
+       http://127.0.0.1:4174/tools/preview-ml-conexao.html?estado=nao_conectado&aba=view-promotions
+     estado = nao_conectado | expirado | conectado | erro · aba = a que fica
+     aberta no fim · theme = light | dark. Fora do deploy (tools/). -->
+<html lang="pt-BR"><head><meta charset="utf-8">
+<style>html,body{margin:0;background:#888}iframe{border:0;display:block;width:1440px;height:1100px}</style>
+</head>
+<body>
+<iframe id="f" src="../index.html"></iframe>
+<script>
+const p = new URLSearchParams(location.search);
+const estado = p.get('estado') || 'nao_conectado';
+const RESPOSTA = {
+  nao_conectado: { connected: false, motivo: 'nao_conectado' },
+  expirado: { connected: false, motivo: 'expirado' },
+  conectado: { connected: true, nickname: 'LOJA_TESTE' },
+  erro: null,
+};
+const ABAS = ['view-reviews', 'view-catalog', 'view-promotions', 'view-ads'];
+const espera = (ms) => new Promise((r) => setTimeout(r, ms));
+
+const f = document.getElementById('f');
+f.addEventListener('load', () => setTimeout(async () => {
+  const w = f.contentWindow, d = f.contentDocument;
+  d.documentElement.setAttribute('data-theme', p.get('theme') || 'light');
+  try { w.localStorage.removeItem('impoclick-ads-painel'); } catch (e) { /* ok */ }
+  w.eval('state.currentUser = { id: "u1", name: "Teste", is_pro: true, access_token: "x" };');
+  const chamadas = [];
+  w.mlApiFetch = async (path) => {
+    chamadas.push(path.split('?')[0] + (path.includes('resource=') ? '?' + path.split('?')[1] : ''));
+    return /ml-status/.test(path) ? RESPOSTA[estado] : null;
+  };
+  let foiPara = null;
+  w.conectarMercadoLivre = () => { foiPara = 'ml-auth'; };
+
+  d.documentElement.classList.add('has-session');
+  const lp = d.getElementById('landing-container'); if (lp) lp.style.display = 'none';
+  for (const id of ['auth-container', 'paywall-screen']) { const el = d.getElementById(id); if (el) el.classList.add('hidden'); }
+  const shell = d.querySelector('.app-container'); if (shell) shell.classList.remove('hidden');
+
+  const avisos = {};
+  const alvo = p.get('aba') || 'view-promotions';
+  for (const id of [...ABAS.filter((a) => a !== alvo), alvo]) {
+    d.querySelector('[data-view="' + id + '"]').click();
+    await espera(400);
+    const caixa = d.querySelector('#' + id + ' > .ml-conexao');
+    avisos[id] = caixa ? caixa.querySelector('.ic-alert__title').textContent : null;
+  }
+  const botao = d.querySelector('#' + alvo + ' > .ml-conexao button');
+  if (botao) botao.click();
+  w.scrollTo(0, 0);
+  document.title = JSON.stringify({
+    estado, avisos, botaoLevaAoLogin: foiPara === 'ml-auth',
+    perguntasAoStatus: chamadas.filter((c) => c === '/api/ml-status').length,
+    painelAdsPediuDados: chamadas.some((c) => /ads-painel/.test(c)),
+  });
+}, 2500));
+</script>
+</body></html>

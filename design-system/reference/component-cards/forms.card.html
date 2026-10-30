@@ -1,0 +1,14 @@
+<!-- @dsCard group="Components" viewport="700x320" name="Forms" subtitle="Input, Select, Checkbox, Radio, Switch, SegmentedControl" -->
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Forms</title>
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../_runtime/ds-bundle.js"></script>
+<style>body{margin:0;padding:24px;background:var(--surface-page)}.stack{display:flex;flex-direction:column;gap:18px}.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}.cap{font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted);font-weight:600}</style>
+</head><body><div id="root"></div>
+<script type="text/babel">
+const { Input, Select, Checkbox, Switch, SegmentedControl } = window.ImpoclickDesignSystem_ec37fd;
+function Demo(){const[c,setC]=React.useState("USD");const[m,setM]=React.useState("sea");return(<div className="stack"><div className="row" style={{gap:16,alignItems:"flex-start"}}><div style={{flex:1,minWidth:200}}><Input label="Número do contêiner" placeholder="MSKU 000 000-0" icon="inventory_2" required/></div><div style={{flex:1,minWidth:200}}><Select label="Modal de transporte" options={["Marítimo","Aéreo","Rodoviário"]}/></div><div style={{flex:1,minWidth:200}}><Input label="Valor FOB" placeholder="0,00" icon="payments" error="Informe o valor da fatura"/></div></div><div className="row" style={{gap:16,alignItems:"flex-start"}}><div style={{flex:1,minWidth:240}}><Input pill icon="search" placeholder="Buscar importações, NCM, fornecedor"/></div><SegmentedControl options={["USD","BRL","CNY"]} value={c} onChange={setC}/><SegmentedControl accent options={[{value:"sea",label:"Marítimo",icon:"directions_boat"},{value:"air",label:"Aéreo",icon:"flight"}]} value={m} onChange={setM}/></div><div className="row" style={{gap:24}}><Checkbox label="Incluir seguro internacional" defaultChecked/><Checkbox label="Carga perigosa"/><Checkbox radio name="d" label="Porta a porta" defaultChecked/><Checkbox radio name="d" label="Porto a porto"/><Switch label="Avisar na atracação" defaultChecked/><Switch label="Relatório semanal"/></div></div>);}
+ReactDOM.createRoot(document.getElementById('root')).render(<Demo />);
+</script></body></html>

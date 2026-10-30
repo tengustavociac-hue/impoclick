@@ -8,13 +8,40 @@ const config = {
   },
 };
 
-// Helper function to read the raw body from the request stream
-async function buffer(readable) {
+// A verificação de assinatura do Stripe exige os BYTES EXATOS do corpo. Se a
+// config de bodyParser acima não for aplicada, o Vercel consome o stream e
+// entrega req.body já parseado — e aí o stream volta vazio. Reconstruir o JSON
+// a partir do objeto não resolve: a serialização quase nunca bate byte a byte
+// com o que o Stripe assinou.
+//
+// Então tratamos os três casos e, no caso perdido, dizemos exatamente qual é o
+// problema. Antes isso virava um "No signatures found matching..." genérico,
+// indistinguível de um segredo errado — e todo pagamento aprovado deixava de
+// virar PRO sem ninguém entender por quê.
+async function readRawBody(req) {
   const chunks = [];
-  for await (const chunk of readable) {
+  for await (const chunk of req) {
     chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
   }
-  return Buffer.concat(chunks);
+  const streamed = Buffer.concat(chunks);
+  if (streamed.length > 0) return streamed;
+
+  // bodyParser desativado corretamente, mas requisição sem corpo
+  if (req.body === undefined || req.body === null) return streamed;
+
+  // Corpo preservado cru por algum caminho alternativo
+  if (Buffer.isBuffer(req.body)) return req.body;
+  if (typeof req.body === 'string') return Buffer.from(req.body, 'utf8');
+
+  // Já parseado como objeto: bytes originais perdidos, sem recuperação possível
+  const err = new Error(
+    'O corpo da requisição chegou já parseado — a config `bodyParser: false` não foi ' +
+    'aplicada por este runtime. Sem os bytes originais é impossível validar a assinatura ' +
+    'do Stripe. Converta este arquivo para ESM com `export const config` ou use o runtime ' +
+    'de Functions novo do Vercel.'
+  );
+  err.rawBodyUnavailable = true;
+  throw err;
 }
 
 module.exports = async (req, res) => {
@@ -38,11 +65,23 @@ module.exports = async (req, res) => {
       process.env.SUPABASE_SERVICE_ROLE_KEY
     );
 
-    const rawBody = await buffer(req);
+    const rawBody = await readRawBody(req);
     event = stripe.webhooks.constructEvent(rawBody, sig, endpointSecret);
   } catch (err) {
+    if (err.rawBodyUnavailable) {
+      // Erro de configuração, não de assinatura. 500 (e não 400) faz o Stripe
+      // reenviar a notificação depois, então nenhum pagamento se perde enquanto
+      // isso não for corrigido.
+      console.error('🚨 CONFIGURAÇÃO: ' + err.message);
+      return res.status(500).send('Webhook misconfigured: raw body unavailable');
+    }
+    // text/plain e mensagem fixa: `res.send(string)` responde como text/html
+    // neste runtime, e devolver err.message interpolado é a mesma classe de
+    // reflexão que virou XSS no ml-callback.js. O detalhe fica no log — o
+    // Stripe não lê esse corpo, só o status.
     console.error('⚠️ Erro na assinatura do Webhook.', err.message);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    return res.status(400).send('Webhook signature verification failed');
   }
 
   try {

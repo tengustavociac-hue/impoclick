@@ -1,0 +1,55 @@
+<!doctype html>
+<!-- Referência do cálculo da calculadora: roda o updateUI() de verdade, dentro
+     do index.html, para vários lotes que cobrem todos os regimes, e devolve o
+     texto da área de resultados de cada um. Serve para comparar o antes e o
+     depois de qualquer mexida na conta (a tela "Ver" do histórico usa a mesma).
+       python -m http.server 4174 --bind 127.0.0.1
+       chrome --headless --dump-dom http://127.0.0.1:4174/tools/referencia-calculo.html
+     O resultado sai no <pre id="saida">, em JSON. Fora do deploy (tools/). -->
+<html lang="pt-BR"><head><meta charset="utf-8"></head>
+<body>
+<iframe id="f" src="../index.html" style="width:1400px;height:900px;border:0"></iframe>
+<pre id="saida">calculando</pre>
+<script>
+const produto = (id, name, qty, unitPrice, unitWeight, extra = {}) =>
+  ({ id, name, description: '', qty, unitPrice, unitWeight, ncm: '', taxation: 'taxable', image: '', ...extra });
+
+const LOTES = {
+  'remessa-ate-50': { taxRegime: 'remessa-conforme', taxMode: 'auto', currency: 'USD', exchangeRate: 5.4, freight: 4, insurance: 0, fees: 10, feesInBRL: true,
+    products: [produto(1, 'Capinha', 10, 2, 0.03), produto(2, 'Cabo', 5, 1.5, 0.05)] },
+  'remessa-acima-50-isentos': { taxRegime: 'remessa-conforme', taxMode: 'auto', currency: 'USD', exchangeRate: 5.4, freight: 30, insurance: 5, fees: 40, feesInBRL: true,
+    products: [produto(1, 'Fone', 20, 8, 0.12), produto(2, 'Livro', 3, 12, 0.4, { taxation: 'exempt-books' }), produto(3, 'Remédio', 2, 15, 0.1, { taxation: 'exempt-meds' })] },
+  'regra-geral-cambio-completo': { taxRegime: 'regra-geral', taxMode: 'auto', currency: 'USD', exchangeRate: 5.3, exchangeMode: 'complete', spread: 4, iof: 3.5,
+    freight: 120, freightInBRL: true, insurance: 10, fees: 250, feesInBRL: true, feesSplit: 'weight', icmsRate: 18,
+    products: [produto(1, 'Luminária', 40, 6.5, 0.8), produto(2, 'Lâmpada', 200, 0.9, 0.05)] },
+  'apenas-icms-brl': { taxRegime: 'apenas-icms', taxMode: 'auto', currency: 'BRL', exchangeRate: 1, freight: 80, freightInBRL: true, insurance: 0, fees: 0, icmsRate: 17,
+    products: [produto(1, 'Tecido', 30, 25, 0.5), produto(2, 'Botão', 500, 0.3, 0.002)] },
+  'personalizado': { taxRegime: 'personalizado', taxMode: 'auto', currency: 'USD', exchangeRate: 5.5, customII: 35, customICMS: 12, freight: 60, insurance: 8, fees: 0,
+    products: [produto(1, 'Mochila', 15, 11, 0.6)] },
+  'formal-ncm': { taxRegime: 'importacao-formal', taxMode: 'auto', currency: 'USD', exchangeRate: 5.35, freight: 900, insurance: 45, fees: 1800, feesInBRL: true,
+    icmsRate: 18, taxSplit: 'value',
+    products: [produto(1, 'Fone bluetooth', 4800, 8, 0.09, { ncm: '8518.30.00' }), produto(2, 'Carregador 65W', 3200, 9, 0.2, { ncm: '8504.40.90' }),
+      produto(3, 'Cabo USB-C', 9000, 1.9, 0.04, { ncm: '8544.42.00' })] },
+  'manual-por-peso': { taxRegime: 'regra-geral', taxMode: 'manual', manualII: 1500, manualICMS: 900, taxSplit: 'weight', currency: 'USD', exchangeRate: 5.5,
+    freight: 200, insurance: 0, fees: 300, feesSplit: 'value', insuranceSplit: 'weight',
+    products: [produto(1, 'Panela', 12, 14, 1.8), produto(2, 'Tampa', 12, 4, 0.4)] },
+  'revenda-margem': { taxRegime: 'remessa-conforme', taxMode: 'auto', currency: 'USD', exchangeRate: 5.4, freight: 25, insurance: 0, fees: 0,
+    resaleMode: true, globalMargin: 35,
+    products: [produto(1, 'Relógio', 10, 7, 0.1), produto(2, 'Pulseira', 30, 1.2, 0.02)] },
+};
+
+const f = document.getElementById('f');
+f.addEventListener('load', () => setTimeout(() => {
+  const w = f.contentWindow;
+  const d = f.contentDocument;
+  const saida = {};
+  for (const [nome, lote] of Object.entries(LOTES)) {
+    // state é let de script clássico: só o eval no escopo global da página o alcança.
+    w.eval('state = Object.assign({}, state, ' + JSON.stringify(lote) + ', { currentUser: { name: "Teste", is_pro: true } }); updateUI();');
+    const area = d.getElementById('results-area');
+    saida[nome] = area ? area.innerText.replace(/\s+/g, ' ').trim() : '(sem area)';
+  }
+  document.getElementById('saida').textContent = JSON.stringify(saida);
+}, 2500));
+</script>
+</body></html>

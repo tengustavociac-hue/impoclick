@@ -1,0 +1,154 @@
+/* Painel de cadastros (admin.js). Visível só para contas em app_admins. */
+
+.ad {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  margin-bottom: var(--space-6);
+}
+
+.ad-topo {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.ad-h {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--text-title-md);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-tight);
+  color: var(--text-title);
+}
+
+.ad-sub {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.ad-numeros {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: var(--space-4);
+}
+
+.ad-conta-email {
+  font-weight: var(--weight-semibold);
+  color: var(--text-title);
+  word-break: break-all;
+}
+
+.ad-conta-nome,
+.ad-detalhe {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--text-caption);
+  color: var(--text-muted);
+}
+
+.ad-selos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.ad-lista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* O SparkBars foi desenhado para cards estreitos: esticado na largura toda,
+   cada uma das 14 barras passa de 70px e a ponta arredondada vira bolha. */
+.ad-grafico {
+  max-width: 560px;
+}
+
+/* Explica o critério da aba aberta — "Nunca usaram" só enxerga o que foi salvo. */
+.ad-legenda {
+  margin: var(--space-3) 0 0;
+  max-width: 76ch;
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+  color: var(--text-muted);
+}
+
+/* ── Painel da conta ─────────────────────────────────────────────────
+   Reaproveita .modal-overlay/.modal-card do app. Fica uma camada abaixo do
+   confirm-modal (z-index 10000): os dois têm a mesma camada por padrão e,
+   como este entra depois no DOM, cobriria a confirmação de "Retirar Pro". */
+.ad-painel-fundo {
+  z-index: 9000;
+}
+
+.ad-painel {
+  max-width: 560px;
+  max-height: calc(100vh - 3rem);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.ad-painel-topo {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.ad-painel-titulo {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  color: var(--text-title);
+  word-break: break-all;
+}
+
+.ad-painel-secao {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.ad-painel-h {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--text-title);
+}
+
+.ad-painel-secao.is-perigo .ad-painel-h {
+  color: var(--danger);
+}
+
+.ad-texto {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+  color: var(--text-muted);
+}
+
+.ad-painel-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+
+.ad-painel-acoes .ic-field {
+  flex: 1 1 220px;
+}
+
+
+/* O ícone de calendário do campo de data é desenhado pelo navegador: sem
+   color-scheme escuro, fica preto sobre o fundo escuro do tema. */
+:root[data-theme="dark"] .ad-painel input[type="date"] {
+  color-scheme: dark;
+}

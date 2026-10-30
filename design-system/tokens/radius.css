@@ -1,0 +1,16 @@
+:root{
+--radius-xs:6px;
+--radius-sm:10px;
+--radius-md:14px;
+--radius-lg:20px;
+--radius-xl:28px;
+--radius-2xl:36px;
+--radius-pill:999px;
+--radius-circle:50%;
+
+/* Where each one belongs */
+--radius-control:var(--radius-pill);  /* buttons, chips, segmented, inputs-as-pills */
+--radius-field:var(--radius-sm);      /* text fields, selects */
+--radius-card:var(--radius-lg);       /* cards, panels */
+--radius-sheet:var(--radius-xl);      /* modals, drawers, hero panels */
+}

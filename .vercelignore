@@ -1,0 +1,82 @@
+# O deploy é feito por `vercel --prod`, que sobe a pasta local inteira — não o
+# que está versionado no Git. Sem este arquivo, TUDO que existe aqui vira URL
+# pública, incluindo segredos que o .gitignore já protegia do Git (o
+# server/.env chegou a ficar acessível em produção por causa disso).
+#
+# ATENÇÃO: quando o .vercelignore existe, ele SUBSTITUI o .gitignore na hora do
+# upload. Por isso .env*, node_modules e .vercel precisam estar repetidos aqui.
+
+# --- Segredos ---
+.env*
+server/.env
+
+# --- Ferramentas e metadados ---
+.git
+.github
+.vercel
+.vscode
+.mcp.json
+.pytest_cache
+node_modules
+# package-lock.json fica DE FORA da lista de propósito: a Vercel usa ele pra
+# instalar as versões exatas das dependências. Sem ele, o build resolve os
+# ranges "^" na hora e pode subir uma versão diferente da testada aqui.
+
+# --- Backend antigo (não é usado pelas funções da Vercel) ---
+server/
+
+# --- Esquema do banco: os .sql descrevem a estrutura e as falhas já corrigidas ---
+supabase/
+
+# --- Documentos internos ---
+docs/
+
+# --- Scripts de build e manutenção ---
+build_novo.py
+check2.ps1
+fix2.ps1
+tools/
+
+# --- Extensão do Chrome: código-fonte ainda não publicado, e o site não
+# referencia esta pasta. Se um dia for distribuída pelo site, suba um .zip
+# em vez de liberar a pasta inteira. ---
+extension/
+
+# --- Versões antigas do site (duplicate content + código velho exposto) ---
+index.backup.html
+design-modelo-v4.html
+
+# --- Imagem do projeto anterior, 360 KB, sem nenhuma referência no site ---
+aduanize_logo.png
+
+# --- Relatório de auditoria e plano de correção: descrevem as falhas do
+# próprio site, não podem virar URL pública ---
+AUDITORIA.md
+PASSO-A-PASSO.md
+
+# --- Pacotes .zip da extensao gerados para a Chrome Web Store ---
+dist/
+
+# --- Design system. O index.html carrega design-system/styles.css, então
+# styles.css, tokens/ e o CSS dos componentes PRECISAM ir para o deploy — sem
+# eles o site sobe sem estilo. O resto fica de fora: showcase e templates são
+# ferramenta interna, e reference/images/ tem quadros de outro produto que não
+# podem virar URL pública. ---
+design-system/dist/
+design-system/reference/
+design-system/showcase/
+design-system/templates/
+design-system/patterns/
+design-system/guidelines/
+design-system/index.html
+design-system/README.md
+design-system/tsconfig.json
+design-system/tsconfig.build.json
+
+# --- Contratos e instruções para agentes, config de lint ---
+DESIGN.md
+AGENTS.md
+CLAUDE.md
+.claude
+.oxlintrc.json
+tsconfig.site.json

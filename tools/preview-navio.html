@@ -1,0 +1,137 @@
+<!doctype html>
+<!-- Revisão da aba "Navio - Container" sem login e sem a tabela no Supabase:
+     abre o index.html num iframe, troca window.db por um banco em memória e
+     clica no item do menu, para exercitar a ligação real com o app.js.
+       python -m http.server 4174 --bind 127.0.0.1
+       http://127.0.0.1:4174/tools/preview-navio.html?cenario=lista&theme=dark
+     cenario = vazio | lista | detalhe | form | erros | semimo | tabela
+     Também confere a validação do IMO e do contêiner (resultado no título).
+     Fica fora do deploy (tools/ está no .vercelignore). -->
+<html lang="pt-BR"><head><meta charset="utf-8">
+<style>html,body{margin:0;background:#888}iframe{border:0;display:block;width:1440px;height:1400px}</style>
+</head>
+<body>
+<iframe id="f" src="../index.html"></iframe>
+<script type="module">
+import { imoValido, conteinerValido } from '../navio.js';
+
+const p = new URLSearchParams(location.search);
+const cenario = p.get('cenario') || 'lista';
+const theme = p.get('theme') || 'light';
+
+// Conferência dos códigos contra referências conhecidas. CSQU3054383 é o
+// exemplo da própria norma ISO 6346.
+const casos = [
+  ['IMO 9839430 (MSC Gülsün)', imoValido('9839430'), true],
+  ['IMO 9839431 (dígito trocado)', imoValido('9839431'), false],
+  ['IMO 983943 (curto)', imoValido('983943'), false],
+  ['CSQU3054383 (exemplo da norma)', conteinerValido('CSQU3054383'), true],
+  ['CSQU3054384 (dígito trocado)', conteinerValido('CSQU3054384'), false],
+  ['MSCU4721188', conteinerValido('MSCU4721188'), true],
+  ['MSCA4721188 (categoria inválida)', conteinerValido('MSCA4721188'), false],
+];
+const falhas = casos.filter(([, obtido, esperado]) => obtido !== esperado).map(([nome]) => nome);
+const validacao = falhas.length ? 'VALIDACAO FALHOU: ' + falhas.join(', ') : 'validacao ok (' + casos.length + ' casos)';
+
+// Datas relativas a hoje, para o cenário não envelhecer.
+const dia = (delta) => {
+  const d = new Date(); d.setDate(d.getDate() + delta);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+};
+const etapas = (...feitas) => ['pedido', 'coleta', 'embarque', 'atracacao', 'desembaraco', 'entrega']
+  .map((key) => ({ key, done: feitas.includes(key), date: feitas.includes(key) ? dia(-60 + feitas.indexOf(key) * 8) : null }));
+
+const EXEMPLOS = [
+  { id: 'a', reference: 'IMP-2481', vessel_name: 'MSC GULSUN', imo: '9839430', carrier: 'MSC', voyage: '418W',
+    container_number: 'MSCU4721188', bl_number: 'MEDUSZ048291', origin_port: 'Shenzhen', destination_port: 'Santos',
+    etd: dia(-21), eta: dia(14), stages: etapas('pedido', 'coleta', 'embarque'),
+    notes: 'Despachante: Porto Seguro Assessoria.\nFree time de 7 dias no terminal.' },
+  { id: 'b', reference: 'IMP-2493', vessel_name: 'MAERSK MC-KINNEY MOLLER', imo: '9619907', carrier: 'Maersk', voyage: '237S',
+    container_number: 'MRKU9012330', bl_number: 'MAEU231874', origin_port: 'Ningbo', destination_port: 'Itajaí',
+    etd: dia(7), eta: dia(42), stages: etapas('pedido') },
+  { id: 'c', reference: 'IMP-2455', vessel_name: 'CMA CGM JACQUES SAADE', imo: '9839179', carrier: 'CMA CGM', voyage: '0FL3E',
+    container_number: 'CMAU5582104', bl_number: 'CMDUSHA77120', origin_port: 'Xangai', destination_port: 'Paranaguá',
+    etd: dia(-48), eta: dia(-6), stages: etapas('pedido', 'coleta', 'embarque') },
+  { id: 'd', reference: 'IMP-2390', vessel_name: 'EVER GIVEN', imo: '9811000', carrier: 'Evergreen', voyage: '1128-062W',
+    container_number: 'TGHU2044176', bl_number: 'EGLV1420390', origin_port: 'Kaohsiung', destination_port: 'Santos',
+    etd: dia(-95), eta: dia(-55), stages: etapas('pedido', 'coleta', 'embarque', 'atracacao', 'desembaraco', 'entrega') },
+];
+// Sem IMO em todos: o cenário clica no primeiro cartão da lista, e qual
+// fica em primeiro depende da ordenação por chegada.
+if (cenario === 'semimo') EXEMPLOS.forEach((e, i) => { EXEMPLOS[i] = { ...e, imo: null }; });
+
+const f = document.getElementById('f');
+f.addEventListener('load', () => {
+  setTimeout(async () => {
+    const w = f.contentWindow;
+    const d = f.contentDocument;
+    d.documentElement.setAttribute('data-theme', theme);
+
+    let dados = cenario === 'vazio' ? [] : structuredClone(EXEMPLOS);
+    w.db.getShipments = async () => (cenario === 'tabela'
+      ? { erro: 'sem_tabela', dados: [] }
+      : { dados: structuredClone(dados) });
+    w.db.saveShipment = async (r) => {
+      const salvo = { ...r, id: r.id || 'novo-' + Date.now() };
+      dados = dados.filter((x) => x.id !== salvo.id).concat(salvo);
+      return { dados: salvo };
+    };
+    w.db.deleteShipment = async (id) => { dados = dados.filter((x) => x.id !== id); return { ok: true }; };
+
+    // Revela o app como o preview-telas.html faz: sem sessão o shell fica oculto.
+    d.documentElement.classList.add('has-session');
+    const lp = d.getElementById('landing-container'); if (lp) lp.style.display = 'none';
+    for (const id of ['auth-container', 'paywall-screen']) { const el = d.getElementById(id); if (el) el.classList.add('hidden'); }
+    const shell = d.querySelector('.app-container'); if (shell) shell.classList.remove('hidden');
+
+    // O clique de verdade no menu: switchView → evento impoclick:tela → navio.js.
+    const item = d.querySelector('[data-view="view-shipping"]');
+    item.click();
+    await new Promise((r) => setTimeout(r, 400));
+    const painelVisivel = !d.getElementById('view-shipping').classList.contains('hidden');
+    const menuAtivo = item.classList.contains('active');
+    const titulo = (d.getElementById('header-view-title') || {}).textContent || '';
+
+    const raiz = d.getElementById('navio-raiz');
+    if (cenario === 'detalhe' || cenario === 'semimo') {
+      raiz.querySelector('.ic-card.is-interactive').click();
+    }
+    if (cenario === 'form' || cenario === 'erros') {
+      [...raiz.querySelectorAll('button')].find((b) => /Novo embarque/.test(b.textContent)).click();
+    }
+    if (cenario === 'erros') {
+      await new Promise((r) => setTimeout(r, 100));
+      const campo = (n, v) => { raiz.querySelector('[name="' + n + '"]').value = v; };
+      campo('vessel_name', 'MSC GULSUN');
+      campo('imo', '9839431');
+      campo('container_number', 'MSCU4721189');
+      campo('etd', dia(10));
+      campo('eta', dia(2));
+      raiz.querySelector('form').requestSubmit();
+    }
+    await new Promise((r) => setTimeout(r, 300));
+    w.scrollTo(0, 0);
+
+    // A regra global de <label> do style.css não pode alcançar os rótulos do
+    // design system, e as telas legadas precisam continuar como estavam.
+    const estilo = (el) => (el ? w.getComputedStyle(el) : null);
+    const legado = estilo(d.querySelector('.view-panel label:not(.ic-label):not(.ic-check):not(.ic-switch)'));
+    const comToggle = estilo(d.querySelector('.label-with-toggle label'));
+    const doSistema = estilo(raiz.querySelector('.ic-label'));
+    const rotulos = [
+      legado ? 'legado ' + legado.textTransform : 'legado ?',
+      comToggle ? 'toggle margem ' + comToggle.marginBottom : 'toggle ?',
+      doSistema ? 'sistema ' + doSistema.textTransform : '',
+    ].filter(Boolean).join(', ');
+
+    document.title = [
+      rotulos,
+      'painel ' + (painelVisivel ? 'visivel' : 'OCULTO'),
+      'menu ' + (menuAtivo ? 'ativo' : 'INATIVO'),
+      'titulo "' + titulo + '"',
+      validacao,
+    ].join(' | ');
+  }, 1500);
+});
+</script>
+</body></html>

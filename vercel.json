@@ -1,4 +1,7 @@
 {
+  "rewrites": [
+    { "source": "/privacidade", "destination": "/privacidade.html" }
+  ],
   "headers": [
     {
       "source": "/(.*)",
@@ -7,7 +10,23 @@
         { "key": "X-Frame-Options", "value": "DENY" },
         { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
         { "key": "Strict-Transport-Security", "value": "max-age=31536000" },
-        { "key": "Permissions-Policy", "value": "geolocation=(), camera=(), microphone=()" }
+        { "key": "Permissions-Policy", "value": "geolocation=(), camera=(), microphone=()" },
+        {
+          "key": "Content-Security-Policy-Report-Only",
+          "value": "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://cdn.sheetjs.com https://sdk.mercadopago.com https://www.mercadopago.com 'sha256-/ycRk3SRueFwaLSTS7Vsqokk+ATe732zJg1Sxk1ycyM='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://qmwvzhpyxrkyxvekcazs.supabase.co wss://qmwvzhpyxrkyxvekcazs.supabase.co https://brasilapi.com.br https://economia.awesomeapi.com.br https://portalunico.siscomex.gov.br https://raw.githubusercontent.com https://api.mercadopago.com https://sdk.mercadopago.com https://www.mercadopago.com; frame-src https://sdk.mercadopago.com https://*.mercadopago.com https://www.vesselfinder.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://mpago.la; object-src 'none'; upgrade-insecure-requests"
+        }
+      ]
+    },
+    {
+      "source": "/(app.js|style.css|ncm_db.js|ncm_rates.js|supabase_client.js|navio.js|navio.css|lote.js|lote.css|patrocinados.js|patrocinados-regras.js|patrocinados.css)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=86400, stale-while-revalidate=604800" }
+      ]
+    },
+    {
+      "source": "/(.*).png",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=86400, stale-while-revalidate=604800" }
       ]
     }
   ]

@@ -7,7 +7,7 @@
     <link rel="icon" type="image/png" href="impoclick_logo.png">
     <link rel="apple-touch-icon" href="impoclick_logo.png">
     <meta name="description" content="Calcule o custo real da importação: impostos, frete, câmbio e rateio por produto. Monitore catálogo, avaliações e promoções no Mercado Livre e veja se compensa vender, com extensão para Chrome.">
-    <meta name="theme-color" content="#b8860b">
+    <meta name="theme-color" content="#0E7C8C">
     <link rel="canonical" href="https://www.impoclick.com.br/">
     <meta property="og:title" content="Impoclick - Simulador de Rateio e Viabilidade de Importação">
     <meta property="og:description" content="Simule custos, impostos e viabilidade de importação antes de fechar o pedido.">
@@ -84,6 +84,12 @@
         ]
     }
     </script>
+    <!-- ⚠️ ATENÇÃO AO EDITAR ESTE SCRIPT: o CSP em vercel.json libera ele por
+         HASH (sha256), não por 'unsafe-inline'. Qualquer alteração aqui —
+         inclusive espaço em branco — muda o hash e o navegador passa a recusar
+         o script, fazendo a landing e o tema piscarem antes do app carregar.
+         Depois de mexer, rode `node tools/csp-hash.js` e cole o valor impresso
+         no lugar do sha256-... em vercel.json. -->
     <script>
         document.documentElement.setAttribute('data-theme', localStorage.getItem('theme') || 'light');
         // Se já existe sessão salva, esconde a landing antes da primeira pintura
@@ -98,14 +104,34 @@
             }
         } catch (e) { /* localStorage bloqueado: mostra a landing normalmente */ }
     </script>
-    <!-- Google Fonts -->
+    <!-- Design system: tokens, fontes (Urbanist, JetBrains Mono, Material
+         Symbols) e componentes. Vem ANTES do style.css, que redefine os nomes
+         antigos em cima destes tokens. Ver DESIGN.md e design-system/README.md. -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="design-system/styles.css?v=1">
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="style.css?v=4">
+    <link rel="stylesheet" href="style.css?v=25">
+    <link rel="stylesheet" href="navio.css?v=3">
+    <link rel="stylesheet" href="lote.css?v=3">
+    <link rel="stylesheet" href="patrocinados.css?v=4">
+    <link rel="stylesheet" href="admin.css?v=3">
+    <link rel="stylesheet" href="ml-painel.css?v=5">
+    <link rel="stylesheet" href="ml-conexao.css">
+    <link rel="stylesheet" href="amazon-painel.css?v=1">
+    <link rel="stylesheet" href="shopee-painel.css?v=1">
     <!-- SheetJS library for native Excel export -->
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- SheetJS pelo CDN oficial, não pelo npm: o pacote "xlsx" do npm está
+         congelado na 0.18.5 (a SheetJS saiu do npm), e essa versão tem a
+         CVE-2023-30533 (prototype pollution no parser, corrigida na 0.19.3) e a
+         CVE-2024-22363 (ReDoS, corrigida na 0.20.2). Pelo npm não existe
+         caminho de atualização; pelo cdn.sheetjs.com existe.
+         O integrity trava o conteúdo: se o arquivo no CDN mudar, o navegador
+         recusa em vez de executar. Ao trocar de versão, recalcule com:
+         curl -s <url> | openssl dgst -sha384 -binary | openssl base64 -A -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"
+            integrity="sha384-EnyY0/GSHQGSxSgMwaIPzSESbqoOLSexfnSMN2AP+39Ckmn92stwABZynq1JyzdT"
+            crossorigin="anonymous"></script>
 </head>
 <body>
     <!-- LANDING PÚBLICA
@@ -475,10 +501,24 @@
                         <div class="form-group">
                             <label for="login-password">Senha</label>
                             <input type="password" id="login-password" class="form-control" required autocomplete="current-password">
+                            <button type="button" id="btn-forgot-password" class="auth-link auth-link-end">Esqueci minha senha</button>
                         </div>
                         <button type="submit" class="btn btn-primary btn-block">Acessar Sistema</button>
                         <div id="login-alert" class="auth-alert hidden"></div>
                         <button type="button" id="btn-resend-confirmation" class="btn btn-secondary btn-sm btn-block hidden" style="margin-top: 0.5rem;">Reenviar e-mail de confirmação</button>
+                    </form>
+
+                    <!-- Esqueci minha senha: pede o link ao Supabase. A senha nova é
+                         escolhida quando a pessoa volta pelo link (recovery-modal). -->
+                    <form id="form-forgot" class="auth-form hidden">
+                        <p class="auth-help">Digite o e-mail da sua conta. Vamos enviar um link para você criar uma senha nova.</p>
+                        <div class="form-group">
+                            <label for="forgot-email">E-mail</label>
+                            <input type="email" id="forgot-email" class="form-control" placeholder="seuemail@exemplo.com" required autocomplete="username">
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block">Enviar link de recuperação</button>
+                        <div id="forgot-alert" class="auth-alert hidden" role="status"></div>
+                        <button type="button" id="btn-forgot-back" class="auth-link">Voltar para o login</button>
                     </form>
 
                     <!-- Register Form -->
@@ -564,6 +604,30 @@
         </div>
     </div>
 
+    <!-- NOVA SENHA: aberto quando a pessoa chega pelo link de recuperação
+         (type=recovery). Sem ele, o link logaria direto no app sem nunca
+         pedir a senha nova. -->
+    <div id="recovery-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="recovery-title">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="recovery-title">Crie sua nova senha</h3>
+            </div>
+            <form id="form-new-password" class="auth-form">
+                <p class="auth-help">Você entrou pelo link de recuperação. Escolha a senha que vai usar daqui para frente.</p>
+                <div class="form-group">
+                    <label for="new-password">Nova senha (mín. 6 caracteres)</label>
+                    <input type="password" id="new-password" class="form-control" minlength="6" required autocomplete="new-password">
+                </div>
+                <div class="form-group">
+                    <label for="new-password-2">Repita a nova senha</label>
+                    <input type="password" id="new-password-2" class="form-control" minlength="6" required autocomplete="new-password">
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">Salvar nova senha</button>
+                <div id="new-password-alert" class="auth-alert hidden" role="status"></div>
+            </form>
+        </div>
+    </div>
+
     <!-- ONBOARDING TOUR (primeiro acesso) -->
     <div id="onboarding-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
         <div class="modal-card onboarding-card">
@@ -594,14 +658,89 @@
                 <div class="paywall-icon" style="margin-bottom: 0; width: 60px; height: 60px;">
                     <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
                 </div>
-                <h4 style="font-size: 1.1rem; font-weight: 700; color: var(--text-primary);">Assinatura por Cartão (Recorrente)</h4>
-                <p class="payment-instruction" style="font-size: 0.85rem; line-height: 1.5; color: var(--text-muted); margin-bottom: 1rem;">
-                    Escolha o plano ideal: <strong>Assinatura Mensal</strong> (Cartão) ou <strong>1 Mês Avulso</strong> (PIX/Cartão).
-                </p>
-                <div style="display: flex; gap: 10px; margin-bottom: 1rem; flex-direction: column;">
-                    <button id="btn-mp-subscription" class="btn btn-primary" style="background-color: #009ee3; border-color: #009ee3;">Assinar Mensal (Cartão)</button>
-                    <button id="btn-mp-checkout" class="btn btn-secondary" style="background-color: #21b183; border-color: #21b183; color: white;">1 Mês Avulso (PIX / Cartão)</button>
-                    <p id="mp-loading" style="display: none; font-size: 0.8rem; color: #009ee3; text-align: center; margin-top: 5px;">Gerando link seguro do Mercado Pago...</p>
+                <h4 style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary);">Escolha seu plano</h4>
+
+                <!-- Escolha do plano. O mensal cobra o cartão aqui mesmo (o
+                     formulário abaixo); o avulso continua indo pro checkout do
+                     Mercado Pago, que é onde o PIX existe. -->
+                <div class="mp-planos" role="radiogroup" aria-label="Planos disponíveis">
+                    <button type="button" class="mp-plano ativo" id="plano-mensal" role="radio" aria-checked="true">
+                        <span class="mp-plano-nome">Mensal</span>
+                        <span class="mp-plano-preco">R$ 29,90<small>/mês</small></span>
+                        <span class="mp-plano-obs">Renova sozinha · cancele quando quiser</span>
+                    </button>
+                    <button type="button" class="mp-plano" id="plano-avulso" role="radio" aria-checked="false">
+                        <span class="mp-plano-nome">1 Mês Avulso</span>
+                        <span class="mp-plano-preco">R$ 29,90</span>
+                        <span class="mp-plano-obs">Pagamento único · PIX ou cartão</span>
+                    </button>
+                </div>
+
+                <!-- Status e erro ficam ACIMA do formulário de propósito: embaixo
+                     do botão eles caíam fora da área visível do modal, e quem
+                     não conseguia assinar via só o botão travado, sem o motivo. -->
+                <p id="mp-loading" class="mp-status" style="display: none;">Processando...</p>
+                <p id="mp-erro" class="mp-status mp-status-erro" style="display: none;" role="alert"></p>
+
+                <!-- ASSINATURA MENSAL — cartão tokenizado no próprio site.
+                     Número, validade e CVV são MP Fields: iframes servidos pelo
+                     Mercado Pago, então esses dados nunca entram no nosso JS nem
+                     no nosso servidor. -->
+                <form id="form-assinatura" class="mp-form">
+                    <div class="mp-campo">
+                        <label for="form-checkout__cardNumber">Número do cartão</label>
+                        <div id="form-checkout__cardNumber" class="mp-input mp-field"></div>
+                    </div>
+                    <div class="mp-linha">
+                        <div class="mp-campo">
+                            <label for="form-checkout__expirationDate">Validade</label>
+                            <div id="form-checkout__expirationDate" class="mp-input mp-field"></div>
+                        </div>
+                        <div class="mp-campo">
+                            <label for="form-checkout__securityCode">CVV</label>
+                            <div id="form-checkout__securityCode" class="mp-input mp-field"></div>
+                        </div>
+                    </div>
+                    <div class="mp-campo">
+                        <label for="form-checkout__cardholderName">Nome impresso no cartão</label>
+                        <input type="text" id="form-checkout__cardholderName" class="mp-input" autocomplete="cc-name">
+                    </div>
+                    <div class="mp-campo">
+                        <label for="form-checkout__identificationNumber">CPF do titular</label>
+                        <input type="text" id="form-checkout__identificationNumber" class="mp-input" inputmode="numeric">
+                    </div>
+
+                    <!-- Emissor, parcelas e tipo de documento não fazem sentido
+                         numa assinatura mensal, mas o cardForm exige os três no
+                         DOM: é ele quem preenche depois de identificar a
+                         bandeira. Ficam escondidos, nunca vazios. -->
+                    <select id="form-checkout__issuer" class="mp-oculto" tabindex="-1" aria-hidden="true"></select>
+                    <select id="form-checkout__installments" class="mp-oculto" tabindex="-1" aria-hidden="true"></select>
+                    <select id="form-checkout__identificationType" class="mp-oculto" tabindex="-1" aria-hidden="true"></select>
+
+                    <button type="submit" id="btn-mp-subscription" class="btn btn-primary btn-pay" disabled>
+                        Carregando formulário seguro...
+                    </button>
+                    <p class="mp-selo">🔒 Cobrança processada pelo Mercado Pago</p>
+                </form>
+
+                <!-- 1 MÊS AVULSO — segue redirecionando, é o caminho do PIX. -->
+                <div id="painel-avulso" class="mp-form hidden">
+                    <p class="mp-avulso-texto">
+                        Pagamento único de <strong>R$ 29,90</strong> por 30 dias de acesso.
+                        Sem renovação automática.
+                    </p>
+                    <button type="button" id="btn-mp-checkout" class="btn btn-primary btn-pay">
+                        Pagar R$ 29,90 · PIX ou Cartão
+                    </button>
+                </div>
+
+                <!-- Estado final: a assinatura já foi autorizada e o PRO liberado. -->
+                <div id="mp-sucesso" class="mp-sucesso hidden">
+                    <div class="mp-sucesso-icone">✓</div>
+                    <h4>Assinatura ativa</h4>
+                    <p>Seu acesso PRO já está liberado. A próxima cobrança acontece daqui a 30 dias e você pode cancelar quando quiser.</p>
+                    <button type="button" id="btn-mp-continuar" class="btn btn-primary btn-pay">Começar a usar</button>
                 </div>
             </div>
         </div>
@@ -626,15 +765,10 @@
                     <span>Painel Inicial</span>
                 </button>
 
-                <span class="nav-eyebrow">Operação</span>
+                <span class="nav-eyebrow">Importação</span>
                 <button class="nav-item" data-view="view-calculator">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
                     <span>Calculadora de Rateio</span>
-                </button>
-
-                <button class="nav-item" data-view="view-imports">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                    <span>Histórico de Importação</span>
                 </button>
 
                 <button class="nav-item" data-view="view-feasibility">
@@ -642,31 +776,22 @@
                     <span>Viabilidade</span>
                 </button>
 
-                <span class="nav-eyebrow">Monitoramento</span>
-                <button class="nav-item" data-view="view-reviews">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-                    <span>Avaliações</span>
-                    <span id="nav-badge-reviews" class="nav-badge hidden">0</span>
-                </button>
-                <button class="nav-item" data-view="view-catalog">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.21 13.89 7 23l5-3 5 3-1.21-9.12"/><circle cx="12" cy="8" r="7"/></svg>
-                    <span>Catálogos</span>
-                    <span id="nav-badge-catalog" class="nav-badge hidden">0</span>
-                </button>
-                <button class="nav-item" data-view="view-promotions">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
-                    <span>Promoções</span>
-                    <span id="nav-badge-promotions" class="nav-badge hidden">0</span>
-                </button>
-                <button class="nav-item" data-view="view-ads">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>
-                    <span>Patrocinados</span>
-                    <span id="nav-badge-ads" class="nav-badge hidden">0</span>
+                <button class="nav-item" data-view="view-imports">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <span>Histórico de Importação</span>
                 </button>
 
-                <span class="nav-eyebrow">Documentos</span>
-                <div class="nav-dropdown-group open">
-                    <div class="nav-dropdown-items">
+                <button class="nav-item" data-view="view-shipping">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 21c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1 .6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M19.38 20A11.6 11.6 0 0 0 21 14l-9-4-9 4c0 2.9.94 5.34 2.81 7.76"/><path d="M19 13V7a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v6"/><path d="M12 10v4"/><path d="M12 2v3"/></svg>
+                    <span>Navio - Container</span>
+                </button>
+
+                <div class="nav-dropdown-group" data-subgroup="documentos">
+                    <button class="nav-item nav-subgroup-toggle" type="button" aria-expanded="false">
+                        <span>Documentos</span>
+                        <svg class="chevron" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
+                    <div class="nav-dropdown-items hidden">
                         <button class="nav-subitem" data-view="view-doc-proforma">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                             <span>Proforma Invoice</span>
@@ -681,6 +806,62 @@
                         </button>
                     </div>
                 </div>
+
+                <span class="nav-eyebrow">Precificação</span>
+                <button class="nav-item" data-view="view-pricing">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                    <span>Marketplaces</span>
+                </button>
+
+                <span class="nav-eyebrow">Mercado Livre</span>
+                <button class="nav-item" data-view="view-ml-painel">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 15 4-5 4 3 5-7"/></svg>
+                    <span>Painel</span>
+                </button>
+                <div class="nav-dropdown-group" data-subgroup="monitoramento">
+                    <button class="nav-item nav-subgroup-toggle" type="button" aria-expanded="false">
+                        <span>Monitoramento</span>
+                        <svg class="chevron" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
+                    <div class="nav-dropdown-items hidden">
+                        <button class="nav-subitem" data-view="view-reviews">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                    <span>Avaliações</span>
+                    <span id="nav-badge-reviews" class="nav-badge hidden">0</span>
+                </button>
+                        <button class="nav-subitem" data-view="view-catalog">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.21 13.89 7 23l5-3 5 3-1.21-9.12"/><circle cx="12" cy="8" r="7"/></svg>
+                    <span>Catálogos</span>
+                    <span id="nav-badge-catalog" class="nav-badge hidden">0</span>
+                </button>
+                        <button class="nav-subitem" data-view="view-promotions">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+                    <span>Promoções</span>
+                    <span id="nav-badge-promotions" class="nav-badge hidden">0</span>
+                </button>
+                        <button class="nav-subitem" data-view="view-ads">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>
+                    <span>Patrocinados</span>
+                    <span id="nav-badge-ads" class="nav-badge hidden">0</span>
+                </button>
+                    </div>
+                </div>
+                <button class="nav-item" data-view="view-gtin">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5v14"/><path d="M8 5v14"/><path d="M12 5v14"/><path d="M17 5v14"/><path d="M21 5v14"/></svg>
+                    <span>Gerador de EAN</span>
+                </button>
+
+                <span class="nav-eyebrow">Amazon</span>
+                <button class="nav-item" data-view="view-amazon-painel">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 15 4-5 4 3 5-7"/></svg>
+                    <span>Painel</span>
+                </button>
+
+                <span class="nav-eyebrow">Shopee</span>
+                <button class="nav-item" data-view="view-shopee-painel">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 15 4-5 4 3 5-7"/></svg>
+                    <span>Painel</span>
+                </button>
 
                 <span class="nav-eyebrow">Conta</span>
                 <div class="nav-dropdown-group open">
@@ -699,6 +880,14 @@
                         </button>
                     </div>
                 </div>
+
+                <!-- Só aparece para contas em app_admins: admin.js pergunta ao banco
+                     e tira o "hidden". Esconder aqui não é a trava — o banco é. -->
+                <span class="nav-eyebrow hidden" data-admin-only>Administração</span>
+                <button class="nav-item hidden" data-view="view-admin" data-admin-only>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    <span>Cadastros</span>
+                </button>
 
                 <span class="nav-eyebrow">Suporte</span>
                 <button class="nav-item" data-view="view-help">
@@ -1145,8 +1334,70 @@
                                 Importar Planilha (CSV)
                             </label>
                             <input type="file" id="input-bulk-csv" accept=".csv" class="hidden">
+                            <label for="input-nfe-xml" class="btn btn-secondary btn-sm bulk-import-label">
+                                Importar NF-e (XML)
+                            </label>
+                            <input type="file" id="input-nfe-xml" accept=".xml,text/xml,application/xml" multiple class="hidden">
+                            <label for="input-invoice" class="btn btn-secondary btn-sm bulk-import-label">
+                                Importar Commercial Invoice
+                            </label>
+                            <input type="file" id="input-invoice" accept=".xlsx,.xls,.csv" class="hidden">
                         </div>
                     </div>
+
+                    <!-- Commercial Invoice não tem formato padrão: cada fornecedor
+                         nomeia as colunas do seu jeito. O app tenta adivinhar pelo
+                         cabeçalho e mostra o mapeamento aqui para conferência —
+                         importar com a coluna errada envenenaria o custo inteiro
+                         sem dar nenhum sinal. -->
+                    <div id="invoice-box" class="nfe-cambio hidden">
+                        <p class="nfe-cambio-achados" id="invoice-achados"></p>
+                        <div class="ci-mapa">
+                            <div class="ci-campo">
+                                <label for="ci-col-nome">Nome do produto</label>
+                                <select id="ci-col-nome" class="form-control"></select>
+                            </div>
+                            <div class="ci-campo">
+                                <label for="ci-col-desc">Descricao detalhada</label>
+                                <select id="ci-col-desc" class="form-control"></select>
+                            </div>
+                            <div class="ci-campo">
+                                <label for="ci-col-qtd">Quantidade</label>
+                                <select id="ci-col-qtd" class="form-control"></select>
+                            </div>
+                            <div class="ci-campo">
+                                <label for="ci-col-preco">Preço unitário (US$)</label>
+                                <select id="ci-col-preco" class="form-control"></select>
+                            </div>
+                            <div class="ci-campo">
+                                <label for="ci-col-ncm">NCM / HS Code</label>
+                                <select id="ci-col-ncm" class="form-control"></select>
+                            </div>
+                        </div>
+                        <div id="invoice-previa" class="ci-previa"></div>
+                        <div class="nfe-cambio-linha">
+                            <button type="button" id="btn-invoice-confirmar" class="btn btn-primary btn-sm">Importar</button>
+                            <button type="button" id="btn-invoice-cancelar" class="btn btn-secondary btn-sm">Cancelar</button>
+                        </div>
+                        <p class="nfe-cambio-dica">O preço já vem em dólar e entra sem conversão. O peso fica em branco para você preencher.</p>
+                    </div>
+
+                    <!-- Câmbio da importação por NF-e. A nota vem em reais e o
+                         simulador trabalha em dólar, então a conversão precisa de
+                         uma taxa — e quem manda nela é o usuário, não a cotação
+                         do dia, porque a taxa da operação real costuma ser outra. -->
+                    <div id="nfe-cambio-box" class="nfe-cambio hidden">
+                        <p class="nfe-cambio-achados" id="nfe-achados"></p>
+                        <label for="input-nfe-cambio">Cotação para converter a nota (R$ por US$ 1,00)</label>
+                        <div class="nfe-cambio-linha">
+                            <input type="number" id="input-nfe-cambio" class="form-control" step="0.0001" min="0.0001" placeholder="5,4321">
+                            <button type="button" id="btn-nfe-usar-cotacao" class="btn btn-secondary btn-sm">Cotação do dia</button>
+                            <button type="button" id="btn-nfe-confirmar" class="btn btn-primary btn-sm">Importar</button>
+                            <button type="button" id="btn-nfe-cancelar" class="btn btn-secondary btn-sm">Cancelar</button>
+                        </div>
+                        <p class="nfe-cambio-dica">Os preços da NF-e estão em reais e serão divididos por esta cotação. O peso fica em branco para você preencher.</p>
+                    </div>
+
                     <div id="bulk-import-status" class="ncm-preview hidden" style="margin-bottom: 1rem;"></div>
                     <form id="form-product" class="product-form">
                         <div class="form-group catalog-field" style="grid-column: 1 / -1;">
@@ -1466,6 +1717,18 @@
                     </table>
                 </div>
             </section>
+        </div>
+
+        <!-- VIEW: Lote salvo, só leitura (botão "Ver" do Histórico de Importação).
+             Montada por lote.js a partir do evento impoclick:ver-lote. -->
+        <div id="view-lote" class="view-panel hidden">
+            <div id="lote-raiz"></div>
+        </div>
+
+        <!-- VIEW: Navio - Container. Montada inteira por navio.js, com os
+             componentes do design system; aqui fica só a raiz. -->
+        <div id="view-shipping" class="view-panel hidden">
+            <div id="navio-raiz"></div>
         </div>
 
         <!-- VIEW: Proforma Invoice -->
@@ -2125,6 +2388,185 @@
         </div>
 
                 <!-- VIEW: Viabilidade de Importação -->
+        <!-- VIEW: Precificação Marketplaces -->
+        <div id="view-pricing" class="view-panel hidden">
+            <section class="card">
+                <p class="helper-text" style="margin-bottom: 1.25rem;">
+                    Informe o custo do produto e o preço que pretende cobrar. O cálculo mostra quanto sobra
+                    em cada marketplace depois das taxas.
+                </p>
+
+                <div class="viab-form-grid">
+                    <div class="form-group">
+                        <label for="pmk-custo">Custo do produto (R$)</label>
+                        <input type="number" id="pmk-custo" class="form-control" step="0.01" min="0" placeholder="0,00">
+                        <p class="helper-text">Quanto o produto custa para você, já posto em mãos.</p>
+                    </div>
+                    <div class="form-group">
+                        <label for="pmk-preco">Preço de venda desejado (R$)</label>
+                        <input type="number" id="pmk-preco" class="form-control" step="0.01" min="0" placeholder="0,00">
+                        <p class="helper-text">O quanto você pretende cobrar do comprador.</p>
+                    </div>
+                    <div class="form-group">
+                        <label for="pmk-imposto">Imposto sobre a venda (%)</label>
+                        <input type="number" id="pmk-imposto" class="form-control" step="0.01" min="0" max="100" placeholder="0">
+                        <p class="helper-text">Opcional. Ex.: 6 para Simples Nacional. Incide sobre o preço de venda em todos os canais.</p>
+                    </div>
+                    <div class="form-group viab-span-2">
+                        <label for="pmk-nome">Nome do produto</label>
+                        <input type="text" id="pmk-nome" class="form-control" placeholder="Ex.: Escova lateral para robô aspirador">
+                        <p class="helper-text">O Mercado Livre define a comissão pela categoria. Sem o nome, usamos 13% de referência.</p>
+                    </div>
+                </div>
+
+                <div class="pmk-tipo-anuncio">
+                    <div>
+                        <span class="pmk-tipo-rotulo">Tipo de anúncio</span>
+                        <span class="pmk-tipo-tag">só Mercado Livre</span>
+                    </div>
+                    <div class="pmk-tipo-opcoes">
+                        <label>
+                            <input type="radio" name="pmk-listing" value="gold_special" checked>
+                            <span>Clássico</span>
+                        </label>
+                        <label>
+                            <input type="radio" name="pmk-listing" value="gold_pro">
+                            <span>Premium</span>
+                        </label>
+                    </div>
+                    <p class="helper-text" style="margin:0; flex-basis:100%;">
+                        O Premium cobra comissão maior em troca de parcelamento sem juros para o comprador.
+                        Shopee, Amazon e TikTok Shop não têm tipos de anúncio, então esta escolha não afeta as outras abas.
+                    </p>
+                </div>
+
+                <div class="pmk-tipo-anuncio">
+                    <div>
+                        <span class="pmk-tipo-rotulo">Programa de Frete Grátis</span>
+                        <span class="pmk-tipo-tag">só TikTok Shop</span>
+                    </div>
+                    <div class="pmk-tipo-opcoes">
+                        <label>
+                            <input type="checkbox" id="pmk-tiktok-frete-gratis">
+                            <span>Participo do programa</span>
+                        </label>
+                    </div>
+                    <p class="helper-text" style="margin:0; flex-basis:100%;">
+                        Quem adere paga mais 6% do preço sobre a comissão normal, para bancar o frete grátis ao comprador — não é uma
+                        troca, é uma taxa a mais. Taxas vigentes desde 15/07/2026, apuradas em reportagens (o TikTok Shop não tem API
+                        pública de tarifas); confira no seu Seller Center se ainda valem.
+                    </p>
+                </div>
+
+                <div class="pmk-tipo-anuncio">
+                    <div>
+                        <span class="pmk-tipo-rotulo">Categoria e plano</span>
+                        <span class="pmk-tipo-tag">só Amazon</span>
+                    </div>
+                    <div class="pmk-tipo-opcoes" style="gap: 1rem; flex: 1 1 320px;">
+                        <select id="pmk-amz-categoria" class="form-control" style="max-width: 320px;">
+                            <option value="">Escolha a categoria…</option>
+                        </select>
+                        <select id="pmk-amz-plano" class="form-control" style="max-width: 200px;">
+                            <option value="profissional">Plano Profissional</option>
+                            <option value="individual">Plano Individual</option>
+                        </select>
+                        <select id="pmk-amz-regiao" class="form-control" style="max-width: 250px;">
+                            <option value="sp">Origem: SP - Capital</option>
+                            <option value="capitais">Origem: outras capitais Sul/Sudeste</option>
+                            <option value="interior">Origem: interior Sul/Sudeste</option>
+                            <option value="demais">Origem: Centro-Oeste, Norte, Nordeste</option>
+                        </select>
+                        <select id="pmk-amz-envio" class="form-control" style="max-width: 220px;">
+                            <option value="proprio">Envio por conta própria</option>
+                            <option value="fba">FBA — Logística da Amazon</option>
+                            <option value="dba">DBA — Envios pela Amazon</option>
+                        </select>
+                    </div>
+                    <p class="helper-text" style="margin:0; flex-basis:100%;">
+                        A Amazon cobra a comissão pela categoria do produto. O Plano Profissional custa R$ 19/mês fixos
+                        e não cobra por item; o Individual não tem mensalidade, mas cobra R$ 2,00 por venda.
+                    </p>
+                </div>
+
+                <div class="pmk-medidas">
+                    <div class="pmk-medidas-campos">
+                        <h4 class="pmk-secao-titulo">Peso e dimensões</h4>
+                        <p class="helper-text" style="margin-bottom: 1rem;">Opcional — usado para cotar o frete real do Mercado Livre na sua conta.</p>
+                        <div class="viab-form-grid">
+                            <div class="form-group">
+                                <label for="pmk-peso">Peso (g)</label>
+                                <input type="number" id="pmk-peso" class="form-control" min="0" step="1" placeholder="0">
+                            </div>
+                            <div class="form-group">
+                                <label for="pmk-comprimento">Comprimento (cm)</label>
+                                <input type="number" id="pmk-comprimento" class="form-control" min="0" step="0.1" placeholder="0">
+                            </div>
+                            <div class="form-group">
+                                <label for="pmk-largura">Largura (cm)</label>
+                                <input type="number" id="pmk-largura" class="form-control" min="0" step="0.1" placeholder="0">
+                            </div>
+                            <div class="form-group">
+                                <label for="pmk-altura">Altura (cm)</label>
+                                <input type="number" id="pmk-altura" class="form-control" min="0" step="0.1" placeholder="0">
+                            </div>
+                        </div>
+                    </div>
+
+                    <figure class="pmk-caixa">
+                        <svg viewBox="0 0 200 175" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagrama de uma caixa indicando comprimento, largura e altura">
+                            <g fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round">
+                                <path d="M35 60 L110 60 L110 130 L35 130 Z" opacity="0.95"/>
+                                <path d="M35 60 L65 32 L140 32 L110 60"/>
+                                <path d="M140 32 L140 102 L110 130"/>
+                            </g>
+                            <g stroke="currentColor" stroke-width="1.5" opacity="0.55" stroke-dasharray="4 3">
+                                <line x1="35" y1="142" x2="110" y2="142"/>
+                                <line x1="122" y1="130" x2="152" y2="102"/>
+                                <line x1="22" y1="60" x2="22" y2="130"/>
+                            </g>
+                            <g font-size="12" font-weight="700" fill="currentColor">
+                                <text x="72" y="158" text-anchor="middle">Comprimento</text>
+                                <text x="152" y="130" text-anchor="middle">Largura</text>
+                                <text x="14" y="99" text-anchor="middle" transform="rotate(-90 14 99)">Altura</text>
+                            </g>
+                        </svg>
+                        <figcaption class="helper-text">
+                            Meça a <strong>embalagem fechada</strong>, não o produto. O Mercado Livre cobra pelo maior valor entre o peso real e a cubagem.
+                        </figcaption>
+                    </figure>
+                </div>
+
+                <button id="pmk-calcular" class="btn btn-primary" style="margin-top: 1rem;">Calcular</button>
+            </section>
+
+            <section class="card" style="margin-top: 1rem;">
+                <div class="results-tab-bar">
+                    <button type="button" id="pmk-tab-btn-ml" class="results-tab-btn active"><svg width="16" height="16" viewBox="0 0 20 20" style="vertical-align:-3px; margin-right:0.35rem;" aria-hidden="true"><rect width="20" height="20" rx="5" fill="#FFE600"/><text x="10" y="14" text-anchor="middle" font-size="8" font-weight="800" fill="#2D3277" font-family="system-ui, sans-serif">ML</text></svg>Mercado Livre</button>
+                    <button type="button" id="pmk-tab-btn-shopee" class="results-tab-btn"><svg width="16" height="16" viewBox="0 0 20 20" style="vertical-align:-3px; margin-right:0.35rem;" aria-hidden="true"><rect width="20" height="20" rx="5" fill="#EE4D2D"/><text x="10" y="14" text-anchor="middle" font-size="11" font-weight="800" fill="#FFFFFF" font-family="system-ui, sans-serif">S</text></svg>Shopee</button>
+                    <button type="button" id="pmk-tab-btn-amazon" class="results-tab-btn"><svg width="16" height="16" viewBox="0 0 20 20" style="vertical-align:-3px; margin-right:0.35rem;" aria-hidden="true"><rect width="20" height="20" rx="5" fill="#FF9900"/><text x="10" y="14" text-anchor="middle" font-size="11" font-weight="800" fill="#232F3E" font-family="system-ui, sans-serif">a</text></svg>Amazon</button>
+                    <button type="button" id="pmk-tab-btn-tiktok" class="results-tab-btn"><svg width="16" height="16" viewBox="0 0 20 20" style="vertical-align:-3px; margin-right:0.35rem;" aria-hidden="true"><rect width="20" height="20" rx="5" fill="#000000"/><text x="10" y="14" text-anchor="middle" font-size="8" font-weight="800" fill="#FFFFFF" font-family="system-ui, sans-serif">TT</text></svg>TikTok Shop</button>
+                    <button type="button" id="pmk-tab-btn-comparativo" class="results-tab-btn">Comparativo</button>
+                </div>
+
+                <div id="pmk-tab-ml" class="tab-content-panel">
+                    <div id="pmk-ml-conteudo"></div>
+                </div>
+                <div id="pmk-tab-shopee" class="tab-content-panel hidden">
+                    <div id="pmk-shopee-conteudo"></div>
+                </div>
+                <div id="pmk-tab-amazon" class="tab-content-panel hidden">
+                    <div id="pmk-amazon-conteudo"></div>
+                </div>
+                <div id="pmk-tab-tiktok" class="tab-content-panel hidden">
+                    <div id="pmk-tiktok-conteudo"></div>
+                </div>
+                <div id="pmk-tab-comparativo" class="tab-content-panel hidden">
+                    <div id="pmk-comparativo-conteudo"></div>
+                </div>
+            </section>
+        </div>
+
         <div id="view-feasibility" class="view-panel hidden">
 
             <!-- Sub-tab Navigation -->
@@ -2136,10 +2578,6 @@
                 <button type="button" id="viab-tab-btn-formal" class="results-tab-btn">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 0.35rem;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                     Importação Formal
-                </button>
-                <button type="button" id="viab-tab-btn-mercado" class="results-tab-btn">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 0.35rem;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                    Comparação de Mercado
                 </button>
             </div>
 
@@ -2304,183 +2742,6 @@
             </div>
 
             <!-- TAB: COMPARAÇÃO DE MERCADO -->
-            <div id="viab-tab-mercado" class="tab-content-panel hidden">
-                <section class="card">
-                    <h2 class="card-title">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                        Comparação de Mercado — Compensa Vender?
-                    </h2>
-                    <p class="small" style="color: var(--text-muted); margin-bottom: 1.25rem;">
-                        Compara o <strong>custo final</strong> já calculado (Simplificada ou Formal) com o preço de um produto mais vendido no Mercado Livre, descontando a taxa de venda da plataforma, para indicar se vale a pena vender aquele produto.
-                    </p>
-
-                    <div class="viab-form-grid">
-                        <div class="form-group viab-span-2">
-                            <label>Qual custo final usar como referência?</label>
-                            <div class="tax-mode-toggle">
-                                <label class="radio-label">
-                                    <input type="radio" name="mkt-cost-source" value="simples" checked>
-                                    <span>Importação Simplificada</span>
-                                </label>
-                                <label class="radio-label">
-                                    <input type="radio" name="mkt-cost-source" value="formal">
-                                    <span>Importação Formal</span>
-                                </label>
-                            </div>
-                            <small class="helper-text">Preenchido automaticamente a partir das outras duas abas — ajuste manualmente se quiser usar outro valor.</small>
-                        </div>
-                        <div class="form-group">
-                            <label for="mkt-ref-simples">Custo Final Simplificada (R$/un.)</label>
-                            <input type="number" id="mkt-ref-simples" class="form-control" value="0" step="0.01" min="0">
-                        </div>
-                        <div class="form-group">
-                            <label for="mkt-ref-formal">Custo Final Formal (R$/un.)</label>
-                            <input type="number" id="mkt-ref-formal" class="form-control" value="0" step="0.01" min="0">
-                        </div>
-                    </div>
-                </section>
-
-                <section class="card" style="margin-top: 1rem;">
-                    <h2 class="card-title">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                        Pesquisar Concorrente no Mercado Livre
-                    </h2>
-                    <div id="viab-ml-status-container" style="background-color: var(--bg-app); border: 1px solid var(--border-color); border-radius: var(--border-radius-md); padding: 0.75rem 1rem; font-size: 0.85rem; display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem;">
-                        <div>
-                            <strong>Status Mercado Livre</strong>
-                            <p id="viab-ml-status-text" style="margin: 0; color: var(--text-muted); font-size: 0.75rem;">Sem conexão. Algumas simulações usarão estimativas padrão.</p>
-                        </div>
-                        <div style="display: flex; gap: 0.5rem;">
-                            <button type="button" id="btn-viab-connect-ml" class="btn btn-primary btn-sm" style="background-color: #FFE600; color: #2D3277; border: none; font-weight: bold;">
-                                Conectar Conta ML
-                            </button>
-                            <button type="button" id="btn-viab-disconnect-ml" class="btn btn-secondary btn-sm hidden">
-                                Desconectar
-                            </button>
-                        </div>
-                    </div>
-                    <div class="viab-form-grid">
-                        <div class="form-group viab-span-2">
-                            <label>Nome / Tipo do Produto</label>
-                            <input type="text" id="mkt-f-query" class="form-control" placeholder="Ex: fone de ouvido bluetooth">
-                            <div id="mkt-category-info" class="ncm-preview hidden" style="margin-top: 0.5rem;"></div>
-                        </div>
-                        <div class="form-group">
-                            <label>Taxa de Venda ML (%)</label>
-                            <input type="number" id="mkt-f-fee" class="form-control" value="13" step="0.1" min="0">
-                            <small class="helper-text" id="mkt-f-fee-note">Preenchida automaticamente pela API (tipo de anúncio Clássico) assim que a categoria e o preço forem definidos — ajuste se usar outro tipo de anúncio.</small>
-                        </div>
-                        <div class="form-group">
-                            <label>Preço do Produto Mais Vendido Encontrado (R$)</label>
-                            <input type="number" id="mkt-f-price" class="form-control" value="0" step="0.01" min="0">
-                        </div>
-                        <div class="form-group viab-span-2">
-                            <button type="button" id="mkt-btn-search" class="btn btn-secondary btn-sm">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                                Pesquisar Mais Vendidos no Mercado Livre ↗
-                            </button>
-                            <div id="mkt-bestseller-info" class="ncm-preview hidden" style="margin-top: 0.75rem;"></div>
-                        </div>
-                    </div>
-                </section>
-
-                <section class="card" style="margin-top: 1rem;">
-                    <h2 class="card-title">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
-                        Frete da Plataforma (Mercado Envios) — por Peso e Dimensões
-                    </h2>
-                    <p class="small" style="color: var(--text-muted); margin-bottom: 1.25rem;">
-                        O frete é calculado pela calculadora oficial do Mercado Livre (mesma regra do peso faturável — o maior valor entre peso real e <strong>peso cubado</strong>, comprimento × largura × altura ÷ 6000), usando a reputação e o tipo de logística da sua conta. Se o servidor local não estiver disponível, usamos uma estimativa por faixa de peso como alternativa.
-                    </p>
-
-                    <div class="package-fields-with-diagram">
-                        <div class="viab-form-grid package-fields-grid">
-                            <div class="form-group">
-                                <label>Peso do Produto (g)</label>
-                                <div class="input-with-hint">
-                                    <input type="number" id="mkt-f-weight" class="form-control input-compact" value="0" step="1" min="0">
-                                    <span class="input-hint">ex: 250</span>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label>Comprimento da Embalagem (cm)</label>
-                                <div class="input-with-hint">
-                                    <input type="number" id="mkt-f-length" class="form-control input-compact" value="0" step="0.1" min="0">
-                                    <span class="input-hint">ex: 20</span>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label>Largura da Embalagem (cm)</label>
-                                <div class="input-with-hint">
-                                    <input type="number" id="mkt-f-width" class="form-control input-compact" value="0" step="0.1" min="0">
-                                    <span class="input-hint">ex: 15</span>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label>Altura da Embalagem (cm)</label>
-                                <div class="input-with-hint">
-                                    <input type="number" id="mkt-f-height" class="form-control input-compact" value="0" step="0.1" min="0">
-                                    <span class="input-hint">ex: 10</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="package-diagram-wrap">
-                            <svg class="package-diagram" viewBox="0 0 260 210" xmlns="http://www.w3.org/2000/svg">
-                                <defs>
-                                    <marker id="pkg-dim-arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                                        <path d="M0,0 L10,5 L0,10 z" fill="var(--text-muted)"/>
-                                    </marker>
-                                </defs>
-                                <polygon points="45,155 155,155 155,70 45,70" fill="#eab308" fill-opacity="0.28" stroke="var(--border-color)" stroke-width="1.5"/>
-                                <polygon points="45,70 80,45 190,45 155,70" fill="#eab308" fill-opacity="0.5" stroke="var(--border-color)" stroke-width="1.5"/>
-                                <polygon points="155,70 190,45 190,130 155,155" fill="#eab308" fill-opacity="0.16" stroke="var(--border-color)" stroke-width="1.5"/>
-
-                                <line x1="45" y1="172" x2="155" y2="172" stroke="var(--text-muted)" stroke-width="1.25" marker-start="url(#pkg-dim-arrow)" marker-end="url(#pkg-dim-arrow)"/>
-                                <text x="100" y="190" text-anchor="middle" font-size="12" font-weight="600" fill="var(--text-muted)">Comprimento</text>
-
-                                <line x1="26" y1="70" x2="26" y2="155" stroke="var(--text-muted)" stroke-width="1.25" marker-start="url(#pkg-dim-arrow)" marker-end="url(#pkg-dim-arrow)"/>
-                                <text x="0" y="0" text-anchor="middle" font-size="12" font-weight="600" fill="var(--text-muted)" transform="translate(14,112) rotate(-90)">Altura</text>
-
-                                <line x1="163" y1="164" x2="198" y2="139" stroke="var(--text-muted)" stroke-width="1.25" marker-start="url(#pkg-dim-arrow)" marker-end="url(#pkg-dim-arrow)"/>
-                                <text x="228" y="128" text-anchor="middle" font-size="12" font-weight="600" fill="var(--text-muted)">Largura</text>
-                            </svg>
-                            <p class="package-diagram-caption">Meça sempre a <strong>embalagem fechada</strong>, não só o produto.</p>
-                        </div>
-                    </div>
-                    <div id="mkt-r-weight-note" style="margin-top: 1rem; font-size: 0.78rem; color: var(--text-muted);"></div>
-                    <div class="viab-form-grid" style="margin-top: 1rem;">
-                        <div class="form-group viab-span-2">
-                            <label>Frete da Plataforma (Mercado Envios) (R$)</label>
-                            <input type="number" id="mkt-f-platform-freight" class="form-control" value="0" step="0.01" min="0">
-                            <small class="helper-text" id="mkt-f-freight-note">Preenchido automaticamente pela calculadora oficial do Mercado Livre — ajuste se quiser simular outro cenário. Deixe 0 se o frete é pago à parte pelo comprador.</small>
-                        </div>
-                    </div>
-                </section>
-
-                <section class="card table-card" style="margin-top: 1rem;">
-                    <h2 class="card-title">Memória de Cálculo — Receita Líquida Real</h2>
-                    <div class="table-container">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Item</th>
-                                    <th class="text-right">Valor (R$)</th>
-                                </tr>
-                            </thead>
-                            <tbody id="mkt-r-memory-tbody"></tbody>
-                            <tfoot id="mkt-r-memory-tfoot"></tfoot>
-                        </table>
-                    </div>
-                </section>
-
-                <section class="card" style="margin-top: 1rem; text-align: center; padding: 1.5rem;">
-                    <span class="viab-kpi-label">Resultado da Comparação</span>
-                    <strong style="font-size: 1.6rem; display: block; margin-top: 0.5rem;" id="mkt-r-verdict">—</strong>
-                    <span style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-top: 0.35rem;" id="mkt-r-detail">Preencha o custo final e o preço do concorrente para ver o resultado.</span>
-                </section>
-
-            </div>
         </div>
 
         <!-- VIEW: Avaliações do Mercado Livre -->
@@ -2508,7 +2769,7 @@
                 <div class="card-header-with-badge" style="display:flex; align-items:center; justify-content:space-between;">
                     <h2 class="card-title">
                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.21 13.89 7 23l5-3 5 3-1.21-9.12"/><circle cx="12" cy="8" r="7"/></svg>
-                        Catálogos — Ganhando ou Perdendo
+                        Catálogos — Ganhando, Perdendo ou no Prejuízo
                     </h2>
                     <button type="button" id="btn-mark-all-catalog-read" class="btn btn-secondary btn-sm">Marcar todas como lidas</button>
                 </div>
@@ -2520,9 +2781,20 @@
                 <div class="results-tab-bar">
                     <button type="button" id="catalog-tab-btn-winning" class="results-tab-btn active">Ganhando</button>
                     <button type="button" id="catalog-tab-btn-losing" class="results-tab-btn">Perdendo</button>
+                    <button type="button" id="catalog-tab-btn-prejuizo" class="results-tab-btn">Prejuízo<span id="catalog-prejuizo-badge" class="tab-badge hidden">0</span></button>
                 </div>
 
                 <div id="catalog-tab-winning" class="tab-content-panel">
+                    <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:1.5rem; margin-bottom:1rem; flex-wrap:wrap;">
+                        <div>
+                            <label for="catalog-imposto-pct" class="small" style="display:block; color: var(--text-muted); margin-bottom:0.2rem;">Imposto sobre a venda (%)</label>
+                            <input type="number" id="catalog-imposto-pct" min="0" max="100" step="0.1" style="width:5.5rem; padding:0.3rem 0.45rem;">
+                        </div>
+                        <button type="button" id="btn-catalog-margem" class="btn btn-secondary btn-sm">Calcular margem</button>
+                    </div>
+                    <p id="catalog-margem-status" class="small" style="color: var(--text-muted); margin: 0 0 0.75rem;">
+                        Calcule o custo de cada produto para ver, ao lado do anúncio, se o preço que está ganhando ainda dá lucro — considerando comissão, frete, imposto e o que se gasta com anúncio patrocinado. Comissão e frete vêm das suas vendas reais dos últimos 30 dias sempre que possível; sem venda no período, entra uma estimativa da tabela do Mercado Livre. Imposto vale para todos os anúncios (mesma configuração da aba Patrocinados).
+                    </p>
                     <div id="catalog-list-winning"></div>
                     <p id="catalog-empty-winning" class="small" style="color: var(--text-muted); text-align:center; padding: 1.5rem 0;">Nenhum anúncio ganhando verificado ainda.</p>
                 </div>
@@ -2530,6 +2802,15 @@
                 <div id="catalog-tab-losing" class="tab-content-panel hidden">
                     <div id="catalog-list-losing"></div>
                     <p id="catalog-empty-losing" class="small" style="color: var(--text-muted); text-align:center; padding: 1.5rem 0;">Nenhum anúncio perdendo no momento.</p>
+                </div>
+
+                <div id="catalog-tab-prejuizo" class="tab-content-panel hidden">
+                    <p class="small" style="color: var(--text-muted); margin: 0 0 0.75rem;">
+                        Anúncios "Ganhando" cujo preço, hoje, dá prejuízo — depois de comissão, frete, imposto, o custo do produto e o anúncio patrocinado. Só entra aqui quem já tem a margem calculada (botão "Calcular margem" na aba Ganhando) e o custo do produto digitado.
+                    </p>
+                    <div id="catalog-prejuizo-resumo" class="card" style="margin-bottom: 1rem;"></div>
+                    <div id="catalog-list-prejuizo"></div>
+                    <p id="catalog-empty-prejuizo" class="small" style="color: var(--text-muted); text-align:center; padding: 1.5rem 0;">Nenhum anúncio com prejuízo identificado — ou a margem ainda não foi calculada.</p>
                 </div>
             </section>
         </div>
@@ -2551,19 +2832,14 @@
 
                 <div class="results-tab-bar">
                     <button type="button" id="promo-tab-btn-active" class="results-tab-btn active">Ativas</button>
-                    <button type="button" id="promo-tab-btn-soon" class="results-tab-btn">Vencem em 10 dias</button>
                     <button type="button" id="promo-tab-btn-ended" class="results-tab-btn">Sem promoção</button>
                     <button type="button" id="promo-tab-btn-lightning" class="results-tab-btn">Podem ter Relâmpago</button>
+                    <button type="button" id="promo-tab-btn-auto" class="results-tab-btn">Automação</button>
                 </div>
 
                 <div id="promo-tab-active" class="tab-content-panel">
                     <div id="promo-list-active"></div>
                     <p id="promo-empty-active" class="small" style="color: var(--text-muted); text-align:center; padding: 1.5rem 0;">Nenhuma promoção ativa no momento.</p>
-                </div>
-
-                <div id="promo-tab-soon" class="tab-content-panel hidden">
-                    <div id="promo-list-soon"></div>
-                    <p id="promo-empty-soon" class="small" style="color: var(--text-muted); text-align:center; padding: 1.5rem 0;">Nenhuma promoção vencendo nos próximos 10 dias.</p>
                 </div>
 
                 <div id="promo-tab-ended" class="tab-content-panel hidden">
@@ -2576,11 +2852,30 @@
                     <div id="promo-list-lightning"></div>
                     <p id="promo-empty-lightning" class="small" style="color: var(--text-muted); text-align:center; padding: 1.5rem 0;">Nenhum anúncio elegível pra oferta relâmpago no momento.</p>
                 </div>
+
+                <div id="promo-tab-auto" class="tab-content-panel hidden">
+                    <p class="small" style="color: var(--text-muted); margin-bottom: 1rem;">
+                        A verificação automática roda a cada 15 minutos. Quando um anúncio é convidado para promoções,
+                        a automação compara todas e <strong>só entra se você receber igual ou mais do que já recebe hoje</strong>.
+                        É o caso das campanhas cofinanciadas, em que o Mercado Livre banca o desconto: o comprador vê um preço
+                        menor e na sua conta cai o mesmo. O preço que você já colocou no anúncio é o padrão —
+                        <strong>não há mínimo para preencher e nenhum anúncio fica de fora</strong>.
+                        E quando uma promoção sua vence e o anúncio volta sozinho ao preço cheio, a automação
+                        <strong>repõe o mesmo desconto que você já praticava</strong> — o mesmo líquido de antes,
+                        sem o anúncio ficar sem promoção até alguém perceber.
+                    </p>
+                    <div id="promo-auto-config"></div>
+                    <div id="promo-auto-items" style="margin-top: 1.25rem;"></div>
+                    <div id="promo-auto-history" style="margin-top: 1.25rem;"></div>
+                </div>
             </section>
         </div>
 
         <!-- VIEW: Patrocinados (Product Ads desligado) -->
         <div id="view-ads" class="view-panel hidden">
+            <!-- Painel de Patrocinados: montado por patrocinados.js. A lista de
+                 "Patrocinados desligados" logo abaixo continua como estava. -->
+            <div id="ads-painel-raiz"></div>
             <section class="card">
                 <div class="card-header-with-badge" style="display:flex; align-items:center; justify-content:space-between;">
                     <h2 class="card-title">
@@ -2593,10 +2888,45 @@
                     Seus anúncios <strong>próprios, ativos e com estoque</strong> que não estão rodando em Patrocinados — os que nunca entraram em campanha e os que estão pausados dentro de uma. Ficam de fora os anúncios de catálogo, os pausados e os sem estoque, porque neles ligar publicidade agora não é decisão sua ou não tem efeito. A verificação roda sozinha junto com as outras abas, e quem sair de campanha aparece destacado.
                 </p>
                 <p id="ads-check-status" class="small" style="color: var(--text-muted); margin-bottom: 0.35rem;"></p>
-                <p id="ads-problem" class="small hidden" style="color: var(--danger, #ef4444); margin-bottom: 1.25rem;"></p>
+                <p id="ads-problem" class="small hidden" style="color: var(--danger); margin-bottom: 1.25rem;"></p>
 
                 <div id="ads-list"></div>
                 <p id="ads-empty" class="small" style="color: var(--text-muted); text-align:center; padding: 1.5rem 0;">Nenhum anúncio com Patrocinados desligado.</p>
+            </section>
+        </div>
+
+        <!-- VIEW: Gerador de EAN -->
+        <div id="view-gtin" class="view-panel hidden">
+            <section class="card">
+                <h2 class="card-title">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5v14"/><path d="M8 5v14"/><path d="M12 5v14"/><path d="M17 5v14"/><path d="M21 5v14"/></svg>
+                    Gerador de EAN
+                </h2>
+
+                <div class="gtin-aviso gtin-aviso-forte">
+                    <strong>Use apenas para testes, prototipagem ou validação de fluxos de cadastro.</strong>
+                    Os códigos usam o prefixo 789 e podem coincidir com o produto de outra
+                    empresa. Para vender em marketplaces de forma oficial, adquira códigos
+                    legítimos junto à GS1.
+                </div>
+
+                <div class="viab-form-grid">
+                    <div class="form-group">
+                        <label for="gtin-teste-qtd">Quantos códigos</label>
+                        <input type="number" id="gtin-teste-qtd" class="form-control" value="10" min="1" max="500">
+                    </div>
+                    <div class="form-group">
+                        <label for="gtin-teste-formato">Formato</label>
+                        <select id="gtin-teste-formato" class="form-control">
+                            <option value="13">EAN-13 (13 dígitos)</option>
+                            <option value="12">UPC-A (12 dígitos)</option>
+                            <option value="8">EAN-8 (8 dígitos)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button type="button" id="gtin-btn-teste" class="btn btn-primary">Gerar códigos</button>
+                <div id="gtin-teste-saida" style="margin-top: 1.25rem;"></div>
             </section>
         </div>
 
@@ -2776,6 +3106,45 @@
                             </button>
                         </div>
                     </div>
+                    <div style="background-color: var(--bg-app); border: 1px solid var(--border-color); border-radius: var(--border-radius-md); padding: 1rem; font-size: 0.85rem; display: flex; align-items: center; justify-content: space-between; margin-top: 0.75rem;">
+                        <div>
+                            <strong>Shopee</strong>
+                            <p id="shopee-connection-status" style="margin: 0; color: var(--text-muted);">Não conectado</p>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button id="btn-connect-shopee" class="btn btn-primary btn-sm" style="background-color: #EE4D2D; color: #fff; border: none; font-weight: bold;">
+                                Conectar
+                            </button>
+                            <button id="btn-disconnect-shopee" class="btn btn-secondary btn-sm hidden">
+                                Desconectar
+                            </button>
+                        </div>
+                    </div>
+                    <div style="background-color: var(--bg-app); border: 1px solid var(--border-color); border-radius: var(--border-radius-md); padding: 1rem; font-size: 0.85rem; display: flex; align-items: center; justify-content: space-between; margin-top: 0.75rem;">
+                        <div>
+                            <strong>Amazon</strong>
+                            <p id="amazon-connection-status" style="margin: 0; color: var(--text-muted);">Ainda não disponível para todas as contas</p>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button id="btn-disconnect-amazon" class="btn btn-secondary btn-sm hidden">
+                                Desconectar
+                            </button>
+                        </div>
+                    </div>
+                    <div style="background-color: var(--bg-app); border: 1px solid var(--border-color); border-radius: var(--border-radius-md); padding: 1rem; font-size: 0.85rem; display: flex; align-items: center; justify-content: space-between; margin-top: 0.75rem;">
+                        <div>
+                            <strong>Amazon Ads (Patrocinados)</strong>
+                            <p id="amazon-ads-connection-status" style="margin: 0; color: var(--text-muted);">Não conectado</p>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button id="btn-connect-amazon-ads" class="btn btn-primary btn-sm" style="background-color: #FF9900; color: #131921; border: none; font-weight: bold;">
+                                Conectar
+                            </button>
+                            <button id="btn-disconnect-amazon-ads" class="btn btn-secondary btn-sm hidden">
+                                Desconectar
+                            </button>
+                        </div>
+                    </div>
                 </div>
                 <div class="form-group" style="margin-bottom: 0;">
                     <label style="color: var(--danger);">Zona de Risco</label>
@@ -2788,6 +3157,26 @@
         </div>
 
         <!-- VIEW: Central de Ajuda / FAQ -->
+        <div id="view-ml-painel" class="view-panel hidden">
+            <!-- Painel do Mercado Livre: montado por ml-painel.js. -->
+            <div id="ml-painel-raiz"></div>
+        </div>
+
+        <div id="view-amazon-painel" class="view-panel hidden">
+            <!-- Painel da Amazon: montado por amazon-painel.js. -->
+            <div id="amazon-painel-raiz"></div>
+        </div>
+
+        <div id="view-shopee-painel" class="view-panel hidden">
+            <!-- Painel da Shopee: montado por shopee-painel.js. -->
+            <div id="shopee-painel-raiz"></div>
+        </div>
+
+        <div id="view-admin" class="view-panel hidden">
+            <!-- Painel de cadastros: montado por admin.js. -->
+            <div id="admin-raiz"></div>
+        </div>
+
         <div id="view-help" class="view-panel hidden">
             <section class="card">
                 <h2 class="card-title">
@@ -2866,10 +3255,38 @@
     </div>
 </div>
 <!-- Script -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase_client.js?v=1"></script>
-<script src="ncm_db.js?v=4"></script>
-<script src="app.js?v=5"></script>
+<!-- Versão fixa, não "@2": aquele range fazia o jsDelivr resolver pra última
+     2.x na hora da requisição, então qualquer release nova entrava em produção
+     sozinha — numa biblioteca que sustenta todo o login. Subir de versão passa
+     a ser decisão sua, com deploy pra reverter.
+     O integrity precisa ser recalculado junto com a versão. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.3"
+        integrity="sha384-l8ah+VgaWtk1mvOe9VC+OirC6qHFF4yH7l7mKRidV9MSti3E9F463bMp6ZVN4kuC"
+        crossorigin="anonymous"></script>
+<script src="supabase_client.js?v=13"></script>
+<script src="ncm_rates.js?v=2"></script>
+<script src="ncm_db.js?v=6"></script>
+<!-- SDK do Mercado Pago: monta os MP Fields (iframes) do cartão e gera o
+     CardToken no navegador. Sem integrity de propósito — o MP atualiza este
+     arquivo sem versionar, e um hash fixo derrubaria o pagamento sem aviso. -->
+<script src="https://sdk.mercadopago.com/js/v2"></script>
+<!-- Device ID: impressão digital do dispositivo que o antifraude do Mercado Pago
+     usa no score da transação. Sem ela, duas cobranças de R$ 29,90 de cartões e
+     pessoas diferentes foram recusadas com cc_rejected_high_risk. O script cria
+     a variável global MP_DEVICE_SESSION_ID, que o app.js manda para a nossa API
+     e que o /api/mp-subscription repassa ao MP no header x-meli-session-id. -->
+<script src="https://www.mercadopago.com/v2/security.js" view="checkout" output="MP_DEVICE_SESSION_ID"></script>
+<script src="app.js?v=73"></script>
+<!-- Módulo: importa os componentes de design-system/components/. Depois do
+     app.js porque escuta o evento de troca de tela que ele dispara. -->
+<script type="module" src="navio.js?v=1"></script>
+<script type="module" src="lote.js?v=3"></script>
+<script type="module" src="ml-conexao.js"></script>
+<script type="module" src="patrocinados.js?v=4"></script>
+<script type="module" src="admin.js?v=4"></script>
+<script type="module" src="ml-painel.js?v=8"></script>
+<script type="module" src="amazon-painel.js?v=1"></script>
+<script type="module" src="shopee-painel.js?v=1"></script>
 </body>
 </html>
 

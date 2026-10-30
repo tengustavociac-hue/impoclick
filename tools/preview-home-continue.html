@@ -1,0 +1,42 @@
+<!doctype html>
+<!-- Revisão do cartão "Continuar de onde parou" (Painel Inicial) sem login:
+     abre o index.html real, troca window.db.getHistory() por um lote de
+     exemplo e força a tela Home a redesenhar.
+       python -m http.server 4174 --bind 127.0.0.1
+       http://127.0.0.1:4174/tools/preview-home-continue.html?theme=dark
+     Fora do deploy (tools/). -->
+<html lang="pt-BR"><head><meta charset="utf-8">
+<style>html,body{margin:0;background:#888}iframe{border:0;display:block;width:900px;height:900px}</style>
+</head>
+<body>
+<iframe id="f" src="../index.html"></iframe>
+<script>
+const p = new URLSearchParams(location.search);
+const f = document.getElementById('f');
+f.addEventListener('load', () => setTimeout(async () => {
+  const w = f.contentWindow, d = f.contentDocument;
+  d.documentElement.setAttribute('data-theme', p.get('theme') || 'light');
+  w.eval('state.currentUser = { id: "u1", name: "Teste", is_pro: true, access_token: "x" };');
+  w.db.getHistory = async () => [{
+    id: 1, name: 'Simplificada 14', created_at: new Date('2026-09-16T20:20:00').toISOString(),
+    state_data: { products: [{ qty: 3000, price: 3.57 }], exchangeRate: 5.14, currency: 'USD', exchangeMode: 'simple' },
+  }];
+  d.documentElement.classList.add('has-session');
+  const lp = d.getElementById('landing-container'); if (lp) lp.style.display = 'none';
+  for (const id of ['auth-container', 'paywall-screen']) { const el = d.getElementById(id); if (el) el.classList.add('hidden'); }
+  const shell = d.querySelector('.app-container'); if (shell) shell.classList.remove('hidden');
+  d.querySelector('[data-view="view-home"]').click();
+  await w.renderHomeDashboard();
+  await new Promise((r) => setTimeout(r, 200));
+  const card = d.getElementById('home-continue-card');
+  const btn = d.getElementById('home-continue-btn');
+  const cs = w.getComputedStyle(btn);
+  document.title = JSON.stringify({
+    visivel: !card.classList.contains('hidden'),
+    textoBotao: btn.textContent.trim(),
+    corTexto: cs.color,
+    corFundo: cs.backgroundColor,
+  });
+}, 1200));
+</script>
+</body></html>

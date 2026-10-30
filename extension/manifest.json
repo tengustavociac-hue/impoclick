@@ -1,29 +1,47 @@
 {
   "manifest_version": 3,
   "name": "Impoclick — Viabilidade no Mercado Livre",
-  "version": "1.0.0",
-  "description": "Veja na hora se compensa vender um produto do Mercado Livre, comparando o preço do anúncio com o seu custo de importação salvo no Impoclick.",
+  "version": "1.8.11",
+  "description": "Compare o preço de um anúncio do Mercado Livre com o seu custo de importação salvo no Impoclick e veja se compensa vender.",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "permissions": ["storage", "alarms"],
+  "permissions": [
+    "storage",
+    "alarms",
+    "sidePanel",
+    "tabs"
+  ],
   "host_permissions": [
     "https://www.impoclick.com.br/*",
-    "https://qmwvzhpyxrkyxvekcazs.supabase.co/*"
+    "https://qmwvzhpyxrkyxvekcazs.supabase.co/*",
+    "*://*.mercadolivre.com.br/*",
+    "*://*.mercadolibre.com/*"
   ],
   "background": {
     "service_worker": "background.js"
   },
   "content_scripts": [
     {
-      "matches": ["*://*.mercadolivre.com.br/*", "*://*.mercadolibre.com/*"],
-      "js": ["content.js"],
-      "css": ["panel.css"],
+      "matches": [
+        "*://*.mercadolivre.com.br/*",
+        "*://*.mercadolibre.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "ds-tokens.css",
+        "panel.css"
+      ],
       "run_at": "document_idle"
     }
   ],
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
@@ -31,5 +49,17 @@
       "48": "icons/icon48.png",
       "128": "icons/icon128.png"
     }
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "fonts/*.woff2",
+        "icons/*.png"
+      ],
+      "matches": [
+        "*://*.mercadolivre.com.br/*",
+        "*://*.mercadolibre.com/*"
+      ]
+    }
+  ]
 }

@@ -1,0 +1,12 @@
+{
+  // Emite só as declarações .d.ts da biblioteca de componentes (npm run ds:build).
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "outDir": "dist/types",
+    "rootDir": "components"
+  },
+  "include": ["components/**/*.js"]
+}

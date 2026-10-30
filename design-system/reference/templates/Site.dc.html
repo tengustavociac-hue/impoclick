@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<!-- @template name="Página institucional" description="Landing page Impoclick: cabeçalho fixo, hero com brilho radial, grade de recursos e CTA." -->
+<helmet><script src="./ds-base.js"></script></helmet>
+<div style="background:var(--surface-page);font-family:var(--font-sans)">
+<header style="position:sticky;top:0;z-index:50;background:var(--veil-light);backdrop-filter:saturate(140%) blur(18px);border-bottom:1px solid var(--border-subtle)">
+<div style="max-width:1440px;margin:0 auto;height:72px;padding:0 32px;display:flex;align-items:center;gap:32px">
+<a href="#" style="display:flex;align-items:center;gap:10px;text-decoration:none"><img src="../../assets/logo-impoclick.png" alt="" style="width:34px;height:34px"><span style="font-size:21px;font-weight:700;letter-spacing:-0.025em;color:var(--text-title)">Impoclick</span></a>
+<nav style="display:flex;gap:26px;margin-left:20px">
+<a href="#" style="font-size:15px;font-weight:500;color:var(--text-body);text-decoration:none">Plataforma</a>
+<a href="#" style="font-size:15px;font-weight:500;color:var(--text-body);text-decoration:none">Como funciona</a>
+<a href="#" style="font-size:15px;font-weight:500;color:var(--text-body);text-decoration:none">Preços</a>
+<a href="#" style="font-size:15px;font-weight:500;color:var(--text-body);text-decoration:none">Casos</a>
+</nav>
+<div style="margin-left:auto;display:flex;align-items:center;gap:12px">
+<x-import component-from-global-scope="ImpoclickDesignSystem_ec37fd.Button" variant="ghost" size="sm" hint-size="80px,34px">Entrar</x-import>
+<x-import component-from-global-scope="ImpoclickDesignSystem_ec37fd.Button" variant="primary" size="sm" icon-right="arrow_outward" hint-size="180px,34px">Abrir demonstração</x-import>
+</div>
+</div>
+</header>
+<section style="position:relative;overflow:hidden;background:var(--surface-card);border-bottom:1px solid var(--border-subtle)">
+<div style="position:absolute;top:-220px;right:-120px;width:620px;height:620px;border-radius:50%;background:radial-gradient(circle, color-mix(in oklab, var(--aqua-400) 26%, transparent) 0%, transparent 68%);pointer-events:none"></div>
+<div style="position:absolute;bottom:-280px;left:-160px;width:520px;height:520px;border-radius:50%;background:radial-gradient(circle, color-mix(in oklab, var(--orange-400) 14%, transparent) 0%, transparent 70%);pointer-events:none"></div>
+<div style="position:relative;max-width:1240px;margin:0 auto;padding:104px 32px;text-align:center">
+<span style="display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 14px;border-radius:999px;background:var(--accent-soft);border:1px solid var(--accent-soft-border);color:var(--accent);font-size:13px;font-weight:600"><span style="width:7px;height:7px;border-radius:50%;background:currentColor"></span>Importação da China, ponta a ponta</span>
+<h1 style="font-size:clamp(40px,6vw,72px);line-height:1.03;letter-spacing:-0.035em;font-weight:600;margin:24px auto 0;max-width:16ch;color:var(--text-title)">Todo o seu processo de importação <span style="color:var(--accent)">em um clique</span></h1>
+<p style="font-size:19px;color:var(--text-muted);max-width:58ch;margin:22px auto 0;line-height:1.5">Cotação, fornecedor, embarque, desembaraço e custo desembarcado no mesmo painel. Você vê onde a carga está e quanto ela custa — antes de ela chegar.</p>
+<div style="display:flex;gap:12px;justify-content:center;margin:32px 0 12px;flex-wrap:wrap">
+<x-import component-from-global-scope="ImpoclickDesignSystem_ec37fd.Button" variant="primary" size="lg" icon-right="arrow_outward" hint-size="220px,52px">Abrir demonstração</x-import>
+<x-import component-from-global-scope="ImpoclickDesignSystem_ec37fd.Button" variant="outline" size="lg" icon-left="play_circle" hint-size="200px,52px">Ver em 2 minutos</x-import>
+</div>
+<p style="font-size:13px;color:var(--text-muted)">Sem cartão. Primeiro contêiner acompanhado grátis.</p>
+</div>
+</section>
+<section style="padding:96px 32px">
+<div style="max-width:1240px;margin:0 auto">
+<div style="max-width:54ch;margin-bottom:48px">
+<span style="display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 14px;border-radius:999px;background:var(--accent-soft);border:1px solid var(--accent-soft-border);color:var(--accent);font-size:13px;font-weight:600"><span style="width:7px;height:7px;border-radius:50%;background:currentColor"></span>Plataforma</span>
+<h2 style="font-size:clamp(30px,4vw,44px);letter-spacing:-0.03em;line-height:1.1;margin-top:20px;color:var(--text-title)">Seis planilhas, três grupos de WhatsApp e um despachante — substituídos por uma tela.</h2>
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px">
+<x-import component-from-global-scope="ImpoclickDesignSystem_ec37fd.Card" interactive="{{ true }}" hint-size="100%,210px">
+<span style="display:inline-flex;width:46px;height:46px;border-radius:14px;background:var(--accent-soft);color:var(--accent);align-items:center;justify-content:center;margin-bottom:18px"><span class="ic-icon" style="font-size:24px">radar</span></span>
+<h3 style="font-size:19px;margin-bottom:8px">Rastreio em tempo real</h3>
+<p style="font-size:15px;color:var(--text-muted);line-height:1.5">Posição do navio, ETA recalculada e alerta quando o contêiner atraca — sem abrir o site da armadora.</p>
+</x-import>
+<x-import component-from-global-scope="ImpoclickDesignSystem_ec37fd.Card" interactive="{{ true }}" hint-size="100%,210px">
+<span style="display:inline-flex;width:46px;height:46px;border-radius:14px;background:var(--accent-soft);color:var(--accent);align-items:center;justify-content:center;margin-bottom:18px"><span class="ic-icon" style="font-size:24px">calculate</span></span>
+<h3 style="font-size:19px;margin-bottom:8px">Custo desembarcado</h3>
+<p style="font-size:15px;color:var(--text-muted);line-height:1.5">II, IPI, PIS, COFINS, ICMS, frete e armazenagem calculados por NCM antes de você fechar o pedido.</p>
+</x-import>
+<x-import component-from-global-scope="ImpoclickDesignSystem_ec37fd.Card" interactive="{{ true }}" hint-size="100%,210px">
+<span style="display:inline-flex;width:46px;height:46px;border-radius:14px;background:var(--accent-soft);color:var(--accent);align-items:center;justify-content:center;margin-bottom:18px"><span class="ic-icon" style="font-size:24px">description</span></span>
+<h3 style="font-size:19px;margin-bottom:8px">Documentos num lugar só</h3>
+<p style="font-size:15px;color:var(--text-muted);line-height:1.5">Invoice, packing list, BL e certificados anexados ao processo e compartilhados com o despachante.</p>
+</x-import>
+</div>
+</div>
+</section>
+<section style="padding:0 32px 96px">
+<div style="max-width:1240px;margin:0 auto">
+<x-import component-from-global-scope="ImpoclickDesignSystem_ec37fd.Card" variant="accent" hint-size="100%,280px">
+<div style="padding:32px;text-align:center">
+<h2 style="font-size:clamp(28px,4vw,42px);letter-spacing:-0.03em;line-height:1.1;max-width:20ch;margin:0 auto">Acompanhe o seu próximo contêiner sem custo</h2>
+<p style="font-size:17px;margin:16px auto 28px;max-width:52ch;color:color-mix(in oklab, var(--text-on-accent) 78%, transparent)">Cadastre um processo em andamento e veja o custo desembarcado em menos de dez minutos.</p>
+<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;max-width:480px;margin:0 auto">
+<div style="flex:1 1 240px"><x-import component-from-global-scope="ImpoclickDesignSystem_ec37fd.Input" pill="{{ true }}" placeholder="seu@email.com.br" icon="mail" hint-size="100%,44px"></x-import></div>
+<x-import component-from-global-scope="ImpoclickDesignSystem_ec37fd.Button" variant="secondary" icon-right="arrow_outward" hint-size="140px,42px">Começar</x-import>
+</div>
+</div>
+</x-import>
+</div>
+</section>
+</div>
+</x-dc>
+</body>
+</html>

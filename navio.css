@@ -1,0 +1,166 @@
+/* Aba "Navio - Container" (navio.js).
+   Só layout: cor, tipografia, raio e sombra vêm dos componentes do design
+   system e dos tokens. As medidas fixas daqui são métricas de layout — largura
+   mínima de coluna, altura do mapa —, cada uma comentada. */
+
+.navio {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.navio-topo {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.navio-titulo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.navio-h {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--text-title-md);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-tight);
+  color: var(--text-title);
+}
+
+.navio-h--grande { font-size: var(--text-title-lg); }
+
+.navio-sub {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+/* Referência, contêiner, BL e viagem: monoespaçado, como no modelo, porque são
+   códigos que o usuário confere caractere por caractere contra o BL. */
+.navio-codigos {
+  margin: var(--space-2) 0 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.navio-acoes {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.navio-acoes--fim { justify-content: flex-end; }
+
+/* Métrica: 200px é o mínimo em que "Chegada prevista" + "atrasado 12 dias"
+   cabem sem quebrar. */
+.navio-numeros {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-4);
+}
+
+/* O mapa pesa mais que a linha do tempo: é o que se abre esta tela para ver. */
+.navio-corpo {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+/* Métrica: abaixo de 980px as duas colunas espremem o mapa a ponto de o navio
+   virar um ponto sem contexto. Empilha. */
+@media (max-width: 980px) {
+  .navio-corpo { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Métrica: 440px de altura. O widget da VesselFinder não aceita menos de 400
+   (ele força 400 abaixo disso), e a sobra deixa ver o rastro das últimas 24h
+   sem precisar arrastar. navio.js lê esta altura e a repassa ao widget. */
+.navio-mapa {
+  display: block;
+  width: 100%;
+  height: 440px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--surface-inset);
+}
+
+.navio-progresso { margin-bottom: var(--space-5); }
+
+.navio-avanco { margin-top: var(--space-5); }
+
+/* Métrica: 300px por cartão — cabe rota, status e a barra de trajeto numa
+   linha de 1280px com três cartões lado a lado. */
+.navio-lista {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--space-4);
+}
+
+.navio-cartao-status { margin-bottom: var(--space-2); }
+
+.navio-lista .navio-codigos { margin-bottom: var(--space-4); }
+
+/* Cartões do formulário em largura cheia, empilhados. Lado a lado, cada um
+   ficava estreito demais para dois campos, e o cartão do navio virava uma
+   coluna de cinco campos que obrigava a rolar. */
+.navio-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* Métrica: 200px por campo — cabe uma data dd/mm/aaaa com o ícone do
+   calendário, e um código de contêiner inteiro sem cortar. */
+.navio-campos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--space-3) var(--space-4);
+}
+
+.navio-link {
+  font-size: var(--text-sm);
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* Métrica: 400px por etapa — o nome mais longo ("Desembaraço aduaneiro")
+   numa linha só, ao lado do campo de data. */
+.navio-etapas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+  gap: var(--space-3) var(--space-5);
+}
+
+/* Métrica: a data ocupa 160px para as datas das etapas ficarem alinhadas
+   entre si, coluna a coluna. */
+.navio-etapa {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 160px;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.navio-notas {
+  margin: 0;
+  white-space: pre-line;
+  color: var(--text-body);
+  line-height: var(--leading-relaxed);
+}
+
+.navio-erros {
+  margin: var(--space-1) 0 0;
+  padding-left: var(--space-5);
+}
+
+.navio-avisos:empty { display: none; }

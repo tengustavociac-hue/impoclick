@@ -1,0 +1,95 @@
+<!doctype html>
+<!-- Revisão do relatório "Ver" do Histórico de Importação, sem login: abre o
+     index.html real, troca window.db.getHistory por lotes de exemplo, entra no
+     Histórico pelo menu e clica em "Ver" na linha escolhida.
+       python -m http.server 4174 --bind 127.0.0.1
+       http://127.0.0.1:4174/tools/preview-lote.html?lote=0&theme=dark
+     lote = índice da linha (0 = formal por NCM, 1 = Remessa Conforme com revenda)
+     Fora do deploy (tools/). -->
+<html lang="pt-BR"><head><meta charset="utf-8">
+<style>html,body{margin:0;background:#888}iframe{border:0;display:block;width:1440px;height:2400px}</style>
+</head>
+<body>
+<iframe id="f" src="../index.html"></iframe>
+<script>
+const p = new URLSearchParams(location.search);
+const qual = Number(p.get('lote') || 0);
+const theme = p.get('theme') || 'light';
+
+const produto = (id, name, qty, unitPrice, unitWeight, extra = {}) =>
+  ({ id, name, description: '', qty, unitPrice, unitWeight, ncm: '', taxation: 'taxable', image: '', ...extra });
+
+const LOTES = [
+  { id: 'lote-formal', name: 'IMPORTAÇÃO MARITIMA 4', created_at: '2026-08-24T17:41:00Z', state_data: {
+    taxRegime: 'importacao-formal', taxMode: 'auto', currency: 'USD', exchangeRate: 5.35, exchangeMode: 'complete', spread: 4, iof: 3.5,
+    freight: 900, insurance: 45, fees: 1800, feesInBRL: true, icmsRate: 18, freightSplit: 'weight', insuranceSplit: 'value', feesSplit: 'quantity',
+    products: [produto(1, 'Fone bluetooth TWS', 4800, 8, 0.09, { ncm: '8518.30.00' }), produto(2, 'Carregador 65W GaN', 3200, 9, 0.2, { ncm: '8504.40.90' }),
+      produto(3, 'Cabo USB-C 2 m', 571, 1.9, 0.04, { ncm: '8544.42.00' })] } },
+  { id: 'lote-remessa', name: 'SIMPLIFICADA 14', created_at: '2026-09-16T23:20:00Z', state_data: {
+    taxRegime: 'remessa-conforme', taxMode: 'auto', currency: 'USD', exchangeRate: 5.4, exchangeMode: 'simple',
+    freight: 120, insurance: 0, fees: 350, feesInBRL: true, icmsRate: 17, resaleMode: true, globalMargin: 35,
+    products: [produto(1, 'Saco coletor para robô', 2000, 0.9, 0.05), produto(2, 'Escova lateral', 1000, 0.5, 0.02), produto(3, 'Livro de receitas', 5, 6, 0.4, { taxation: 'exempt-books' })] } },
+];
+
+const f = document.getElementById('f');
+f.addEventListener('load', () => setTimeout(async () => {
+  const w = f.contentWindow, d = f.contentDocument;
+  d.documentElement.setAttribute('data-theme', theme);
+  w.db.getHistory = async () => JSON.parse(JSON.stringify(LOTES));
+  w.eval('state.currentUser = { name: "Teste", is_pro: true };');
+
+  d.documentElement.classList.add('has-session');
+  const lp = d.getElementById('landing-container'); if (lp) lp.style.display = 'none';
+  for (const id of ['auth-container', 'paywall-screen']) { const el = d.getElementById(id); if (el) el.classList.add('hidden'); }
+  const shell = d.querySelector('.app-container'); if (shell) shell.classList.remove('hidden');
+
+  d.querySelector('[data-view="view-imports"]').click();
+  await w.eval('renderHistoryTable()');
+  const linha = d.querySelectorAll('#tbody-saved-imports tr')[qual];
+  const botoes = [...linha.querySelectorAll('button')].map((b) => b.textContent.trim());
+  linha.querySelector('button').click();          // o primeiro botão é o "Ver"
+  await new Promise((r) => setTimeout(r, 500));
+
+  const visivel = (id) => !d.getElementById(id).classList.contains('hidden');
+  const titulo = (d.getElementById('header-view-title') || {}).textContent || '';
+  const menu = d.querySelector('[data-view="view-imports"]').classList.contains('active');
+  const cartoes = d.querySelectorAll('#lote-raiz .ic-card').length;
+  const rosca = !!d.querySelector('#lote-raiz .ic-donut');
+  const passos = d.querySelectorAll('#lote-raiz .lote-memoria li').length;
+  const calculadoraIntacta = w.eval('state.products.length') === 0;
+  w.scrollTo(0, 0);
+
+  // a trilha volta para a lista
+  const relatorio = { visivel: visivel('view-lote'), titulo, menu, cartoes, rosca, passos, botoes: botoes.join('/'), calculadoraIntacta };
+
+  // Revenda sob demanda: nada de lucro nem preço de venda até digitar a margem.
+  if (p.get('margem')) {
+    const temLucro = () => [...d.querySelectorAll('#lote-raiz .ic-stat__label')].some((el) => /Lucro projetado/.test(el.textContent));
+    const temColunaVenda = () => [...d.querySelectorAll('#lote-raiz th')].some((el) => /Preço de venda/.test(el.textContent));
+    relatorio.inicio = { lucro: temLucro(), colunaVenda: temColunaVenda() };
+    const campo = d.querySelector('#lote-raiz .lote-margem input');
+    campo.focus();
+    let digitado = '';
+    for (const ch of p.get('margem')) {           // tecla por tecla, como uma pessoa
+      digitado += ch;
+      campo.value = digitado;
+      campo.dispatchEvent(new w.Event('input', { bubbles: true }));
+    }
+    const lucroTexto = [...d.querySelectorAll('#lote-raiz .ic-stat')].find((el) => /Lucro projetado/.test(el.textContent));
+    relatorio.depois = { lucro: temLucro(), colunaVenda: temColunaVenda(), focoNoCampo: d.activeElement === campo,
+      cartaoLucro: lucroTexto ? lucroTexto.innerText.replace(/\s+/g, ' ') : null };
+    if (p.get('limpar')) {
+      campo.value = '';
+      campo.dispatchEvent(new w.Event('input', { bubbles: true }));
+      relatorio.limpo = { lucro: temLucro(), colunaVenda: temColunaVenda() };
+    }
+  }
+  if (p.get('voltar')) {
+    d.querySelector('#lote-raiz a[href="#view-imports"]').click();
+    await new Promise((r) => setTimeout(r, 200));
+    relatorio.voltouParaLista = visivel('view-imports') && !visivel('view-lote');
+  }
+  document.title = JSON.stringify(relatorio);
+}, 2500));
+</script>
+</body></html>

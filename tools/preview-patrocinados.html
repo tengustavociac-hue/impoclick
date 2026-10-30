@@ -1,0 +1,109 @@
+<!doctype html>
+<!-- Revisão do painel de Patrocinados sem login e sem Mercado Livre: abre o
+     index.html real, troca mlApiFetch e window.db por dados de exemplo e
+     clica no item do menu.
+       python -m http.server 4174 --bind 127.0.0.1
+       http://127.0.0.1:4174/tools/preview-patrocinados.html?abrir=1&theme=dark
+     abrir = índice do anúncio a expandir (opcional) · semtabela=1 simula a
+     tabela de custos ainda não criada. Fora do deploy (tools/). -->
+<html lang="pt-BR"><head><meta charset="utf-8">
+<style>html,body{margin:0;background:#888}iframe{border:0;display:block;width:1440px;height:3200px}</style>
+</head>
+<body>
+<iframe id="f" src="../index.html"></iframe>
+<script>
+const p = new URLSearchParams(location.search);
+const met = (o) => ({ investimento: 0, receitaAds: 0, receitaDireta: 0, receitaIndireta: 0, cliques: 0, impressoes: 0, ctr: 0, cpc: 0, cvr: 0,
+  roas: 0, acos: 0, tacos: 0, unidadesAds: 0, unidadesDiretas: 0, unidadesOrganicas: 0, receitaOrganica: 0, ...o });
+const eco = (o) => ({ precoMedio: 0, comissaoUn: null, comissaoFonte: 'vendas', freteUn: null, freteFonte: 'vendas', amostrasFrete: 3, unidadesVendidas: 0, ...o });
+const ad = (itemId, titulo, campanhaId, preco, m, e, extra = {}) => ({ itemId, adGroupId: 1, campanhaId, titulo, thumbnail: null, permalink: '#',
+  preco, logistica: 'cross_docking', tipoAnuncio: 'gold_special', recomendado: false, fotoBoa: true, estoqueDiferido: false,
+  metricas: met(m), economia: eco({ precoMedio: preco, ...e }), ...extra });
+
+const PAINEL = {
+  ok: true,
+  periodo: { de: '2026-08-19', ate: '2026-09-17', dias: 30 },
+  avisos: { pedidosParciais: false },
+  campanhas: [
+    { id: 1, nome: 'Rentabilidade acessórios', estrategia: 'PROFITABILITY', roasObjetivo: 6, orcamentoDiario: 30, orcamentoAutomatico: false,
+      metricas: { investimento: 620, receita: 3900, roas: 6.3, acos: 15.9, cliques: 900, impressoes: 60000, unidadesAds: 70, unidadesOrganicas: 120,
+        impressoesGanhas: 0.54, perdidasOrcamento: 0.34, perdidasRanking: 0.12, acosReferencia: 14 } },
+    { id: 2, nome: 'Crescimento kits', estrategia: 'INCREASE', roasObjetivo: 3, orcamentoDiario: 50, orcamentoAutomatico: false,
+      metricas: { investimento: 1400, receita: 4800, roas: 3.4, acos: 29.2, cliques: 1500, impressoes: 90000, unidadesAds: 40, unidadesOrganicas: 20,
+        impressoesGanhas: 0.40, perdidasOrcamento: 0.05, perdidasRanking: 0.55, acosReferencia: 22 } },
+  ],
+  anuncios: [
+    ad('MLB4211000011', 'Kit 4 Sacos Coletor Xiaomi X20+ X20 Max H40', 1, 41.98,
+      { investimento: 210, receitaAds: 1680, cliques: 400, impressoes: 22000, ctr: 1.8, cvr: 10, roas: 8, acos: 12.5, tacos: 4.5, unidadesAds: 40, unidadesOrganicas: 70, receitaOrganica: 2938 },
+      { comissaoUn: 5.04, freteUn: 6.5, unidadesVendidas: 110 }),
+    ad('MLB4211000022', 'Kit Peças Aspirador Xiaomi Robot Vacuum X10 B102gl', 2, 186.88,
+      { investimento: 900, receitaAds: 2200, cliques: 700, impressoes: 40000, ctr: 1.75, cvr: 1.7, roas: 2.44, acos: 40.9, tacos: 30.5, unidadesAds: 12, unidadesOrganicas: 4, receitaOrganica: 747 },
+      { comissaoUn: 30.83, freteUn: 24.9, unidadesVendidas: 16 }),
+    ad('MLB4211000033', 'Filtro Saco Base Para Robo Xiaomi Vacuum 5 Pro', 2, 59.99,
+      { investimento: 180, receitaAds: 0, cliques: 95, impressoes: 6000, ctr: 1.6, cvr: 0, roas: 0, unidadesAds: 0, unidadesOrganicas: 2, receitaOrganica: 120 },
+      { comissaoUn: 7.2, freteUn: 8.1, unidadesVendidas: 2 }),
+    ad('MLB4211000044', 'Escova Lateral Robô Aspirador Xiaomi X20+', 1, 19.9,
+      { investimento: 45, receitaAds: 59.7, cliques: 60, impressoes: 15000, ctr: 0.4, cvr: 5, roas: 1.33, acos: 75, tacos: 20.6, unidadesAds: 3, unidadesOrganicas: 8, receitaOrganica: 159.2 },
+      { comissaoUn: 3.5, comissaoFonte: 'tabela', freteUn: 0, freteFonte: 'cotacao', unidadesVendidas: 0 }, { fotoBoa: false }),
+    ad('MLB4211000055', 'Mop Giratório Refil Robô Xiaomi S10+', 1, 34.9,
+      { investimento: 95, receitaAds: 640, cliques: 180, impressoes: 11000, ctr: 1.6, cvr: 8, roas: 6.7, acos: 14.8, tacos: 6, unidadesAds: 18, unidadesOrganicas: 30, receitaOrganica: 1047 },
+      { comissaoUn: 4.19, freteUn: 6.2, unidadesVendidas: 48 }),
+    ad('MLB4211000066', '8 Saco Pó Robô Xiaomi H40 S10+ X20+ Pro Max', 2, 71.05,
+      { investimento: 160, receitaAds: 710, cliques: 150, impressoes: 9000, ctr: 1.7, cvr: 6.6, roas: 4.4, acos: 22.5, tacos: 15, unidadesAds: 10, unidadesOrganicas: 5, receitaOrganica: 355 },
+      { comissaoUn: 8.53, freteUn: 12.4, unidadesVendidas: 15 }, { estoqueDiferido: true }),
+  ],
+};
+const CUSTOS = { MLB4211000011: 12, MLB4211000022: 95, MLB4211000033: 20, MLB4211000044: 6, MLB4211000066: 28 };
+
+const f = document.getElementById('f');
+f.addEventListener('load', () => setTimeout(async () => {
+  const w = f.contentWindow, d = f.contentDocument;
+  d.documentElement.setAttribute('data-theme', p.get('theme') || 'light');
+  try { w.localStorage.removeItem('impoclick-ads-painel'); } catch (e) { /* ok */ }
+  w.eval('state.currentUser = { id: "u1", name: "Teste", is_pro: true, access_token: "x" };');
+  w.mlApiFetch = async (path) => (/ads-painel/.test(path) ? JSON.parse(JSON.stringify(PAINEL)) : (/resource=ads/.test(path) ? { items: [], unreadCount: 0 } : null));
+  const salvos = [];
+  w.db.getAdsMargemDados = async () => (p.get('semtabela') ? { erro: 'sem_tabela' } : { dados: { custos: { ...CUSTOS }, impostoPct: 6 } });
+  w.db.saveItemCost = async (id, v) => { salvos.push([id, v]); return { ok: true }; };
+  w.db.saveAdsTax = async () => ({ ok: true });
+
+  d.documentElement.classList.add('has-session');
+  const lp = d.getElementById('landing-container'); if (lp) lp.style.display = 'none';
+  for (const id of ['auth-container', 'paywall-screen']) { const el = d.getElementById(id); if (el) el.classList.add('hidden'); }
+  const shell = d.querySelector('.app-container'); if (shell) shell.classList.remove('hidden');
+
+  d.querySelector('[data-view="view-ads"]').click();
+  await new Promise((r) => setTimeout(r, 800));
+
+  const raiz = d.getElementById('ads-painel-raiz');
+  if (p.get('abrir') != null) {
+    const botoes = raiz.querySelectorAll('.pa-anuncio .ic-iconbtn, .pa-anuncio button[aria-label="Ver diagnóstico"]');
+    const alvo = [...raiz.querySelectorAll('.pa-anuncio')][Number(p.get('abrir'))];
+    if (alvo) alvo.querySelector('button[aria-label="Ver diagnóstico"]').click();
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  // Digitar um custo onde faltava: a margem tem que aparecer sem ir ao ML.
+  if (p.get('custo')) {
+    const linha = [...raiz.querySelectorAll('.pa-anuncio')].find((el) => /Mop Giratório/.test(el.textContent));
+    const campo = linha.querySelector('.pa-custo input');
+    campo.value = p.get('custo');
+    campo.dispatchEvent(new w.Event('change', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  w.scrollTo(0, 0);
+  const selos = [...raiz.querySelectorAll('.pa-anuncio .pa-linha > .ic-badge')].map((b) => b.textContent.trim());
+  const titulos = [...raiz.querySelectorAll('.pa-anuncio .pa-produto__titulo')].map((t) => t.textContent.trim().slice(0, 22));
+  const acoes = [...raiz.querySelectorAll('.pa-acoes li')].map((li) => li.querySelector('.pa-acoes__titulo').textContent.trim().slice(0, 60));
+  const mop = [...raiz.querySelectorAll('.pa-anuncio')].find((el) => /Mop Giratório/.test(el.textContent));
+  document.title = JSON.stringify({
+    painelVisivel: !d.getElementById('view-ads').classList.contains('hidden'),
+    titulo: (d.getElementById('header-view-title') || {}).textContent,
+    anuncios: titulos.map((t, i) => t + ' => ' + selos[i]),
+    oQueFazer: acoes,
+    mop: mop ? mop.querySelector('.pa-linha').innerText.replace(/\s+/g, ' ') : null,
+    salvos,
+    desligadosAindaLa: !!d.getElementById('ads-list'),
+  });
+}, 2500));
+</script>
+</body></html>

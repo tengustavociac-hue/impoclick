@@ -1,0 +1,109 @@
+:root{
+/* ---- Base palette: Aqua (primary, taken from the container mark) ---- */
+--aqua-50:#E6F7F8;--aqua-100:#C2EDEF;--aqua-200:#8FDEE1;--aqua-300:#52CFD3;--aqua-400:#23D3D3;
+--aqua-500:#12B3B3;--aqua-600:#0E7C8C;--aqua-700:#0A6674;--aqua-800:#08525E;--aqua-900:#053A44;--aqua-950:#02252C;
+
+/* ---- Base palette: Deep sea (the container body) ---- */
+--sea-700:#0B3A47;--sea-800:#072A34;--sea-900:#04202A;--sea-950:#020F14;
+
+/* ---- Base palette: Cargo orange (the arrow) ---- */
+--orange-50:#FFF1E6;--orange-100:#FFDCC2;--orange-200:#FFB783;--orange-300:#FF9247;
+--orange-400:#FF7A1A;--orange-500:#FF6000;--orange-600:#DB4F00;--orange-700:#A63C00;
+
+/* ---- Base palette: Neutrals (very slightly teal-cooled) ---- */
+--ink-0:#FFFFFF;--ink-25:#FAFCFC;--ink-50:#F6F8F8;--ink-100:#F1F4F5;--ink-200:#E2E8E9;
+--ink-300:#CBD5D7;--ink-400:#9DAEB2;--ink-500:#7B8C92;--ink-600:#5C6E74;--ink-700:#46595F;
+--ink-800:#2A3B40;--ink-850:#1E2A2D;--ink-900:#162023;--ink-925:#0E1618;--ink-950:#070D0F;
+
+/* ---- Base palette: Status ---- */
+--green-400:#37D399;--green-500:#16A06A;--green-600:#0F7C51;
+--amber-400:#F5B33C;--amber-500:#C9820B;--amber-600:#9A6407;
+--red-400:#FF6B5E;--red-500:#D9463C;--red-600:#AE332B;
+
+/* ================= Semantic aliases — LIGHT (default) ================= */
+--surface-page:var(--ink-50);
+--surface-card:var(--ink-0);
+--surface-raised:var(--ink-100);
+--surface-inset:var(--ink-200);
+--surface-invert:var(--sea-900);
+--surface-scrim:rgba(4,32,42,.55);
+
+--text-title:#0B1A1F;
+--text-body:var(--ink-700);
+--text-muted:var(--ink-500);
+--text-invert:var(--ink-0);
+--text-on-accent:var(--ink-0);
+
+--border-subtle:var(--ink-200);
+--border-strong:var(--ink-300);
+--border-accent:var(--aqua-600);
+
+--accent:var(--aqua-600);
+--accent-hover:var(--aqua-700);
+--accent-press:var(--aqua-800);
+--accent-soft:var(--aqua-50);
+--accent-soft-border:var(--aqua-100);
+--accent-glow:var(--aqua-400);
+/* Fixed copies of the accent pair, so tinted panels can swap ink/ground without self-reference */
+--accent-bg:var(--aqua-600);
+--accent-ink:var(--ink-0);
+
+--secondary:var(--orange-500);
+--secondary-hover:var(--orange-600);
+--secondary-soft:var(--orange-50);
+
+--success:var(--green-500);--success-soft:#E4F6EE;
+--warning:var(--amber-500);--warning-soft:#FCF2DD;
+--danger:var(--red-500);--danger-soft:#FCE9E7;
+--info:var(--aqua-600);--info-soft:var(--aqua-50);
+
+--chart-1:var(--aqua-600);--chart-2:var(--orange-500);--chart-3:var(--sea-700);
+--chart-4:var(--aqua-300);--chart-5:var(--ink-300);
+--chart-track:var(--ink-200);
+
+--focus-ring:0 0 0 3px color-mix(in oklab, var(--aqua-400) 45%, transparent);
+}
+
+/* ================= Semantic aliases — DARK ================= */
+[data-theme="dark"]{
+--surface-page:var(--ink-950);
+--surface-card:var(--ink-925);
+--surface-raised:var(--ink-900);
+--surface-inset:var(--ink-850);
+--surface-invert:var(--ink-0);
+--surface-scrim:rgba(2,15,20,.72);
+
+--text-title:#F2F7F7;
+--text-body:#A9BCC0;
+--text-muted:#72878C;
+--text-invert:#0B1A1F;
+--text-on-accent:var(--aqua-950);
+
+--border-subtle:#1D2A2D;
+--border-strong:#2C3A3E;
+--border-accent:var(--aqua-400);
+
+--accent:var(--aqua-400);
+--accent-hover:#4BE0E0;
+--accent-press:var(--aqua-500);
+--accent-soft:rgba(35,211,211,.13);
+--accent-soft-border:rgba(35,211,211,.26);
+--accent-glow:var(--aqua-400);
+--accent-bg:var(--aqua-400);
+--accent-ink:var(--aqua-950);
+
+--secondary:var(--orange-400);
+--secondary-hover:var(--orange-300);
+--secondary-soft:rgba(255,122,26,.14);
+
+--success:var(--green-400);--success-soft:rgba(55,211,153,.14);
+--warning:var(--amber-400);--warning-soft:rgba(245,179,60,.14);
+--danger:var(--red-400);--danger-soft:rgba(255,107,94,.14);
+--info:var(--aqua-400);--info-soft:rgba(35,211,211,.13);
+
+--chart-1:var(--aqua-400);--chart-2:var(--orange-400);--chart-3:var(--aqua-200);
+--chart-4:#4F6367;--chart-5:#2C3A3E;
+--chart-track:#1D2A2D;
+
+--focus-ring:0 0 0 3px color-mix(in oklab, var(--aqua-400) 38%, transparent);
+}
