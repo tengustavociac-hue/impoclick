@@ -235,9 +235,16 @@ async function listarPedidosShopee(userId, deSeg, ateSeg) {
         if (cursor) qs.set('cursor', cursor);
 
         const resp = await shopeeFetch(userId, `/api/v2/order/get_order_list?${qs.toString()}`);
-        if (!resp.ok) break;
+        if (!resp.ok) {
+            console.error(`[shopee-diag] get_order_list HTTP ${resp.status}: ${await resp.text()}`);
+            break;
+        }
         const data = await resp.json();
-        if (data.error) throw new Error(`Shopee recusou get_order_list: ${data.error} — ${data.message || ''}`);
+        if (data.error) {
+            console.error(`[shopee-diag] get_order_list error=${data.error} message=${data.message}`);
+            throw new Error(`Shopee recusou get_order_list: ${data.error} — ${data.message || ''}`);
+        }
+        console.log(`[shopee-diag] get_order_list ok: ${((data.response && data.response.order_list) || []).length} pedido(s) nesta página`);
 
         const lista = (data.response && data.response.order_list) || [];
         for (const o of lista) if (o.order_sn) pedidos.push(o.order_sn);
@@ -333,9 +340,17 @@ async function handleShopeeProdutos(req, res, userId) {
         item_status: 'NORMAL',
     });
     const respLista = await shopeeFetch(userId, `/api/v2/product/get_item_list?${qsLista.toString()}`);
-    if (!respLista.ok) return res.status(respLista.status).json({ error: await respLista.text() });
+    if (!respLista.ok) {
+        const texto = await respLista.text();
+        console.error(`[shopee-diag] get_item_list HTTP ${respLista.status}: ${texto}`);
+        return res.status(respLista.status).json({ error: texto });
+    }
     const dataLista = await respLista.json();
-    if (dataLista.error) return res.status(502).json({ error: `Shopee recusou get_item_list: ${dataLista.error} — ${dataLista.message || ''}` });
+    if (dataLista.error) {
+        console.error(`[shopee-diag] get_item_list error=${dataLista.error} message=${dataLista.message}`);
+        return res.status(502).json({ error: `Shopee recusou get_item_list: ${dataLista.error} — ${dataLista.message || ''}` });
+    }
+    console.log(`[shopee-diag] get_item_list ok: total_count=${dataLista.response && dataLista.response.total_count} itens_nesta_pagina=${((dataLista.response && dataLista.response.item) || []).length}`);
 
     const itemIds = ((dataLista.response && dataLista.response.item) || []).map((i) => i.item_id).filter(Boolean);
     if (itemIds.length === 0) {

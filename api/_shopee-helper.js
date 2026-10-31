@@ -145,12 +145,18 @@ async function shopeeFetch(userId, path, opts = {}) {
     let { token, shopId } = await getShopeeToken(userId);
     if (!shopId) throw new Error('shop_id da Shopee não encontrado para este usuário. Conecte a conta de novo.');
 
+    // A assinatura usa só o CAMINHO da API (ex.: /api/v2/order/get_order_list),
+    // nunca a query string — quem chama shopeeFetch costuma passar path+query
+    // já montados (ex.: `${path}?time_from=...`), e assinar a string toda
+    // dava "Wrong sign" porque a Shopee calcula com o caminho limpo.
+    const [caminhoLimpo, queryDaChamada] = path.split('?');
+
     const montar = (t) => {
         const timestamp = timestampAtual();
-        const sign = assinaturaDeLoja(path, timestamp, t, shopId);
-        const qs = `partner_id=${PARTNER_ID}&timestamp=${timestamp}&sign=${sign}&access_token=${t}&shop_id=${shopId}`;
-        const separador = path.includes('?') ? '&' : '?';
-        return fetch(`${SHOPEE_BASE}${path}${separador}${qs}`, opts);
+        const sign = assinaturaDeLoja(caminhoLimpo, timestamp, t, shopId);
+        const qsAuth = `partner_id=${PARTNER_ID}&timestamp=${timestamp}&sign=${sign}&access_token=${t}&shop_id=${shopId}`;
+        const qs = queryDaChamada ? `${queryDaChamada}&${qsAuth}` : qsAuth;
+        return fetch(`${SHOPEE_BASE}${caminhoLimpo}?${qs}`, opts);
     };
 
     let resp = await montar(token);
